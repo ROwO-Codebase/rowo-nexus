@@ -1,9 +1,15 @@
 import { ownershipProofV1Schema } from '@nexus/protocol';
 
-import type { IssueChallengeInput, NoteDraft, SubmitOperationInput } from '../src/shared/contracts';
+import type {
+  NoteDraft,
+  NoteVisibility,
+  SessionOperationInput,
+  StartSessionOperation,
+  SubmitProofInput,
+} from '../src/shared/contracts';
 import { RpWorkerError } from './errors';
 
-export function parseSubmitOperation(value: unknown): SubmitOperationInput {
+export function parseSubmitProof(value: unknown): SubmitProofInput {
   const record = requireRecord(value, ['challengeId', 'operation', 'proof']);
   if (typeof record['challengeId'] !== 'string' || record['challengeId'].length < 20) {
     throw badRequest('challengeId is invalid.');
@@ -12,14 +18,22 @@ export function parseSubmitOperation(value: unknown): SubmitOperationInput {
   if (!proof.success) throw badRequest('proof is invalid.');
   return {
     challengeId: record['challengeId'],
-    operation: parseOperation(record['operation']),
+    operation: parseStartSessionOperation(record['operation']),
     proof: proof.data,
   };
 }
 
-export function parseOperation(value: unknown): IssueChallengeInput {
+export function parseStartSessionOperation(value: unknown): StartSessionOperation {
+  const record = requireRecord(value, ['action']);
+  if (record['action'] !== 'session.start') {
+    throw badRequest('Only an explicit session.start proof is accepted.');
+  }
+  return { action: 'session.start' };
+}
+
+export function parseSessionOperation(value: unknown): SessionOperationInput {
   if (!isRecord(value) || typeof value['action'] !== 'string') {
-    throw badRequest('A note action is required.');
+    throw badRequest('A note session action is required.');
   }
   if (value['action'] === 'note.create') {
     const record = requireRecord(value, ['action', 'draft']);
@@ -42,7 +56,27 @@ export function parseOperation(value: unknown): IssueChallengeInput {
       expectedVersion: parseVersion(record['expectedVersion']),
     };
   }
-  throw badRequest('The requested note action is unsupported.');
+  if (value['action'] === 'reply.create') {
+    const record = requireRecord(value, ['action', 'body', 'noteId']);
+    return {
+      action: 'reply.create',
+      noteId: parseNoteId(record['noteId']),
+      body: parseReplyBody(record['body']),
+    };
+  }
+  if (value['action'] === 'reply.delete') {
+    const record = requireRecord(value, ['action', 'noteId', 'replyId']);
+    return {
+      action: 'reply.delete',
+      noteId: parseNoteId(record['noteId']),
+      replyId: parseReplyId(record['replyId']),
+    };
+  }
+  if (value['action'] === 'note.like' || value['action'] === 'note.unlike') {
+    const record = requireRecord(value, ['action', 'noteId']);
+    return { action: value['action'], noteId: parseNoteId(record['noteId']) };
+  }
+  throw badRequest('The requested note session action is unsupported.');
 }
 
 export function parseNoteId(value: unknown): string {
@@ -52,17 +86,40 @@ export function parseNoteId(value: unknown): string {
   return value;
 }
 
+function parseReplyId(value: unknown): string {
+  if (typeof value !== 'string' || !/^rpy_[A-Za-z0-9_-]{12,80}$/u.test(value)) {
+    throw badRequest('replyId is invalid.');
+  }
+  return value;
+}
+
 function parseDraft(value: unknown): NoteDraft {
-  const record = requireRecord(value, ['body', 'title']);
+  const record = requireRecord(value, ['body', 'title', 'visibility']);
   const title = typeof record['title'] === 'string' ? record['title'].trim() : '';
   const body = typeof record['body'] === 'string' ? record['body'].trim() : '';
+  const visibility = parseVisibility(record['visibility']);
   if (title.length < 1 || title.length > 80) {
     throw badRequest('Note title must be between 1 and 80 characters.');
   }
   if (body.length < 1 || body.length > 4_000) {
     throw badRequest('Note body must be between 1 and 4,000 characters.');
   }
-  return { title, body };
+  return { title, body, visibility };
+}
+
+function parseVisibility(value: unknown): NoteVisibility {
+  if (value !== 'public' && value !== 'private') {
+    throw badRequest('visibility must be public or private.');
+  }
+  return value;
+}
+
+function parseReplyBody(value: unknown): string {
+  const body = typeof value === 'string' ? value.trim() : '';
+  if (body.length < 1 || body.length > 1_000) {
+    throw badRequest('Reply body must be between 1 and 1,000 characters.');
+  }
+  return body;
 }
 
 function parseVersion(value: unknown): number {

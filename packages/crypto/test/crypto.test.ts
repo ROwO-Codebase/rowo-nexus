@@ -91,7 +91,7 @@ describe('WebCryptoProvider', () => {
     const key = provider.randomBytes(32);
     const iv = provider.randomBytes(12);
     const additionalData = utf8Encode('explicit associated data');
-    const plaintext = utf8Encode('opaque wallet backup material');
+    const plaintext = utf8Encode('local encrypted wallet material');
     const ciphertext = await provider.encryptAes256Gcm({
       key,
       iv,

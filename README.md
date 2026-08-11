@@ -40,8 +40,6 @@ anonymity layer.
 - `workers/edge-api`: fixed public protocol endpoints and service receipt/status signing.
 - `workers/projector`: idempotent Queue-to-D1 projection.
 - `workers/transparency`: hash-only transparency checkpoints.
-- `workers/backup`: optional opaque backup service; blocked pending approval of
-  [ADR-0011](./docs/adr/0011-backup-security.md).
 
 The lifecycle authority is always the per-subject Durable Object. D1, KV, R2, Queue consumers,
 Worker memory, and transparency data cannot authorize current control.
@@ -59,8 +57,9 @@ Worker memory, and transparency data cannot authorize current control.
 9. [ADR-0009: Historical timestamps require trusted receipts](./docs/adr/0009-trusted-historical-timestamps.md)
 10. [ADR-0010: Hash-only transparency](./docs/adr/0010-hash-only-transparency.md)
 
-The optional backup proposal is [ADR-0011](./docs/adr/0011-backup-security.md) and remains
-**PROPOSED — BLOCKED**. It deliberately selects no KDF or parameters.
+Nexus v1 intentionally provides no identity-key backup, portable private-key export/import, or cloud
+recovery service. Identity keys remain local to the wallet; losing local key material is permanent,
+and a disposed identity cannot be recovered or reactivated.
 
 ## Prerequisites
 
@@ -129,6 +128,15 @@ See [deployment](./docs/cloudflare/deployment.md),
 Wrangler files intentionally contain example domains, resource names, and public key identifiers.
 Deployment requires environment-specific Cloudflare resources plus separately provisioned Worker
 secrets; a successful dry run does not provision those resources.
+
+## Contributing
+
+Contributions are welcome. Read [CONTRIBUTING.md](./CONTRIBUTING.md) before opening a pull request,
+especially for protocol, cryptographic, lifecycle, wallet-origin, or Cloudflare authority changes.
+
+The [ROwO Nexus Developer Portal](https://developers.rowo.link/nexus) is the recommended place to
+learn the product, follow the quick start, and use safe playgrounds before working on an
+integration. Keep Nexus contributions and documentation distinct from ROwO OAuth concepts.
 
 ## License
 

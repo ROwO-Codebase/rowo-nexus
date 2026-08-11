@@ -10,14 +10,17 @@ import type { LifecycleProvider } from '@nexus/verifier';
 
 import type {
   ApplicationReceipt,
-  IssueChallengeInput,
+  AuthorizationMethod,
   IssuedChallenge,
   NoteDraft,
   NoteView,
-  OperationResult,
-  RpSession,
+  ReplyView,
+  SessionOperationInput,
+  SessionOperationResult,
+  SessionStartResult,
   SessionStatus,
-  SubmitOperationInput,
+  StartSessionOperation,
+  SubmitProofInput,
 } from '../shared/contracts.js';
 import { HashOnlyChallengeStore, asNonce } from './challenges.js';
 import { canonicalSha256, constantTimeTextEqual, secureToken, sha256Base64Url } from './digests.js';
@@ -26,6 +29,20 @@ import { RpError } from './errors.js';
 const CHALLENGE_TTL_SECONDS = 60;
 const SESSION_TTL_SECONDS = 5 * 60;
 const MAX_CLOCK_SKEW_SECONDS = 30;
+const SESSION_RESOURCE = 'urn:rowo:nexus-notes:session';
+const SESSION_POLICY = Object.freeze({
+  actions: [
+    'note.create',
+    'note.edit',
+    'note.delete',
+    'reply.create',
+    'reply.delete',
+    'note.like',
+    'note.unlike',
+  ],
+  resourcePolicy: 'public-notes-and-private-notes-owned-by-session-subject',
+  ttlSeconds: SESSION_TTL_SECONDS,
+});
 
 interface StoredNote {
   readonly id: string;
@@ -34,15 +51,36 @@ interface StoredNote {
   readonly createdAt: number;
   readonly title: string;
   readonly body: string;
+  readonly visibility: 'public' | 'private';
   readonly updatedAt: number;
   readonly version: number;
   readonly acceptedProofHash: string;
+  readonly authorization: AuthorizationMethod;
+}
+
+interface StoredReply {
+  readonly id: string;
+  readonly noteId: string;
+  readonly authorSubject: NexusSubject;
+  readonly body: string;
+  readonly createdAt: number;
 }
 
 interface StoredSession {
-  tokenHash: string;
-  subject: NexusSubject;
-  expiresAt: number;
+  readonly tokenHash: string;
+  readonly subject: NexusSubject;
+  readonly expiresAt: number;
+  readonly proofHash: string;
+}
+
+interface ActiveSession {
+  readonly stored: StoredSession;
+  readonly status: SessionStatus;
+}
+
+export interface StartedLocalSession {
+  readonly token: string;
+  readonly result: SessionStartResult;
 }
 
 export interface ReferenceRpRepositoryOptions {
@@ -59,6 +97,8 @@ export class ReferenceRpRepository {
   readonly #audience: string;
   readonly #now: () => number;
   readonly #notes = new Map<string, StoredNote>();
+  readonly #replies = new Map<string, StoredReply>();
+  readonly #likes = new Map<string, Map<NexusSubject, number>>();
   readonly #receipts = new Map<string, ApplicationReceipt>();
   readonly #sessions = new Map<string, StoredSession>();
   #exclusive: Promise<void> = Promise.resolve();
@@ -74,24 +114,27 @@ export class ReferenceRpRepository {
     if (options.seed !== false) this.#seedNotes();
   }
 
-  public listNotes(): NoteView[] {
+  public async listNotes(token?: string): Promise<NoteView[]> {
+    const subject = await this.#optionalSubject(token);
     return [...this.#notes.values()]
+      .filter((note) => note.visibility === 'public' || note.authorSubject === subject)
       .sort((left, right) => right.updatedAt - left.updatedAt)
-      .map((note) => toNoteView(note));
+      .map((note) => this.#toNoteView(note, subject));
   }
 
-  public getNote(id: string): NoteView {
-    return toNoteView(this.#requireNote(id));
+  public async getNote(id: string, token?: string): Promise<NoteView> {
+    const subject = await this.#optionalSubject(token);
+    return this.#toNoteView(this.#requireVisibleNote(id, subject), subject);
   }
 
   public issueChallenge(value: unknown): IssuedChallenge {
-    const operation = parseOperation(value);
+    const operation = parseStartSessionOperation(value);
     const now = this.#now();
-    const { resource, contextHash } = this.#operationBinding(operation, true);
+    const contextHash = canonicalSha256({ action: operation.action, policy: SESSION_POLICY });
     const challenge: IssuedChallenge = {
       challengeId: secureToken(16),
       action: operation.action,
-      resource,
+      resource: SESSION_RESOURCE,
       nonce: asNonce(secureToken(32)),
       expiresAt: now + CHALLENGE_TTL_SECONDS,
       contextHash: contextHash as Base64Url32,
@@ -100,48 +143,49 @@ export class ReferenceRpRepository {
     return challenge;
   }
 
-  public submitOperation(value: unknown): Promise<OperationResult> {
-    const input = parseSubmitOperation(value);
-    return this.#runExclusive(async () => this.#authorizeAndMutate(input));
+  public startSession(value: unknown): Promise<StartedLocalSession> {
+    const input = parseSubmitProof(value);
+    return this.#runExclusive(async () => this.#verifyAndStartSession(input));
+  }
+
+  public executeSessionOperation(value: unknown, token: string): Promise<SessionOperationResult> {
+    const operation = parseSessionOperation(value);
+    return this.#runExclusive(async () => {
+      const session = await this.#activeSession(token);
+      return this.#mutateWithSession(operation, session);
+    });
   }
 
   public async getSession(token: string): Promise<SessionStatus> {
-    if (token.length < 20)
-      throw new RpError('SESSION_INVALID', 'The RP session is missing or invalid.', 401);
-    const session = this.#sessions.get(sha256Base64Url(token));
-    const now = this.#now();
-    if (session === undefined || session.expiresAt <= now) {
-      throw new RpError('SESSION_INVALID', 'The RP session has expired.', 401);
-    }
+    return (await this.#activeSession(token)).status;
+  }
 
-    const lifecycle = await this.lifecycle.getAuthoritativeStatus(session.subject);
-    if (lifecycle.state === 'not-found') {
-      throw new RpError('SESSION_INVALID', 'The identity is no longer registered.', 401);
-    }
-    return {
-      subject: session.subject,
-      state: lifecycle.state,
-      sequence: lifecycle.sequence,
-      expiresAt: session.expiresAt,
-      checkedAt: now,
-    };
+  public endSession(token: string): void {
+    if (token.length < 20) return;
+    this.#sessions.delete(sha256Base64Url(token));
   }
 
   public debugSnapshot(): {
     notes: readonly Readonly<StoredNote>[];
+    replies: readonly Readonly<StoredReply>[];
+    likes: readonly { readonly noteId: string; readonly subject: NexusSubject }[];
     receipts: readonly Readonly<ApplicationReceipt>[];
     sessions: readonly Readonly<StoredSession>[];
     challenges: ReturnType<HashOnlyChallengeStore['debugSnapshot']>;
   } {
     return {
       notes: [...this.#notes.values()].map((note) => ({ ...note })),
+      replies: [...this.#replies.values()].map((reply) => ({ ...reply })),
+      likes: [...this.#likes.entries()].flatMap(([noteId, likes]) =>
+        [...likes.keys()].map((subject) => ({ noteId, subject })),
+      ),
       receipts: [...this.#receipts.values()].map((receipt) => ({ ...receipt })),
       sessions: [...this.#sessions.values()].map((session) => ({ ...session })),
       challenges: this.challenges.debugSnapshot(),
     };
   }
 
-  async #authorizeAndMutate(input: SubmitOperationInput): Promise<OperationResult> {
+  async #verifyAndStartSession(input: SubmitProofInput): Promise<StartedLocalSession> {
     const challenge = this.challenges.getById(input.challengeId);
     if (challenge === null || challenge.consumedAt !== null || challenge.expiresAt <= this.#now()) {
       throw new RpError(
@@ -151,23 +195,14 @@ export class ReferenceRpRepository {
       );
     }
 
-    const { resource, contextHash } = this.#operationBinding(
-      input.operation,
-      false,
-      challenge.resource,
-    );
+    const contextHash = canonicalSha256({ action: input.operation.action, policy: SESSION_POLICY });
     if (
       challenge.action !== input.operation.action ||
-      challenge.resource !== resource ||
+      challenge.resource !== SESSION_RESOURCE ||
       !constantTimeTextEqual(challenge.contextHash, contextHash)
     ) {
-      throw new RpError(
-        'CHALLENGE_MISMATCH',
-        'The note changed after this challenge was issued.',
-        409,
-      );
+      throw new RpError('CHALLENGE_MISMATCH', 'The session policy has changed.', 409);
     }
-
     const payload = input.proof.payload;
     if (
       sha256Base64Url(payload.nonce) !== challenge.nonceHash ||
@@ -176,7 +211,7 @@ export class ReferenceRpRepository {
     ) {
       throw new RpError(
         'CHALLENGE_MISMATCH',
-        'The proof is not bound to this exact note change.',
+        'The proof is not bound to this exact Notes session.',
         403,
       );
     }
@@ -195,131 +230,246 @@ export class ReferenceRpRepository {
       this.challenges,
       this.lifecycle,
     );
-
     const proofHash = canonicalSha256(input.proof);
+    const token = secureToken(32);
+    const stored: StoredSession = {
+      tokenHash: sha256Base64Url(token),
+      subject: verified.subject,
+      expiresAt: this.#now() + SESSION_TTL_SECONDS,
+      proofHash,
+    };
+    this.#sessions.set(stored.tokenHash, stored);
+    const lifecycle = await this.lifecycle.getAuthoritativeStatus(verified.subject);
+    if (lifecycle.state !== 'active') {
+      this.#sessions.delete(stored.tokenHash);
+      throw new RpError('SESSION_INVALID', 'The identity is no longer active.', 401);
+    }
+    const receipt = this.#recordReceipt({
+      operation: 'session.start',
+      resource: SESSION_RESOURCE,
+      subject: verified.subject,
+      authorization: 'wallet-proof',
+      proofHash,
+      resultingVersion: null,
+    });
+    return {
+      token,
+      result: {
+        receipt,
+        session: {
+          subject: verified.subject,
+          state: 'active',
+          sequence: lifecycle.sequence,
+          expiresAt: stored.expiresAt,
+          checkedAt: this.#now(),
+        },
+      },
+    };
+  }
+
+  async #activeSession(token: string): Promise<ActiveSession> {
+    if (token.length < 20) {
+      throw new RpError('SESSION_INVALID', 'The RP session is missing or invalid.', 401);
+    }
+    const stored = this.#sessions.get(sha256Base64Url(token));
+    const now = this.#now();
+    if (stored === undefined || stored.expiresAt <= now) {
+      throw new RpError('SESSION_INVALID', 'The RP session has expired.', 401);
+    }
+    const lifecycle = await this.lifecycle.getAuthoritativeStatus(stored.subject);
+    if (lifecycle.state !== 'active') {
+      throw new RpError('SESSION_INVALID', 'The identity is no longer active.', 401);
+    }
+    return {
+      stored,
+      status: {
+        subject: stored.subject,
+        state: 'active',
+        sequence: lifecycle.sequence,
+        expiresAt: stored.expiresAt,
+        checkedAt: now,
+      },
+    };
+  }
+
+  async #optionalSubject(token?: string): Promise<NexusSubject | undefined> {
+    if (token === undefined || token.length === 0) return undefined;
+    try {
+      return (await this.#activeSession(token)).status.subject;
+    } catch {
+      return undefined;
+    }
+  }
+
+  #mutateWithSession(
+    operation: SessionOperationInput,
+    session: ActiveSession,
+  ): SessionOperationResult {
+    const subject = session.status.subject;
+    const now = this.#now();
     let note: StoredNote | null;
+    let resource: string;
     let resultingVersion: number | null;
 
-    if (input.operation.action === 'note.create') {
-      const id = noteIdFromResource(challenge.resource);
-      if (this.#notes.has(id)) {
-        throw new RpError('VERSION_CONFLICT', 'A note already exists for this resource.', 409);
-      }
-      const now = this.#now();
+    if (operation.action === 'note.create') {
+      const id = `nt_${secureToken(9)}`;
+      resource = `note:${id}`;
       note = Object.freeze({
         id,
-        resource: challenge.resource,
-        authorSubject: verified.subject,
-        title: input.operation.draft.title,
-        body: input.operation.draft.body,
+        resource,
+        authorSubject: subject,
+        title: operation.draft.title,
+        body: operation.draft.body,
+        visibility: operation.draft.visibility,
         createdAt: now,
         updatedAt: now,
         version: 1,
-        acceptedProofHash: proofHash,
+        acceptedProofHash: session.stored.proofHash,
+        authorization: 'rp-session',
       });
       this.#notes.set(id, note);
-      resultingVersion = note.version;
-    } else {
-      const current = this.#requireNote(input.operation.noteId);
-      if (current.authorSubject !== verified.subject) {
-        throw new RpError('AUTHOR_MISMATCH', 'This identity did not create the note.', 403);
-      }
-      if (current.version !== input.operation.expectedVersion) {
+      resultingVersion = 1;
+    } else if (operation.action === 'note.edit' || operation.action === 'note.delete') {
+      const current = this.#requireOwnedNote(operation.noteId, subject);
+      if (current.version !== operation.expectedVersion) {
         throw new RpError(
           'VERSION_CONFLICT',
           'The note was updated in another view. Refresh and try again.',
           409,
         );
       }
-
-      if (input.operation.action === 'note.delete') {
+      resource = current.resource;
+      if (operation.action === 'note.delete') {
         this.#notes.delete(current.id);
+        for (const [id, reply] of this.#replies) {
+          if (reply.noteId === current.id) this.#replies.delete(id);
+        }
+        this.#likes.delete(current.id);
         note = null;
         resultingVersion = null;
       } else {
         note = Object.freeze({
           ...current,
-          title: input.operation.draft.title,
-          body: input.operation.draft.body,
-          updatedAt: this.#now(),
+          title: operation.draft.title,
+          body: operation.draft.body,
+          visibility: operation.draft.visibility,
+          updatedAt: now,
           version: current.version + 1,
-          acceptedProofHash: proofHash,
+          acceptedProofHash: session.stored.proofHash,
+          authorization: 'rp-session',
         });
         this.#notes.set(note.id, note);
         resultingVersion = note.version;
       }
+    } else if (operation.action === 'reply.create') {
+      const current = this.#requireVisibleNote(operation.noteId, subject);
+      const reply: StoredReply = Object.freeze({
+        id: `rpy_${secureToken(12)}`,
+        noteId: current.id,
+        authorSubject: subject,
+        body: operation.body,
+        createdAt: now,
+      });
+      this.#replies.set(reply.id, reply);
+      resource = `${current.resource}#reply:${reply.id}`;
+      note = current;
+      resultingVersion = current.version;
+    } else if (operation.action === 'reply.delete') {
+      const current = this.#requireVisibleNote(operation.noteId, subject);
+      const reply = this.#replies.get(operation.replyId);
+      if (reply === undefined || reply.noteId !== current.id) {
+        throw new RpError('NOT_FOUND', 'The requested reply does not exist.', 404);
+      }
+      if (reply.authorSubject !== subject && current.authorSubject !== subject) {
+        throw new RpError(
+          'AUTHOR_MISMATCH',
+          'Only the reply author or note author can remove this reply.',
+          403,
+        );
+      }
+      this.#replies.delete(reply.id);
+      resource = `${current.resource}#reply:${reply.id}`;
+      note = current;
+      resultingVersion = current.version;
+    } else {
+      const current = this.#requireNote(operation.noteId);
+      if (current.visibility !== 'public') {
+        throw new RpError('OPERATION_NOT_ALLOWED', 'Private notes cannot be liked.', 403);
+      }
+      const likes = this.#likes.get(current.id) ?? new Map<NexusSubject, number>();
+      if (operation.action === 'note.like') likes.set(subject, now);
+      else likes.delete(subject);
+      this.#likes.set(current.id, likes);
+      resource = current.resource;
+      note = current;
+      resultingVersion = current.version;
     }
 
     const receipt = this.#recordReceipt({
-      operation: input.operation.action,
-      resource: challenge.resource,
-      subject: verified.subject,
-      proofHash,
+      operation: operation.action,
+      resource,
+      subject,
+      authorization: 'rp-session',
+      proofHash: session.stored.proofHash,
       resultingVersion,
     });
-    const session = this.#issueSession(verified.subject);
-    return { note: note === null ? null : toNoteView(note), receipt, session };
-  }
-
-  #operationBinding(
-    operation: IssueChallengeInput,
-    requireCurrentVersion: boolean,
-    existingCreateResource?: string,
-  ): {
-    resource: string;
-    contextHash: string;
-  } {
-    if (operation.action === 'note.create') {
-      const resource = existingCreateResource ?? `note:nt_${secureToken(9)}`;
-      return {
-        resource,
-        contextHash: canonicalSha256({ action: operation.action, draft: operation.draft }),
-      };
-    }
-
-    const note = this.#requireNote(operation.noteId);
-    if (requireCurrentVersion && note.version !== operation.expectedVersion) {
-      throw new RpError(
-        'VERSION_CONFLICT',
-        'The note was updated in another view. Refresh and try again.',
-        409,
-      );
-    }
-    const context =
-      operation.action === 'note.edit'
-        ? {
-            action: operation.action,
-            expectedVersion: operation.expectedVersion,
-            draft: operation.draft,
-          }
-        : { action: operation.action, expectedVersion: operation.expectedVersion };
-    return { resource: note.resource, contextHash: canonicalSha256(context) };
+    return { note: note === null ? null : this.#toNoteView(note, subject), receipt };
   }
 
   #recordReceipt(input: Omit<ApplicationReceipt, 'acceptedAt' | 'receiptId'>): ApplicationReceipt {
     const acceptedAt = this.#now();
-    const receiptId = `rpr_${canonicalSha256({ ...input, acceptedAt })}`;
+    const receiptId = `rpr_${secureToken(18)}`;
     const receipt = Object.freeze({ ...input, acceptedAt, receiptId });
     this.#receipts.set(receiptId, receipt);
     return receipt;
   }
 
-  #issueSession(subject: NexusSubject): RpSession {
-    const token = secureToken(32);
-    const session: StoredSession = {
-      tokenHash: sha256Base64Url(token),
-      subject,
-      expiresAt: this.#now() + SESSION_TTL_SECONDS,
-    };
-    this.#sessions.set(session.tokenHash, session);
-    return { token, subject, expiresAt: session.expiresAt };
-  }
-
   #requireNote(id: string): StoredNote {
     const note = this.#notes.get(id);
-    if (note === undefined)
+    if (note === undefined) {
       throw new RpError('NOT_FOUND', 'The requested note does not exist.', 404);
+    }
     return note;
+  }
+
+  #requireOwnedNote(id: string, subject: NexusSubject): StoredNote {
+    const note = this.#requireNote(id);
+    if (note.authorSubject !== subject) {
+      throw new RpError('AUTHOR_MISMATCH', 'This session did not create the note.', 403);
+    }
+    return note;
+  }
+
+  #requireVisibleNote(id: string, subject?: NexusSubject): StoredNote {
+    const note = this.#requireNote(id);
+    if (note.visibility === 'private' && note.authorSubject !== subject) {
+      throw new RpError('NOT_FOUND', 'The requested note does not exist.', 404);
+    }
+    return note;
+  }
+
+  #toNoteView(note: StoredNote, viewer?: NexusSubject): NoteView {
+    const replies = [...this.#replies.values()]
+      .filter((reply) => reply.noteId === note.id)
+      .sort((left, right) => left.createdAt - right.createdAt)
+      .map(toReplyView);
+    const likes = this.#likes.get(note.id);
+    return {
+      id: note.id,
+      resource: note.resource,
+      authorSubject: note.authorSubject,
+      title: note.title,
+      body: note.body,
+      visibility: note.visibility,
+      createdAt: note.createdAt,
+      updatedAt: note.updatedAt,
+      version: note.version,
+      authorization: note.authorization,
+      proofFingerprint: note.acceptedProofHash.slice(0, 12),
+      likeCount: likes?.size ?? 0,
+      likedByViewer: viewer !== undefined && (likes?.has(viewer) ?? false),
+      replies,
+    };
   }
 
   #runExclusive<T>(work: () => Promise<T>): Promise<T> {
@@ -364,17 +514,19 @@ export class ReferenceRpRepository {
         authorSubject: seedSubject(row.author),
         title: row.title,
         body: row.body,
+        visibility: 'public',
         createdAt: timestamp,
         updatedAt: timestamp,
         version: 1,
         acceptedProofHash: proofHash,
+        authorization: 'wallet-proof',
       });
       this.#notes.set(note.id, note);
     }
   }
 }
 
-function parseSubmitOperation(value: unknown): SubmitOperationInput {
+function parseSubmitProof(value: unknown): SubmitProofInput {
   const record = requireRecord(value, ['challengeId', 'operation', 'proof']);
   if (typeof record['challengeId'] !== 'string' || record['challengeId'].length < 20) {
     throw new RpError('BAD_REQUEST', 'challengeId is invalid.', 400);
@@ -382,14 +534,22 @@ function parseSubmitOperation(value: unknown): SubmitOperationInput {
   if (!isRecord(record['proof'])) throw new RpError('BAD_REQUEST', 'proof is required.', 400);
   return {
     challengeId: record['challengeId'],
-    operation: parseOperation(record['operation']),
+    operation: parseStartSessionOperation(record['operation']),
     proof: record['proof'] as unknown as OwnershipProofV1,
   };
 }
 
-function parseOperation(value: unknown): IssueChallengeInput {
+function parseStartSessionOperation(value: unknown): StartSessionOperation {
+  const record = requireRecord(value, ['action']);
+  if (record['action'] !== 'session.start') {
+    throw new RpError('BAD_REQUEST', 'Only an explicit session.start proof is accepted.', 400);
+  }
+  return { action: 'session.start' };
+}
+
+function parseSessionOperation(value: unknown): SessionOperationInput {
   if (!isRecord(value) || typeof value['action'] !== 'string') {
-    throw new RpError('BAD_REQUEST', 'A note action is required.', 400);
+    throw new RpError('BAD_REQUEST', 'A note session action is required.', 400);
   }
   if (value['action'] === 'note.create') {
     const record = requireRecord(value, ['action', 'draft']);
@@ -412,11 +572,31 @@ function parseOperation(value: unknown): IssueChallengeInput {
       expectedVersion: parseVersion(record['expectedVersion']),
     };
   }
-  throw new RpError('BAD_REQUEST', 'The requested note action is unsupported.', 400);
+  if (value['action'] === 'reply.create') {
+    const record = requireRecord(value, ['action', 'body', 'noteId']);
+    return {
+      action: 'reply.create',
+      noteId: parseNoteId(record['noteId']),
+      body: parseReplyBody(record['body']),
+    };
+  }
+  if (value['action'] === 'reply.delete') {
+    const record = requireRecord(value, ['action', 'noteId', 'replyId']);
+    return {
+      action: 'reply.delete',
+      noteId: parseNoteId(record['noteId']),
+      replyId: parseReplyId(record['replyId']),
+    };
+  }
+  if (value['action'] === 'note.like' || value['action'] === 'note.unlike') {
+    const record = requireRecord(value, ['action', 'noteId']);
+    return { action: value['action'], noteId: parseNoteId(record['noteId']) };
+  }
+  throw new RpError('BAD_REQUEST', 'The requested note session action is unsupported.', 400);
 }
 
 function parseDraft(value: unknown): NoteDraft {
-  const record = requireRecord(value, ['body', 'title']);
+  const record = requireRecord(value, ['body', 'title', 'visibility']);
   const title = typeof record['title'] === 'string' ? record['title'].trim() : '';
   const body = typeof record['body'] === 'string' ? record['body'].trim() : '';
   if (title.length < 1 || title.length > 80) {
@@ -425,12 +605,30 @@ function parseDraft(value: unknown): NoteDraft {
   if (body.length < 1 || body.length > 4_000) {
     throw new RpError('BAD_REQUEST', 'Note body must be between 1 and 4,000 characters.', 400);
   }
-  return { title, body };
+  if (record['visibility'] !== 'public' && record['visibility'] !== 'private') {
+    throw new RpError('BAD_REQUEST', 'visibility must be public or private.', 400);
+  }
+  return { title, body, visibility: record['visibility'] };
+}
+
+function parseReplyBody(value: unknown): string {
+  const body = typeof value === 'string' ? value.trim() : '';
+  if (body.length < 1 || body.length > 1_000) {
+    throw new RpError('BAD_REQUEST', 'Reply body must be between 1 and 1,000 characters.', 400);
+  }
+  return body;
 }
 
 function parseNoteId(value: unknown): string {
   if (typeof value !== 'string' || !/^nt_[A-Za-z0-9_-]{3,80}$/u.test(value)) {
     throw new RpError('BAD_REQUEST', 'noteId is invalid.', 400);
+  }
+  return value;
+}
+
+function parseReplyId(value: unknown): string {
+  if (typeof value !== 'string' || !/^rpy_[A-Za-z0-9_-]{12,80}$/u.test(value)) {
+    throw new RpError('BAD_REQUEST', 'replyId is invalid.', 400);
   }
   return value;
 }
@@ -456,26 +654,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function noteIdFromResource(resource: string): string {
-  if (!resource.startsWith('note:'))
-    throw new RpError('INTERNAL_ERROR', 'Invalid note resource.', 500);
-  return resource.slice('note:'.length);
-}
-
 function seedSubject(label: string): NexusSubject {
   return `nx1_${sha256Base64Url(`seed-subject:${label}`)}`;
 }
 
-function toNoteView(note: StoredNote): NoteView {
+function toReplyView(reply: StoredReply): ReplyView {
   return {
-    id: note.id,
-    resource: note.resource,
-    authorSubject: note.authorSubject,
-    title: note.title,
-    body: note.body,
-    createdAt: note.createdAt,
-    updatedAt: note.updatedAt,
-    version: note.version,
-    proofFingerprint: note.acceptedProofHash.slice(0, 12),
+    id: reply.id,
+    noteId: reply.noteId,
+    authorSubject: reply.authorSubject,
+    body: reply.body,
+    createdAt: reply.createdAt,
   };
 }

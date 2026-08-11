@@ -18,7 +18,6 @@ nexus.rowo.link (edge validation, CORS, receipts/status signing)
         |                                                              +-- TRANSPARENCY_SERVICE RPC
         |                                                                    +-- shard DOs
         |                                                                    +-- R2 checkpoints
-        +-- BACKUP_SERVICE --> private R2 ciphertext bucket (disabled until ADR-0011 approval)
 
 status.rowo.link (optional controlled transparency/checkpoint publication)
 
@@ -26,9 +25,9 @@ notes.rowo.link (reference RP assets + API)
         +-- ReferenceRpState SQLite DO (durable challenges, notes, sessions, receipts)
 ```
 
-Service Bindings keep registry, backup, and transparency internal APIs off the public Internet. The
-edge Worker performs strict method, content-type, size, schema, CORS, and abuse validation but never
-owns lifecycle state in memory.
+Service Bindings keep registry and transparency internal APIs off the public Internet. The edge
+Worker performs strict method, content-type, size, schema, CORS, and abuse validation but never owns
+lifecycle state in memory.
 
 ## Environments
 
@@ -47,7 +46,7 @@ Every environment has distinct:
 - Durable Object namespace/migration history;
 - D1 database;
 - Queue producers/consumers;
-- R2 transparency bucket and, if later approved, private backup bucket;
+- R2 transparency bucket;
 - rate-limit namespace and metrics dataset;
 - wallet/API/status origins.
 
@@ -59,8 +58,8 @@ credentials and performs local builds/dry runs only.
 
 - `wallet.<domain>`: dedicated wallet UI, strict CSP, no third-party scripts/analytics/fonts, no
   framing, no referrer, and no credentials shared with the API.
-- `api.<domain>`: fixed protocol endpoints using `application/nexus+json`; mutation/status responses
-  use `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`, and
+- `nexus.<domain>`: fixed protocol endpoints using `application/nexus+json`; mutation/status
+  responses use `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`, and
   `Referrer-Policy: no-referrer`.
 - `status.<domain>`: optional signed checkpoint artifacts under an explicit cache policy; never a
   chronological subject directory.
@@ -77,8 +76,7 @@ clients. Wildcard CORS is never combined with credentials.
   `nexus-registry-events`.
 - Projector Worker: Queue consumer, non-authoritative `INDEX_DB` D1, and internal transparency
   binding.
-- Edge Worker: internal `REGISTRY_SERVICE` and optional `BACKUP_SERVICE`, coarse rate limiter, and
-  aggregate-only metrics.
+- Edge Worker: internal `REGISTRY_SERVICE`, coarse rate limiter, and aggregate-only metrics.
 - Transparency Worker: shard Durable Objects and R2 checkpoint storage.
 - Reference RP Worker: static assets, a coarse API rate limiter, and one SQLite Durable Object for
   its application data.
@@ -99,12 +97,8 @@ Store private service keys in per-Worker secrets or an explicitly approved Secre
 Separate registry receipt/status, transparency checkpoint, and optional notary keys. Publish public
 key history by `kid` for at least the promised receipt-verification lifetime.
 
-User signing keys, agreement keys, revocation secrets, backup decryption keys, and plaintext wallet
-manifests never enter Cloudflare secrets, logs, environment variables, or storage.
-
-Backup deployment remains disabled under [ADR-0011](../adr/0011-backup-security.md). No production
-R2 backup binding or user-facing backup path may be enabled until that decision is reviewed and
-accepted.
+User signing keys, agreement keys, revocation secrets, and plaintext wallet manifests never enter
+Cloudflare secrets, logs, environment variables, or storage.
 
 ## Migration and release procedure
 

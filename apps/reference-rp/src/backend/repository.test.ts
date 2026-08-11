@@ -20,7 +20,7 @@ import type {
 } from '@nexus/protocol';
 import { describe, expect, it } from 'vitest';
 
-import type { IssueChallengeInput, IssuedChallenge } from '../shared/contracts.js';
+import type { IssuedChallenge } from '../shared/contracts.js';
 import { LocalLifecycleAuthority } from './lifecycle.js';
 import { ReferenceRpRepository } from './repository.js';
 
@@ -35,256 +35,275 @@ interface TestIdentity {
 }
 
 describe('ReferenceRpRepository', () => {
-  it('stores hash-only challenges and proof receipts without an account/controller record', async () => {
+  it('starts one hash-only session and rejects replay of its exact proof', async () => {
     const repository = createRepository();
     const identity = await createIdentity();
-    const operation: IssueChallengeInput = {
-      action: 'note.create',
-      draft: {
-        title: 'Hash-only record',
-        body: 'The raw proof should leave no database-shaped trace.',
-      },
-    };
-    const challenge = repository.issueChallenge(operation);
-    const proof = await createProof(identity, challenge);
-
-    const before = repository.debugSnapshot();
-    expect(before.challenges).toHaveLength(1);
-    expect(before.challenges[0]?.nonceHash).not.toBe(challenge.nonce);
-    expect(JSON.stringify(before)).not.toContain(challenge.nonce);
-
-    const result = await repository.submitOperation({
-      challengeId: challenge.challengeId,
-      operation,
-      proof,
-    });
-    const after = repository.debugSnapshot();
-
-    expect(result.note?.authorSubject).toBe(identity.subject);
-    expect(result.receipt.proofHash).toMatch(/^[A-Za-z0-9_-]{43}$/u);
-    expect(JSON.stringify(after)).not.toContain(proof.signature);
-    expect(JSON.stringify(after)).not.toContain(result.session.token);
-    expect(after.sessions[0]?.tokenHash).not.toBe(result.session.token);
-    expect(Object.keys(after)).toEqual(['notes', 'receipts', 'sessions', 'challenges']);
-    expect(JSON.stringify(after)).not.toMatch(/controller|realUser|userId|rawProof/iu);
-  });
-
-  it('rejects a replay and allows only one winner under concurrent submission', async () => {
-    const repository = createRepository();
-    const identity = await createIdentity();
-    const operation: IssueChallengeInput = {
-      action: 'note.create',
-      draft: {
-        title: 'Only once',
-        body: 'A single nonce must produce a single accepted mutation.',
-      },
-    };
-    const challenge = repository.issueChallenge(operation);
+    const challenge = repository.issueChallenge({ action: 'session.start' });
     const input = {
       challengeId: challenge.challengeId,
-      operation,
+      operation: { action: 'session.start' as const },
       proof: await createProof(identity, challenge),
     };
 
+    const before = repository.debugSnapshot();
+    expect(before.challenges[0]?.nonceHash).not.toBe(challenge.nonce);
+    expect(JSON.stringify(before)).not.toContain(challenge.nonce);
+
     const attempts = await Promise.allSettled([
-      repository.submitOperation(input),
-      repository.submitOperation(input),
+      repository.startSession(input),
+      repository.startSession(input),
     ]);
+    const successful = attempts.find((attempt) => attempt.status === 'fulfilled');
     expect(attempts.filter((attempt) => attempt.status === 'fulfilled')).toHaveLength(1);
     expect(attempts.filter((attempt) => attempt.status === 'rejected')).toHaveLength(1);
-    expect(repository.listNotes().filter((note) => note.title === 'Only once')).toHaveLength(1);
+    if (successful?.status !== 'fulfilled') throw new Error('Expected one session.');
 
-    await expect(repository.submitOperation(input)).rejects.toMatchObject({
-      code: 'CHALLENGE_EXPIRED',
+    const after = repository.debugSnapshot();
+    expect(successful.value.result.session.subject).toBe(identity.subject);
+    expect(successful.value.result.receipt).toMatchObject({
+      operation: 'session.start',
+      authorization: 'wallet-proof',
     });
+    expect(JSON.stringify(after)).not.toContain(input.proof.signature);
+    expect(JSON.stringify(after)).not.toContain(successful.value.token);
+    expect(after.sessions[0]?.tokenHash).not.toBe(successful.value.token);
+    expect(Object.keys(after)).toEqual([
+      'notes',
+      'replies',
+      'likes',
+      'receipts',
+      'sessions',
+      'challenges',
+    ]);
   });
 
-  it('binds the challenge to exact content, version, action, resource, and audience', async () => {
+  it('returns private notes only to their active creator session', async () => {
     const repository = createRepository();
-    const identity = await createIdentity();
-    const original: IssueChallengeInput = {
-      action: 'note.create',
-      draft: { title: 'Original title', body: 'Original content.' },
-    };
-    const challenge = repository.issueChallenge(original);
-    const proof = await createProof(identity, challenge);
-    const changed: IssueChallengeInput = {
-      action: 'note.create',
-      draft: { title: 'Changed title', body: 'Original content.' },
-    };
+    const owner = await login(repository, await createIdentity());
+    const other = await login(repository, await createIdentity());
 
-    await expect(
-      repository.submitOperation({ challengeId: challenge.challengeId, operation: changed, proof }),
-    ).rejects.toMatchObject({ code: 'CHALLENGE_MISMATCH' });
-
-    const wrongAudienceChallenge = repository.issueChallenge(original);
-    const wrongAudienceProof = await createProof(identity, wrongAudienceChallenge, {
-      audience: 'https://other.example.test',
-    });
-    await expect(
-      repository.submitOperation({
-        challengeId: wrongAudienceChallenge.challengeId,
-        operation: original,
-        proof: wrongAudienceProof,
-      }),
-    ).rejects.toMatchObject({ code: 'WRONG_AUDIENCE' });
-  });
-
-  it('keeps author_subject immutable across edit and rejects a different identity', async () => {
-    const repository = createRepository();
-    const author = await createIdentity();
-    const intruder = await createIdentity();
-    const create: IssueChallengeInput = {
-      action: 'note.create',
-      draft: { title: 'Authored once', body: 'The subject cannot be replaced later.' },
-    };
-    const createChallenge = repository.issueChallenge(create);
-    const created = await repository.submitOperation({
-      challengeId: createChallenge.challengeId,
-      operation: create,
-      proof: await createProof(author, createChallenge),
-    });
-    const note = created.note;
-    expect(note).not.toBeNull();
-    if (note === null) throw new Error('Expected created note.');
-
-    const attemptedEdit: IssueChallengeInput = {
-      action: 'note.edit',
-      noteId: note.id,
-      expectedVersion: note.version,
-      draft: { title: 'Attempted takeover', body: 'This must not change ownership.' },
-    };
-    const editChallenge = repository.issueChallenge(attemptedEdit);
-    await expect(
-      repository.submitOperation({
-        challengeId: editChallenge.challengeId,
-        operation: attemptedEdit,
-        proof: await createProof(intruder, editChallenge),
-      }),
-    ).rejects.toMatchObject({ code: 'AUTHOR_MISMATCH' });
-
-    const unchanged = repository.getNote(note.id);
-    expect(unchanged.authorSubject).toBe(author.subject);
-    expect(unchanged.title).toBe('Authored once');
-  });
-
-  it('blocks create, edit, and delete when authoritative lifecycle is revoked', async () => {
-    const lifecycle = new LocalLifecycleAuthority(() => NOW);
-    const repository = createRepository(lifecycle);
-    const identity = await createIdentity();
-    const initial: IssueChallengeInput = {
-      action: 'note.create',
-      draft: {
-        title: 'Before disposal',
-        body: 'This note was accepted while the subject was active.',
-      },
-    };
-    const initialChallenge = repository.issueChallenge(initial);
-    const created = await repository.submitOperation({
-      challengeId: initialChallenge.challengeId,
-      operation: initial,
-      proof: await createProof(identity, initialChallenge),
-    });
-    if (created.note === null) throw new Error('Expected created note.');
-    lifecycle.revoke(identity.subject);
-
-    const operations: IssueChallengeInput[] = [
+    const created = await repository.executeSessionOperation(
       {
         action: 'note.create',
-        draft: { title: 'After disposal', body: 'A revoked identity cannot create another note.' },
+        draft: {
+          title: 'Private field notes',
+          body: 'Only the creator can read this.',
+          visibility: 'private',
+        },
       },
-      {
-        action: 'note.edit',
-        noteId: created.note.id,
-        expectedVersion: created.note.version,
-        draft: { title: 'Changed after disposal', body: 'This mutation must be rejected.' },
-      },
-      {
-        action: 'note.delete',
-        noteId: created.note.id,
-        expectedVersion: created.note.version,
-      },
-    ];
-    for (const operation of operations) {
-      const challenge = repository.issueChallenge(operation);
-      await expect(
-        repository.submitOperation({
-          challengeId: challenge.challengeId,
-          operation,
-          proof: await createProof(identity, challenge),
-        }),
-      ).rejects.toMatchObject({ code: 'IDENTITY_REVOKED' });
-    }
+      owner.token,
+    );
+    if (created.note === null) throw new Error('Expected private note.');
 
-    expect(repository.listNotes().some((note) => note.title === 'After disposal')).toBe(false);
-    expect(repository.getNote(created.note.id)).toMatchObject({
-      title: 'Before disposal',
-      version: 1,
-      authorSubject: identity.subject,
+    expect(await repository.listNotes()).toEqual([]);
+    expect(await repository.listNotes(other.token)).toEqual([]);
+    await expect(repository.getNote(created.note.id, other.token)).rejects.toMatchObject({
+      code: 'NOT_FOUND',
     });
+    expect(await repository.getNote(created.note.id, owner.token)).toMatchObject({
+      visibility: 'private',
+      authorSubject: owner.identity.subject,
+    });
+
+    await repository.executeSessionOperation(
+      {
+        action: 'note.create',
+        draft: {
+          title: 'Public field notes',
+          body: 'Everyone can read this.',
+          visibility: 'public',
+        },
+      },
+      owner.token,
+    );
+    expect((await repository.listNotes()).map((note) => note.title)).toEqual([
+      'Public field notes',
+    ]);
   });
 
-  it('supports create, edit, session status, and delete with the same subject', async () => {
+  it('allows replies on visible notes and enforces reply-or-note-author removal', async () => {
     const repository = createRepository();
-    const identity = await createIdentity();
-    const create: IssueChallengeInput = {
-      action: 'note.create',
-      draft: { title: 'A complete lifecycle', body: 'First version.' },
-    };
-    const createChallenge = repository.issueChallenge(create);
-    const created = await repository.submitOperation({
-      challengeId: createChallenge.challengeId,
-      operation: create,
-      proof: await createProof(identity, createChallenge),
-    });
-    if (created.note === null) throw new Error('Expected created note.');
-    const session = await repository.getSession(created.session.token);
-    expect(session).toMatchObject({ subject: identity.subject, state: 'active' });
+    const owner = await login(repository, await createIdentity());
+    const visitor = await login(repository, await createIdentity());
+    const stranger = await login(repository, await createIdentity());
+    const created = await createNote(repository, owner.token, 'public');
 
-    const edit: IssueChallengeInput = {
-      action: 'note.edit',
-      noteId: created.note.id,
-      expectedVersion: created.note.version,
-      draft: { title: 'A complete lifecycle', body: 'Second version.' },
-    };
-    const editChallenge = repository.issueChallenge(edit);
-    const edited = await repository.submitOperation({
-      challengeId: editChallenge.challengeId,
-      operation: edit,
-      proof: await createProof(identity, editChallenge),
-    });
-    expect(edited.note).toMatchObject({
-      version: 2,
-      authorSubject: identity.subject,
-      body: 'Second version.',
-    });
-
-    if (edited.note === null) throw new Error('Expected edited note.');
-    const remove: IssueChallengeInput = {
-      action: 'note.delete',
-      noteId: edited.note.id,
-      expectedVersion: edited.note.version,
-    };
-    const deleteChallenge = repository.issueChallenge(remove);
-    const deleted = await repository.submitOperation({
-      challengeId: deleteChallenge.challengeId,
-      operation: remove,
-      proof: await createProof(identity, deleteChallenge),
-    });
-    expect(deleted.note).toBeNull();
-    expect(() => repository.getNote(edited.note?.id ?? '')).toThrowError(
-      'The requested note does not exist.',
+    let updated = await repository.executeSessionOperation(
+      { action: 'reply.create', noteId: created.id, body: 'A visitor reply.' },
+      visitor.token,
     );
+    expect(updated.note?.replies).toHaveLength(1);
+    const visitorReply = updated.note?.replies[0];
+    if (visitorReply === undefined) throw new Error('Expected reply.');
+
+    await expect(
+      repository.executeSessionOperation(
+        { action: 'reply.delete', noteId: created.id, replyId: visitorReply.id },
+        stranger.token,
+      ),
+    ).rejects.toMatchObject({ code: 'AUTHOR_MISMATCH' });
+
+    updated = await repository.executeSessionOperation(
+      { action: 'reply.delete', noteId: created.id, replyId: visitorReply.id },
+      owner.token,
+    );
+    expect(updated.note?.replies).toEqual([]);
+
+    const privateNote = await createNote(repository, owner.token, 'private');
+    expect(
+      (
+        await repository.executeSessionOperation(
+          { action: 'reply.create', noteId: privateNote.id, body: 'A private self-reply.' },
+          owner.token,
+        )
+      ).note?.replies,
+    ).toHaveLength(1);
+    await expect(
+      repository.executeSessionOperation(
+        { action: 'reply.create', noteId: privateNote.id, body: 'This must not be visible.' },
+        visitor.token,
+      ),
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+
+  it('counts one like per subject, supports unlike, and rejects private-note likes', async () => {
+    const repository = createRepository();
+    const owner = await login(repository, await createIdentity());
+    const visitor = await login(repository, await createIdentity());
+    const publicNote = await createNote(repository, owner.token, 'public');
+
+    await repository.executeSessionOperation(
+      { action: 'note.like', noteId: publicNote.id },
+      visitor.token,
+    );
+    const liked = await repository.executeSessionOperation(
+      { action: 'note.like', noteId: publicNote.id },
+      visitor.token,
+    );
+    expect(liked.note).toMatchObject({ likeCount: 1, likedByViewer: true });
+
+    const unliked = await repository.executeSessionOperation(
+      { action: 'note.unlike', noteId: publicNote.id },
+      visitor.token,
+    );
+    expect(unliked.note).toMatchObject({ likeCount: 0, likedByViewer: false });
+
+    const privateNote = await createNote(repository, owner.token, 'private');
+    await expect(
+      repository.executeSessionOperation(
+        { action: 'note.like', noteId: privateNote.id },
+        owner.token,
+      ),
+    ).rejects.toMatchObject({ code: 'OPERATION_NOT_ALLOWED' });
+  });
+
+  it('gates edit and delete by active immutable-author session and lifecycle', async () => {
+    const lifecycle = new LocalLifecycleAuthority(() => NOW);
+    const repository = createRepository(lifecycle);
+    const ownerIdentity = await createIdentity();
+    const owner = await login(repository, ownerIdentity);
+    const other = await login(repository, await createIdentity());
+    const note = await createNote(repository, owner.token, 'public');
+
+    await expect(
+      repository.executeSessionOperation(
+        {
+          action: 'note.edit',
+          noteId: note.id,
+          expectedVersion: note.version,
+          draft: { title: 'Takeover', body: 'Rejected.', visibility: 'public' },
+        },
+        other.token,
+      ),
+    ).rejects.toMatchObject({ code: 'AUTHOR_MISMATCH' });
+
+    const edited = await repository.executeSessionOperation(
+      {
+        action: 'note.edit',
+        noteId: note.id,
+        expectedVersion: note.version,
+        draft: { title: 'Updated', body: 'Accepted.', visibility: 'private' },
+      },
+      owner.token,
+    );
+    expect(edited.note).toMatchObject({
+      title: 'Updated',
+      visibility: 'private',
+      authorSubject: ownerIdentity.subject,
+      authorization: 'rp-session',
+    });
+
+    lifecycle.revoke(ownerIdentity.subject);
+    await expect(
+      repository.executeSessionOperation(
+        {
+          action: 'note.delete',
+          noteId: note.id,
+          expectedVersion: edited.note?.version ?? 2,
+        },
+        owner.token,
+      ),
+    ).rejects.toMatchObject({ code: 'SESSION_INVALID' });
+  });
+
+  it('expires sessions absolutely after five minutes', async () => {
+    const clock = { now: NOW };
+    const lifecycle = new LocalLifecycleAuthority(() => clock.now);
+    const repository = createRepository(lifecycle, () => clock.now);
+    const started = await login(repository, await createIdentity());
+    clock.now += 301;
+
+    await expect(repository.getSession(started.token)).rejects.toMatchObject({
+      code: 'SESSION_INVALID',
+    });
+    await expect(
+      repository.executeSessionOperation(
+        {
+          action: 'note.create',
+          draft: { title: 'Too late', body: 'The session expired.', visibility: 'public' },
+        },
+        started.token,
+      ),
+    ).rejects.toMatchObject({ code: 'SESSION_INVALID' });
   });
 });
 
-function createRepository(lifecycle?: LocalLifecycleAuthority): ReferenceRpRepository {
+function createRepository(
+  lifecycle?: LocalLifecycleAuthority,
+  now: () => number = () => NOW,
+): ReferenceRpRepository {
   return new ReferenceRpRepository({
     audience: AUDIENCE,
-    lifecycle: lifecycle ?? new LocalLifecycleAuthority(() => NOW),
-    now: () => NOW,
+    lifecycle: lifecycle ?? new LocalLifecycleAuthority(now),
+    now,
     seed: false,
   });
+}
+
+async function login(repository: ReferenceRpRepository, identity: TestIdentity) {
+  const challenge = repository.issueChallenge({ action: 'session.start' });
+  const started = await repository.startSession({
+    challengeId: challenge.challengeId,
+    operation: { action: 'session.start' },
+    proof: await createProof(identity, challenge),
+  });
+  return { ...started, identity };
+}
+
+async function createNote(
+  repository: ReferenceRpRepository,
+  token: string,
+  visibility: 'public' | 'private',
+) {
+  const created = await repository.executeSessionOperation(
+    {
+      action: 'note.create',
+      draft: { title: `${visibility} note`, body: 'A note body.', visibility },
+    },
+    token,
+  );
+  if (created.note === null) throw new Error('Expected note.');
+  return created.note;
 }
 
 async function createIdentity(): Promise<TestIdentity> {
@@ -310,13 +329,13 @@ async function createIdentity(): Promise<TestIdentity> {
 async function createProof(
   identity: TestIdentity,
   challenge: IssuedChallenge,
-  overrides: { audience?: string } = {},
+  audience = AUDIENCE,
 ): Promise<OwnershipProofV1> {
   const payload: OwnershipProofV1['payload'] = {
     protocol: OWNERSHIP_PROOF_PROTOCOL_V1,
     subject: identity.subject,
     genesis: identity.genesis,
-    aud: overrides.audience ?? AUDIENCE,
+    aud: audience,
     act: challenge.action,
     resource: challenge.resource,
     nonce: challenge.nonce,

@@ -1,13 +1,13 @@
 import type { Base64UrlAtLeast16 } from '@nexus/protocol';
 import type { ChallengeRecord, ChallengeStore } from '@nexus/verifier';
 
-import type { IssuedChallenge, NoteAction } from '../shared/contracts.js';
+import type { IssuedChallenge, ProofAction } from '../shared/contracts.js';
 import { sha256Base64Url } from './digests.js';
 
 interface StoredChallenge {
   challengeId: string;
   nonceHash: string;
-  action: NoteAction;
+  action: ProofAction;
   resource: string;
   contextHash: string;
   expiresAt: number;
@@ -22,7 +22,7 @@ export class HashOnlyChallengeStore implements ChallengeStore {
     const record: StoredChallenge = {
       challengeId: challenge.challengeId,
       nonceHash: sha256Base64Url(challenge.nonce),
-      action: challenge.action as NoteAction,
+      action: challenge.action as ProofAction,
       resource: challenge.resource,
       contextHash: challenge.contextHash ?? '',
       expiresAt: challenge.expiresAt,

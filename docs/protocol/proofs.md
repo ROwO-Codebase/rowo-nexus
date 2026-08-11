@@ -71,7 +71,7 @@ receipts under a `kid` are expected to verify.
 
 ## Historical claims
 
-A user-controlled `iat` is not trusted historical time after a key is lost or restored from an old
-backup. Durable historical authorship needs a trusted pre-revocation acceptance receipt or timestamp
-from the RP, registry, or reviewed notary flow. A valid old user signature can establish possession
-of an old key, but cannot by itself prove when it was made.
+A user-controlled `iat` is not trusted historical time after old key material is stolen or copied.
+Durable historical authorship needs a trusted pre-revocation acceptance receipt or timestamp from
+the RP, registry, or reviewed notary flow. A valid old user signature can establish possession of an
+old key, but cannot by itself prove when it was made.

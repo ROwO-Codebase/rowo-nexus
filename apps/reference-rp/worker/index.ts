@@ -83,7 +83,9 @@ export default class ReferenceRpWorker extends WorkerEntrypoint<Env> {
 function isLimitedRoute(request: Request, url: URL): boolean {
   return (
     request.method === 'POST' &&
-    (url.pathname === '/api/challenges' || url.pathname === '/api/operations')
+    (url.pathname === '/api/challenges' ||
+      url.pathname === '/api/operations' ||
+      url.pathname === '/api/session-operations')
   );
 }
 

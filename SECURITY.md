@@ -21,8 +21,8 @@ Security Advisory reporting flow. Include:
   involved;
 - any suggested mitigation.
 
-Do not include real user private keys, revocation secrets, backup capability secrets, full ownership
-proofs, IP addresses, or other sensitive personal data. Use freshly generated test identities.
+Do not include real user private keys, revocation secrets, full ownership proofs, IP addresses, or
+other sensitive personal data. Use freshly generated test identities.
 
 Maintainers should acknowledge a complete report promptly, keep investigation details private,
 coordinate a fix and disclosure window with the reporter, and preserve evidence without expanding

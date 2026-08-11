@@ -202,23 +202,15 @@ describe('architectural security guardrails', () => {
     expect(matchingFiles(walletCore, registryCallWithPrivateKey)).toEqual([]);
   });
 
-  it('keeps backup cryptography and KDF implementation blocked by ADR-0011', () => {
-    const backupAdr = requiredFile('docs/adr/0011-backup-security.md').source;
-    expect(backupAdr).toMatch(/Status:\s*\*\*PROPOSED\s+—\s+BLOCKED\*\*/u);
+  it('keeps identity-key backup, export, and restore outside the product', () => {
+    expect(existsSync(join(WORKSPACE_ROOT, 'workers', 'backup'))).toBe(false);
+    expect(existsSync(join(WORKSPACE_ROOT, 'docs', 'adr', '0011-backup-security.md'))).toBe(false);
 
-    const backupCandidates = implementationFiles([
-      'workers/backup/src',
-      'packages/wallet-core/src',
-      'apps/wallet/src',
-    ]).filter(
-      (file) =>
-        file.path.startsWith('workers/backup/src/') ||
-        /(?:^|\/)(?:backup|export|restore)[^/]*\.[cm]?[jt]sx?$/iu.test(file.path),
-    );
-    const backupCryptography =
-      /\b(?:argon2(?:id)?|scrypt|pbkdf2|hkdf)\b|\bAES(?:[-_]?256)?[-_]?GCM\b|\bsubtle\s*\.\s*(?:deriveBits|deriveKey|encrypt|decrypt)\s*\(|\b(?:deriveKey|encryptVault|decryptVault)\s*\(/iu;
+    const implementation = implementationFiles(['apps', 'packages', 'workers']);
+    const retiredBackupSurface =
+      /\b(?:BACKUP_SERVICE|NEXUS_BACKUP_ENABLED|EncryptedVaultBackupV\d*|backupId|backupSecret|exportIdentity|importIdentity|restoreIdentity|createBackup|restoreBackup|deriveBackupKey|encryptVault|decryptVault|backup_read|backup_write|backup_delete)\b|['"]\/v\d+\/(?:backup|vault-backup)(?:\/|['"])/iu;
 
-    expect(matchingFiles(backupCandidates, backupCryptography)).toEqual([]);
+    expect(matchingFiles(implementation, retiredBackupSurface)).toEqual([]);
   });
 
   it('keeps default rotation and registry wire state free of old/new linkage', () => {
@@ -239,7 +231,7 @@ describe('architectural security guardrails', () => {
   it('keeps routine log calls and metric dimensions free of sensitive values', () => {
     const implementation = implementationFiles(['apps', 'packages', 'workers']);
     const forbiddenDimension =
-      /\b(?:subject|ipAddress|userAgent|backupId|rpOrigin|audience|nonce|proofId|proof|privateKey|revocationSecret|backupSecret|genesis)\b/iu;
+      /\b(?:subject|ipAddress|userAgent|rpOrigin|audience|nonce|proofId|proof|privateKey|revocationSecret|genesis)\b/iu;
     const violations: string[] = [];
     const logCall =
       /\b(?:console\s*\.\s*(?:log|info|warn|error|debug)|(?:logger|log)\s*\.\s*(?:log|info|warn|error|debug))\s*\(([\s\S]{0,1000}?)\)\s*;?/giu;
@@ -255,7 +247,7 @@ describe('architectural security guardrails', () => {
 
       if (/(?:logging|metrics?|analytics)/iu.test(basename(file.path))) {
         const declaredDimension =
-          /\b(subject|ipAddress|userAgent|backupId|rpOrigin|audience|nonce|proofId|proof|privateKey|revocationSecret|backupSecret|genesis)\??\s*:/giu;
+          /\b(subject|ipAddress|userAgent|rpOrigin|audience|nonce|proofId|proof|privateKey|revocationSecret|genesis)\??\s*:/giu;
         for (const match of source.matchAll(declaredDimension)) {
           violations.push(`${file.path}: forbidden metric field ${match[1] ?? 'unknown'}`);
         }

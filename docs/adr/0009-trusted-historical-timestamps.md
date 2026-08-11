@@ -2,12 +2,12 @@
 
 - Status: Accepted
 - Date: 2026-08-11
-- Scope: ownership proofs, RP resource receipts, registry/notary receipts, backup restore
+- Scope: ownership proofs, RP resource receipts, registry/notary receipts
 
 ## Context
 
-After a private key is stolen or restored from an old backup, its holder can create a valid
-signature containing an arbitrary backdated `iat`. Cryptography proves key possession, not that the
+After a private key is stolen or previously copied, its holder can create a valid signature
+containing an arbitrary backdated `iat`. Cryptography proves key possession, not that the
 self-asserted timestamp is truthful.
 
 ## Decision
@@ -24,11 +24,11 @@ subject.
 
 ## Consequences
 
-- Restored old keys cannot manufacture accepted pre-revocation history merely by backdating a proof.
+- Stolen or copied old keys cannot manufacture accepted pre-revocation history merely by backdating
+  a proof.
 - Current-control and historical-authorship policies remain explicit and separate.
 - Key compromise does not erase valid trusted receipts issued before the compromise/revocation
   interval, but service-key incidents may affect their trust assessment.
-- Backup design must document this limitation prominently.
 
 ## Compliance
 
