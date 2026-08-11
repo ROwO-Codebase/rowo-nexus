@@ -83,7 +83,8 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: d1 migrations apply nexus-index --remote --config workers/projector/wrangler.jsonc
+          command:
+            d1 migrations apply nexus-index --remote --config workers/projector/wrangler.jsonc
 
       - name: Deploy transparency
         uses: cloudflare/wrangler-action@v3
