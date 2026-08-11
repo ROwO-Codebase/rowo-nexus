@@ -24,6 +24,23 @@ It is an RP-local convenience session, not a Nexus account or a reusable bearer 
 another origin. Revocation invalidates it before the next protected operation, and expiration never
 extends beyond five minutes.
 
+## Shareable note URLs
+
+Opening a note updates the browser to `/notes/<note-id>`. A specific reply uses
+`/notes/<note-id>/replies/<reply-id>` and is scrolled into focus after the note loads. Loading
+either URL directly retrieves the note through the same visibility-aware API used by the app. Public
+notes are available to everyone; private notes resolve only when the request carries their creator's
+valid Notes session. Missing, malformed, deleted, or inaccessible note IDs fall back to `/` without
+distinguishing private notes from nonexistent ones. A missing or malformed reply ID is ignored while
+the accessible parent note remains open.
+
+Public notes and their replies have explicit Share controls. After the user clicks Share, the
+request body sent to `https://pi3.dev/create` contains only the selected public, canonical URL;
+Notes then exposes the returned short link for copying or opening. As with any direct web request,
+Pi3 receives ordinary network metadata, but no Nexus subject, session, proof, or private note
+content is included. Private notes never show Share controls. No Pi3 script is loaded, and no
+request is made during ordinary browsing.
+
 ## Local HTTPS
 
 Nexus ownership proofs require a canonical HTTPS audience. The reference RP therefore uses Vite's

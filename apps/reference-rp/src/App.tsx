@@ -29,6 +29,7 @@ import {
   Plus,
   ReceiptText,
   RefreshCw,
+  Share2,
   ShieldCheck,
   Trash2,
   UserRoundX,
@@ -40,12 +41,15 @@ import { motion } from 'motion/react';
 import {
   executeSessionOperation,
   ReferenceRpApiError,
+  getNote,
   getSession,
   issueChallenge,
   listNotes,
   logoutSession,
   startSession,
 } from './api.js';
+import { notePath, noteRouteFromPathname } from './note-route.js';
+import { createPi3ShareLink } from './share-links.js';
 import type {
   ApplicationReceipt,
   NoteDraft,
@@ -78,17 +82,27 @@ const IDLE_PROOF: ProofFlow = {
   message: 'Log in with Nexus to approve a five-minute Notes session.',
 };
 
+function writeBrowserRoute(path: string, mode: 'push' | 'replace'): void {
+  const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  if (current === path) return;
+  if (mode === 'push') window.history.pushState(null, '', path);
+  else window.history.replaceState(null, '', path);
+}
+
 export function App(): React.ReactElement {
   const [notes, setNotes] = useState<NoteView[]>([]);
   const [selectedNote, setSelectedNote] = useState<NoteView | null>(null);
+  const [focusedReplyId, setFocusedReplyId] = useState<string>();
   const [view, setView] = useState<AppView>('feed');
   const [loading, setLoading] = useState(true);
+  const [routeLoading, setRouteLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [proof, setProof] = useState<ProofFlow>(IDLE_PROOF);
   const [session, setSession] = useState<SessionStatus | null>(null);
   const [receipts, setReceipts] = useState<ApplicationReceipt[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<NoteView | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const routeRequestRef = useRef(0);
 
   const refreshNotes = useCallback(async (showLoading = true): Promise<NoteView[]> => {
     if (showLoading) setLoading(true);
@@ -105,6 +119,45 @@ export function App(): React.ReactElement {
     }
   }, []);
 
+  const resolveBrowserRoute = useCallback(async (): Promise<void> => {
+    const requestId = routeRequestRef.current + 1;
+    routeRequestRef.current = requestId;
+    const route = noteRouteFromPathname(window.location.pathname);
+
+    if (route === null) {
+      setSelectedNote(null);
+      setFocusedReplyId(undefined);
+      setView('feed');
+      setRouteLoading(false);
+      writeBrowserRoute('/', 'replace');
+      return;
+    }
+
+    setSelectedNote(null);
+    setFocusedReplyId(undefined);
+    setView('feed');
+    setRouteLoading(true);
+    try {
+      const note = await getNote(route.noteId);
+      if (routeRequestRef.current !== requestId) return;
+      const replyId = note.replies.some((reply) => reply.id === route.replyId)
+        ? route.replyId
+        : undefined;
+      setSelectedNote(note);
+      setFocusedReplyId(replyId);
+      setView('detail');
+      writeBrowserRoute(notePath(note.id, replyId), 'replace');
+    } catch {
+      if (routeRequestRef.current !== requestId) return;
+      setSelectedNote(null);
+      setFocusedReplyId(undefined);
+      setView('feed');
+      writeBrowserRoute('/', 'replace');
+    } finally {
+      if (routeRequestRef.current === requestId) setRouteLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     let mounted = true;
     void (async () => {
@@ -114,13 +167,25 @@ export function App(): React.ReactElement {
       } catch {
         if (mounted) setSession(null);
       } finally {
-        if (mounted) await refreshNotes();
+        if (mounted) {
+          await refreshNotes();
+          if (mounted) await resolveBrowserRoute();
+        }
       }
     })();
     return () => {
       mounted = false;
+      routeRequestRef.current += 1;
     };
-  }, [refreshNotes]);
+  }, [refreshNotes, resolveBrowserRoute]);
+
+  useEffect(() => {
+    const onPopState = (): void => {
+      void resolveBrowserRoute();
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [resolveBrowserRoute]);
 
   const startLogin = useCallback(async (): Promise<void> => {
     const controller = new AbortController();
@@ -217,15 +282,30 @@ export function App(): React.ReactElement {
         }
         if (operationResult.note === null) {
           setSelectedNote(null);
+          setFocusedReplyId(undefined);
           setView('feed');
+          writeBrowserRoute('/', 'replace');
         } else {
           const current = refreshed.find((note) => note.id === operationResult.note?.id);
-          setSelectedNote(current ?? operationResult.note);
+          const nextNote = current ?? operationResult.note;
+          const nextFocusedReplyId = nextNote.replies.some((reply) => reply.id === focusedReplyId)
+            ? focusedReplyId
+            : undefined;
+          setSelectedNote(nextNote);
+          setFocusedReplyId(nextFocusedReplyId);
           setView('detail');
+          writeBrowserRoute(
+            notePath(nextNote.id, nextFocusedReplyId),
+            operation.action === 'note.create' ? 'push' : 'replace',
+          );
         }
       } catch (error) {
         if (error instanceof ReferenceRpApiError && error.code === 'SESSION_INVALID') {
           setSession(null);
+          setSelectedNote(null);
+          setFocusedReplyId(undefined);
+          setView('feed');
+          writeBrowserRoute('/', 'replace');
           await refreshNotes(false);
         }
         setProof({
@@ -238,7 +318,7 @@ export function App(): React.ReactElement {
         abortRef.current = null;
       }
     },
-    [refreshNotes, selectedNote],
+    [focusedReplyId, refreshNotes, selectedNote],
   );
 
   const endLogin = useCallback(async (): Promise<void> => {
@@ -247,7 +327,9 @@ export function App(): React.ReactElement {
     } finally {
       setSession(null);
       setSelectedNote(null);
+      setFocusedReplyId(undefined);
       setView('feed');
+      writeBrowserRoute('/', 'replace');
       setProof(IDLE_PROOF);
       await refreshNotes(false);
     }
@@ -258,13 +340,19 @@ export function App(): React.ReactElement {
     const remaining = session.expiresAt * 1_000 - Date.now();
     if (remaining <= 0) {
       setSession(null);
+      setSelectedNote(null);
+      setFocusedReplyId(undefined);
+      setView('feed');
+      writeBrowserRoute('/', 'replace');
       void refreshNotes(false);
       return;
     }
     const timer = window.setTimeout(() => {
       setSession(null);
       setSelectedNote(null);
+      setFocusedReplyId(undefined);
       setView('feed');
+      writeBrowserRoute('/', 'replace');
       void refreshNotes(false);
     }, remaining);
     return () => window.clearTimeout(timer);
@@ -281,11 +369,30 @@ export function App(): React.ReactElement {
   const openFeed = (): void => {
     setView('feed');
     setSelectedNote(null);
+    setFocusedReplyId(undefined);
+    writeBrowserRoute('/', 'push');
   };
 
   const openNote = (note: NoteView): void => {
     setSelectedNote(note);
+    setFocusedReplyId(undefined);
     setView('detail');
+    writeBrowserRoute(notePath(note.id), 'push');
+  };
+
+  const openSecurity = (): void => {
+    setSelectedNote(null);
+    setFocusedReplyId(undefined);
+    setView('security');
+    writeBrowserRoute('/', 'push');
+  };
+
+  const openCreate = (): void => {
+    setProof(IDLE_PROOF);
+    setSelectedNote(null);
+    setFocusedReplyId(undefined);
+    setView('create');
+    writeBrowserRoute('/', 'push');
   };
 
   return (
@@ -295,14 +402,13 @@ export function App(): React.ReactElement {
         session={session}
         busy={isBusy}
         onNotes={openFeed}
-        onSecurity={() => setView('security')}
+        onSecurity={openSecurity}
         onCreate={() => {
           if (!hasValidSession) {
             void startLogin();
             return;
           }
-          setProof(IDLE_PROOF);
-          setView('create');
+          openCreate();
         }}
         onLogin={() => void startLogin()}
         onLogout={() => void endLogin()}
@@ -328,8 +434,7 @@ export function App(): React.ReactElement {
             <button
               type="button"
               onClick={() => {
-                setProof(IDLE_PROOF);
-                setView('create');
+                openCreate();
               }}
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
             >
@@ -351,7 +456,7 @@ export function App(): React.ReactElement {
                   <FeedView
                     key="feed"
                     notes={notes}
-                    loading={loading}
+                    loading={loading || routeLoading}
                     error={loadError}
                     session={session}
                     onOpen={openNote}
@@ -362,10 +467,15 @@ export function App(): React.ReactElement {
                   <DetailView
                     key={selectedNote.id}
                     note={selectedNote}
+                    focusedReplyId={focusedReplyId}
                     session={session}
                     busy={isBusy}
                     onBack={openFeed}
-                    onEdit={() => setView('edit')}
+                    onEdit={() => {
+                      setFocusedReplyId(undefined);
+                      writeBrowserRoute(notePath(selectedNote.id), 'replace');
+                      setView('edit');
+                    }}
                     onDelete={() => setDeleteTarget(selectedNote)}
                     onLike={() =>
                       void runSessionOperation({
@@ -667,6 +777,7 @@ function FeedView({
 
 function DetailView({
   note,
+  focusedReplyId,
   session,
   busy,
   onBack,
@@ -677,6 +788,7 @@ function DetailView({
   onDeleteReply,
 }: {
   note: NoteView;
+  focusedReplyId: string | undefined;
   session: SessionStatus | null;
   busy: boolean;
   onBack: () => void;
@@ -786,6 +898,7 @@ function DetailView({
             <Lock className="h-4 w-4" /> Visible only to you
           </span>
         )}
+        {note.visibility === 'public' ? <ShareButton noteId={note.id} /> : null}
         <span className="inline-flex items-center gap-2 text-sm text-slate-500">
           <MessageCircle className="h-4 w-4" /> {note.replies.length}{' '}
           {note.replies.length === 1 ? 'reply' : 'replies'}
@@ -816,6 +929,8 @@ function DetailView({
               <ReplyRow
                 key={reply.id}
                 reply={reply}
+                focused={reply.id === focusedReplyId}
+                shareable={note.visibility === 'public'}
                 canDelete={
                   session !== null &&
                   (reply.authorSubject === session.subject ||
@@ -839,17 +954,41 @@ function DetailView({
 
 function ReplyRow({
   reply,
+  focused,
+  shareable,
   canDelete,
   busy,
   onDelete,
 }: {
   reply: ReplyView;
+  focused: boolean;
+  shareable: boolean;
   canDelete: boolean;
   busy: boolean;
   onDelete: () => void;
 }): React.ReactElement {
+  const rowRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!focused) return;
+    const frame = window.requestAnimationFrame(() => {
+      rowRef.current?.scrollIntoView({ behavior: 'auto', block: 'center' });
+      rowRef.current?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [focused]);
+
   return (
-    <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+    <div
+      ref={rowRef}
+      data-reply-id={reply.id}
+      tabIndex={focused ? -1 : undefined}
+      className={`rounded-2xl border bg-slate-50/70 p-4 outline-none transition-shadow ${
+        focused
+          ? 'border-indigo-300 ring-4 ring-indigo-100'
+          : 'border-slate-100 focus-visible:border-indigo-300 focus-visible:ring-4 focus-visible:ring-indigo-100'
+      }`}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
@@ -860,19 +999,106 @@ function ReplyRow({
           </div>
           <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">{reply.body}</p>
         </div>
-        {canDelete ? (
-          <button
-            type="button"
-            onClick={onDelete}
-            disabled={busy}
-            aria-label="Delete reply"
-            className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
-        ) : null}
+        <div className="flex shrink-0 items-center gap-1">
+          {shareable ? <ShareButton noteId={reply.noteId} replyId={reply.id} compact /> : null}
+          {canDelete ? (
+            <button
+              type="button"
+              onClick={onDelete}
+              disabled={busy}
+              aria-label="Delete reply"
+              className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          ) : null}
+        </div>
       </div>
     </div>
+  );
+}
+
+function ShareButton({
+  noteId,
+  replyId,
+  compact = false,
+}: {
+  noteId: string;
+  replyId?: string;
+  compact?: boolean;
+}): React.ReactElement {
+  const target = replyId === undefined ? 'note' : 'reply';
+  const [state, setState] = useState<'idle' | 'loading' | 'copied' | 'ready' | 'error'>('idle');
+  const [shortLink, setShortLink] = useState<string>();
+
+  const share = async (): Promise<void> => {
+    if (state === 'loading') return;
+    setState('loading');
+    setShortLink(undefined);
+    try {
+      const destination = new URL(notePath(noteId, replyId), window.location.origin).href;
+      const link = await createPi3ShareLink(destination, window.location.origin);
+      setShortLink(link);
+      try {
+        await navigator.clipboard.writeText(link);
+        setState('copied');
+      } catch {
+        setState('ready');
+      }
+    } catch {
+      setState('error');
+    }
+  };
+
+  const label =
+    state === 'loading'
+      ? 'Shortening…'
+      : state === 'copied'
+        ? 'Copied'
+        : state === 'ready'
+          ? 'Link ready'
+          : state === 'error'
+            ? 'Retry share'
+            : 'Share';
+
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1.5">
+      <button
+        type="button"
+        onClick={() => void share()}
+        disabled={state === 'loading'}
+        aria-label={`Share ${target}`}
+        className={`inline-flex items-center gap-1.5 rounded-lg font-medium transition-colors disabled:opacity-60 ${
+          compact
+            ? 'p-2 text-slate-400 hover:bg-indigo-50 hover:text-indigo-700'
+            : 'border border-slate-200 bg-white px-3.5 py-2 text-sm text-slate-700 hover:bg-slate-50'
+        }`}
+      >
+        {state === 'loading' ? (
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+        ) : state === 'copied' ? (
+          <Check className="h-4 w-4 text-emerald-600" aria-hidden="true" />
+        ) : (
+          <Share2 className="h-4 w-4" aria-hidden="true" />
+        )}
+        {!compact ? label : <span className="sr-only">{label}</span>}
+      </button>
+      {shortLink !== undefined ? (
+        <a
+          href={shortLink}
+          target="_blank"
+          rel="noreferrer"
+          aria-label={`Short link for ${target}`}
+          className="rounded-md px-1.5 py-1 text-[11px] font-medium text-indigo-600 hover:bg-indigo-50 hover:text-indigo-800"
+        >
+          Open short link
+        </a>
+      ) : state === 'error' ? (
+        <span role="alert" className="text-[11px] font-medium text-red-600">
+          Short link unavailable
+        </span>
+      ) : null}
+    </span>
   );
 }
 

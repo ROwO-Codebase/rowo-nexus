@@ -12,7 +12,7 @@ const SESSION_TTL_SECONDS = 5 * 60;
 const SESSION_COOKIE_NAME = '__Host-nexus_notes_session';
 const SECURITY_HEADERS: Readonly<Record<string, string>> = {
   'Content-Security-Policy':
-    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws: wss:; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://pi3.dev ws: wss:; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
   'Referrer-Policy': 'no-referrer',
   'X-Content-Type-Options': 'nosniff',
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',

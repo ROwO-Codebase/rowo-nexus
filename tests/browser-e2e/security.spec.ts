@@ -150,6 +150,9 @@ test.describe.serial('Nexus browser security boundary', () => {
     ownedNote = (await listNotes(RP_A_ORIGIN)).find((note) => note.title === title) as NoteView;
     expect(ownedNote.authorSubject).toBe(proofForA.payload.subject);
     expect(ownedNote.authorFriendlyName).toBe('friendly_name');
+    await expect(page).toHaveURL(`${RP_A_ORIGIN}/notes/${ownedNote.id}`);
+    await page.reload();
+    await expect(page.getByRole('heading', { name: title })).toBeVisible();
 
     const historyPage = await context.newPage();
     await historyPage.goto(WALLET_ORIGIN);
@@ -169,6 +172,37 @@ test.describe.serial('Nexus browser security boundary', () => {
   });
 
   test('supports private notes, replies, and idempotent likes in the browser', async () => {
+    const shortenedDestinations: string[] = [];
+    let shortLinkSequence = 0;
+    await context.route('https://pi3.dev/create', async (route) => {
+      const request = route.request();
+      if (request.method() === 'OPTIONS') {
+        await route.fulfill({
+          status: 204,
+          headers: {
+            'Access-Control-Allow-Headers': 'content-type',
+            'Access-Control-Allow-Methods': 'POST, OPTIONS',
+            'Access-Control-Allow-Origin': '*',
+          },
+        });
+        return;
+      }
+      const requestBody = request.postDataJSON() as { url?: unknown };
+      expect(typeof requestBody.url).toBe('string');
+      shortenedDestinations.push(requestBody.url as string);
+      shortLinkSequence += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: { 'Access-Control-Allow-Origin': '*' },
+        body: JSON.stringify({
+          slug: `e2e${shortLinkSequence}`,
+          link: `https://pi3.dev/e2e${shortLinkSequence}`,
+          expiresAt: null,
+        }),
+      });
+    });
+
     const page = await context.newPage();
     await page.goto(RP_A_ORIGIN);
     await page.getByText(ownedNote.title, { exact: true }).click();
@@ -183,7 +217,30 @@ test.describe.serial('Nexus browser security boundary', () => {
     await page.getByPlaceholder('Write a reply…').fill('The creator can reply too.');
     await page.getByRole('button', { name: 'Reply' }).click();
     await expect(page.getByText('The creator can reply too.', { exact: true })).toBeVisible();
-    await page.getByRole('button', { name: 'Delete reply' }).click();
+    const noteWithReply = (await listNotes(RP_A_ORIGIN)).find((note) => note.id === ownedNote.id);
+    const createdReply = noteWithReply?.replies.find(
+      (reply) => reply.body === 'The creator can reply too.',
+    );
+    expect(createdReply).toBeDefined();
+    const replyUrl = `${RP_A_ORIGIN}/notes/${ownedNote.id}/replies/${createdReply?.id}`;
+    await page.goto(replyUrl);
+    await expect(page).toHaveURL(replyUrl);
+    const focusedReply = page.locator(`[data-reply-id="${createdReply?.id}"]`);
+    await expect(focusedReply).toBeFocused();
+
+    await page.getByRole('button', { name: 'Share note' }).click();
+    await expect(page.getByRole('link', { name: 'Short link for note' })).toHaveAttribute(
+      'href',
+      'https://pi3.dev/e2e1',
+    );
+    await focusedReply.getByRole('button', { name: 'Share reply' }).click();
+    await expect(focusedReply.getByRole('link', { name: 'Short link for reply' })).toHaveAttribute(
+      'href',
+      'https://pi3.dev/e2e2',
+    );
+    expect(shortenedDestinations).toEqual([`${RP_A_ORIGIN}/notes/${ownedNote.id}`, replyUrl]);
+
+    await focusedReply.getByRole('button', { name: 'Delete reply' }).click();
     await expect(page.getByText('The creator can reply too.', { exact: true })).toHaveCount(0);
 
     await page.getByRole('button', { name: 'Notes', exact: true }).click();
@@ -195,14 +252,21 @@ test.describe.serial('Nexus browser security boundary', () => {
     await page.getByRole('button', { name: 'Publish note' }).click();
     await expect(page.getByRole('heading', { name: privateTitle })).toBeVisible();
     await expect(page.getByText('Private', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Share note' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Share reply' })).toHaveCount(0);
+    const privateNoteUrl = page.url();
+    expect(privateNoteUrl).toMatch(new RegExp(`${RP_A_ORIGIN}/notes/nt_[A-Za-z0-9_-]+$`, 'u'));
 
     const browser = context.browser();
     if (browser === null) throw new Error('Expected a browser.');
     const anonymous = await browser.newContext({ ignoreHTTPSErrors: true });
     const anonymousPage = await anonymous.newPage();
-    await anonymousPage.goto(RP_A_ORIGIN);
+    await anonymousPage.goto(privateNoteUrl);
+    await expect(anonymousPage).toHaveURL(`${RP_A_ORIGIN}/`);
     await expect(anonymousPage.getByText(privateTitle, { exact: true })).toHaveCount(0);
-    await anonymousPage.getByText(ownedNote.title, { exact: true }).click();
+    await anonymousPage.goto(`${RP_A_ORIGIN}/notes/${ownedNote.id}`);
+    await expect(anonymousPage).toHaveURL(`${RP_A_ORIGIN}/notes/${ownedNote.id}`);
+    await expect(anonymousPage.getByRole('heading', { name: ownedNote.title })).toBeVisible();
     await expect(anonymousPage.getByText('friendly_name', { exact: true })).toBeVisible();
     await expect(anonymousPage.getByText('Log in to reply.', { exact: true })).toBeVisible();
     await expect(anonymousPage.getByRole('button', { name: 'Log in to reply' })).toHaveCount(0);
@@ -212,8 +276,17 @@ test.describe.serial('Nexus browser security boundary', () => {
         { exact: true },
       ),
     ).toHaveCount(0);
+    await anonymousPage.goto(`${RP_A_ORIGIN}/notes/${ownedNote.id}/replies/rpy_missingreply000`);
+    await expect(anonymousPage).toHaveURL(`${RP_A_ORIGIN}/notes/${ownedNote.id}`);
+    await expect(anonymousPage.getByRole('heading', { name: ownedNote.title })).toBeVisible();
+    await anonymousPage.goto(`${RP_A_ORIGIN}/notes/nt_does-not-exist`);
+    await expect(anonymousPage).toHaveURL(`${RP_A_ORIGIN}/`);
+    await expect(
+      anonymousPage.getByRole('heading', { name: 'Notes without accounts' }),
+    ).toBeVisible();
     await anonymous.close();
     await page.close();
+    await context.unroute('https://pi3.dev/create');
   });
 
   test('rejects an A proof at B and pins the wallet response to origin, source, and requestId', async () => {
@@ -322,6 +395,8 @@ test.describe.serial('Nexus browser security boundary', () => {
       expect(csp).not.toContain("script-src 'unsafe-inline'");
       if (origin === WALLET_ORIGIN) {
         expect(csp).toContain(`connect-src 'self' ${REGISTRY_ORIGIN}`);
+      } else {
+        expect(csp).toContain("connect-src 'self' https://pi3.dev");
       }
       await expect(page.locator('body')).toBeVisible();
     }

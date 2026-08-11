@@ -20,7 +20,7 @@ let rateLimitSalt: { bucket: number; value: Uint8Array } | undefined;
 
 const SECURITY_HEADERS: Readonly<Record<string, string>> = Object.freeze({
   'Content-Security-Policy':
-    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://pi3.dev; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
   'Referrer-Policy': 'no-referrer',
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
