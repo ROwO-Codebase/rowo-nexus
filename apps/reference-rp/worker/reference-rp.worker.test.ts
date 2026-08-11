@@ -29,19 +29,28 @@ import type {
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import type {
-  IssueChallengeInput,
   IssuedChallenge,
-  OperationResult,
+  NoteView,
+  SessionOperationInput,
+  SessionOperationResult,
+  SessionStartResult,
 } from '../src/shared/contracts';
 import type { ReferenceRpState } from './reference-rp-state';
 
 const AUDIENCE = 'https://notes.example.test';
+const SESSION_RESOURCE = 'urn:rowo:nexus-notes:session';
 const provider = new WebCryptoProvider();
 
 interface TestIdentity {
   readonly subject: NexusSubject;
   readonly genesis: IdentityGenesisV1;
   readonly privateKey: CryptoKey;
+}
+
+interface LoggedInIdentity {
+  readonly identity: TestIdentity;
+  readonly cookie: string;
+  readonly result: SessionStartResult;
 }
 
 interface TestRateLimiter {
@@ -66,7 +75,14 @@ describe('deployed reference RP Worker', () => {
     await env.TEST_LIFECYCLE.fetch('https://lifecycle.test/__test/reset', { method: 'POST' });
     await env.RP_API_RATE_LIMITER.reset();
     await runInDurableObject(env.RP_STATE.getByName('reference-rp-primary'), (_instance, state) => {
-      state.storage.sql.exec('DELETE FROM challenges; DELETE FROM sessions; DELETE FROM receipts;');
+      state.storage.sql.exec(`
+        DELETE FROM note_likes;
+        DELETE FROM replies;
+        DELETE FROM notes;
+        DELETE FROM challenges;
+        DELETE FROM sessions;
+        DELETE FROM receipts;
+      `);
     });
   });
 
@@ -81,10 +97,6 @@ describe('deployed reference RP Worker', () => {
             .one().count,
       );
     const before = await countChallenges();
-    const operation: IssueChallengeInput = {
-      action: 'note.create',
-      draft: { title: 'Rate limited', body: 'This challenge must never reach durable storage.' },
-    };
 
     await env.RP_API_RATE_LIMITER.setMode('deny');
     const denied = await SELF.fetch(`${AUDIENCE}/api/challenges`, {
@@ -93,7 +105,7 @@ describe('deployed reference RP Worker', () => {
         'Content-Type': 'application/json',
         'CF-Connecting-IP': '203.0.113.42',
       },
-      body: JSON.stringify(operation),
+      body: JSON.stringify({ action: 'session.start' }),
     });
     expect(denied.status).toBe(429);
     expect(denied.headers.get('Retry-After')).toBe('60');
@@ -103,27 +115,24 @@ describe('deployed reference RP Worker', () => {
     expect(keys[0]).not.toContain('203.0.113.42');
 
     await env.RP_API_RATE_LIMITER.setMode('fail');
-    const unavailable = await postJson('/api/challenges', operation);
+    const unavailable = await postJson('/api/challenges', { action: 'session.start' });
     expect(unavailable.status).toBe(503);
     expect(await countChallenges()).toBe(before);
   });
 
-  it('cleans expired challenges and enforces outstanding and total SQLite quotas', async () => {
+  it('cleans expired challenges and enforces bounded outstanding challenge storage', async () => {
     const stub = env.RP_STATE.getByName('reference-rp-primary');
     const now = Math.floor(Date.now() / 1_000);
     await runInDurableObject(stub, (_instance, state) => {
-      state.storage.sql.exec('DELETE FROM challenges');
       state.storage.sql.exec(
         `INSERT INTO challenges
           (challenge_id, nonce_hash, action, resource, context_hash, expires_at, consumed_at)
-         VALUES ('expired', 'expired-hash', 'note.create', 'note:nt_expired', 'expired-context', ?, NULL)`,
+         VALUES ('expired', 'expired-hash', 'session.start', ?, 'expired-context', ?, NULL)`,
+        SESSION_RESOURCE,
         now - 1,
       );
     });
-    const cleanup = await issueChallenge({
-      action: 'note.create',
-      draft: { title: 'Cleanup', body: 'Expired rows are removed before insertion.' },
-    });
+    const challenge = await issueChallenge();
     const afterCleanup = await runInDurableObject(stub, (_instance, state) => ({
       expired: state.storage.sql
         .exec<{ count: number }>(
@@ -133,7 +142,7 @@ describe('deployed reference RP Worker', () => {
       inserted: state.storage.sql
         .exec<{ count: number }>(
           'SELECT COUNT(*) AS count FROM challenges WHERE challenge_id = ?',
-          cleanup.challengeId,
+          challenge.challengeId,
         )
         .one().count,
     }));
@@ -146,212 +155,229 @@ describe('deployed reference RP Worker', () => {
           state.storage.sql.exec(
             `INSERT INTO challenges
               (challenge_id, nonce_hash, action, resource, context_hash, expires_at, consumed_at)
-             VALUES (?, ?, 'note.create', 'note:nt_quota', 'quota-context', ?, NULL)`,
+             VALUES (?, ?, 'session.start', ?, 'quota-context', ?, NULL)`,
             `outstanding-${String(index)}`,
             `outstanding-hash-${String(index)}`,
+            SESSION_RESOURCE,
             now + 600,
           );
         }
       });
     });
-    const outstandingDenied = await postJson('/api/challenges', {
-      action: 'note.create',
-      draft: { title: 'Outstanding quota', body: 'This must be rejected.' },
-    });
-    expect(outstandingDenied.status).toBe(429);
-
-    await runInDurableObject(stub, (_instance, state) => {
-      state.storage.sql.exec('DELETE FROM challenges');
-      state.storage.transactionSync(() => {
-        for (let index = 0; index < 2_048; index += 1) {
-          state.storage.sql.exec(
-            `INSERT INTO challenges
-              (challenge_id, nonce_hash, action, resource, context_hash, expires_at, consumed_at)
-             VALUES (?, ?, 'note.create', 'note:nt_quota', 'quota-context', ?, ?)`,
-            `total-${String(index)}`,
-            `total-hash-${String(index)}`,
-            now + 600,
-            now,
-          );
-        }
-      });
-    });
-    const totalDenied = await postJson('/api/challenges', {
-      action: 'note.create',
-      draft: { title: 'Total quota', body: 'This must also be rejected.' },
-    });
-    expect(totalDenied.status).toBe(429);
+    const denied = await postJson('/api/challenges', { action: 'session.start' });
+    expect(denied.status).toBe(429);
   });
 
-  it('allows exactly one mutation for a challenge and stores no raw nonce, token, or proof', async () => {
+  it('starts one hash-only five-minute session and rejects proof replay', async () => {
     const identity = await createRegisteredIdentity();
-    const operation: IssueChallengeInput = {
-      action: 'note.create',
-      draft: { title: `Replay ${crypto.randomUUID()}`, body: 'Only one request may win.' },
+    const challenge = await issueChallenge();
+    const input = {
+      challengeId: challenge.challengeId,
+      operation: { action: 'session.start' as const },
+      proof: await createProof(identity, challenge),
     };
-    const challenge = await issueChallenge(operation);
-    const proof = await createProof(identity, challenge);
-    const input = { challengeId: challenge.challengeId, operation, proof };
 
     const attempts = await Promise.all([
       postJson('/api/operations', input),
       postJson('/api/operations', input),
     ]);
-    expect(
-      attempts.map((response) => response.status).sort(),
-      (await Promise.all(attempts.map(async (response) => await response.clone().text()))).join(
-        '\n',
-      ),
-    ).toEqual([200, 409]);
+    expect(attempts.map((response) => response.status).sort()).toEqual([200, 409]);
     const accepted = attempts.find((response) => response.status === 200);
-    if (accepted === undefined) throw new Error('Expected one accepted operation.');
-    const result: OperationResult = await accepted.json();
+    if (accepted === undefined) throw new Error('Expected one accepted session.');
+    const result: SessionStartResult = await accepted.clone().json();
+    const setCookie = accepted.headers.get('Set-Cookie');
+    expect(setCookie).toContain('__Host-nexus_notes_session=');
+    expect(setCookie).toContain('Max-Age=300');
+    expect(setCookie).toContain('Secure');
+    expect(setCookie).toContain('HttpOnly');
+    expect(setCookie).toContain('SameSite=Strict');
+    const cookie = cookiePair(setCookie);
 
-    const stub = env.RP_STATE.getByName('reference-rp-primary');
-    const snapshot = await runInDurableObject(stub, (_instance, state) => ({
-      challenge: state.storage.sql
-        .exec<{ nonce_hash: string; consumed_at: number | null }>(
-          'SELECT nonce_hash, consumed_at FROM challenges WHERE challenge_id = ?',
-          challenge.challengeId,
-        )
-        .one(),
-      session: state.storage.sql
-        .exec<{ token_hash: string }>(
-          'SELECT token_hash FROM sessions WHERE subject = ?',
-          identity.subject,
-        )
-        .toArray()[0],
-      receiptCount: state.storage.sql
-        .exec<{ count: number }>(
-          'SELECT COUNT(*) AS count FROM receipts WHERE subject = ?',
-          identity.subject,
-        )
-        .one().count,
-    }));
+    const snapshot = await runInDurableObject(
+      env.RP_STATE.getByName('reference-rp-primary'),
+      (_instance, state) => ({
+        challenge: state.storage.sql
+          .exec<{ nonce_hash: string; consumed_at: number | null }>(
+            'SELECT nonce_hash, consumed_at FROM challenges WHERE challenge_id = ?',
+            challenge.challengeId,
+          )
+          .one(),
+        session: state.storage.sql
+          .exec<{ token_hash: string; proof_hash: string; expires_at: number }>(
+            'SELECT token_hash, proof_hash, expires_at FROM sessions WHERE subject = ?',
+            identity.subject,
+          )
+          .one(),
+      }),
+    );
     expect(snapshot.challenge.nonce_hash).not.toBe(challenge.nonce);
     expect(snapshot.challenge.consumed_at).toEqual(expect.any(Number));
-    expect(snapshot.session?.token_hash).not.toBe(result.session.token);
-    expect(snapshot.receiptCount).toBe(1);
-    expect(JSON.stringify(snapshot)).not.toContain(proof.signature);
-  });
+    expect(snapshot.session.token_hash).not.toBe(cookie.split('=')[1]);
+    expect(snapshot.session.proof_hash).toBe(result.receipt.proofHash);
+    expect(snapshot.session.expires_at - result.receipt.acceptedAt).toBe(300);
+    expect(JSON.stringify(snapshot)).not.toContain(input.proof.signature);
 
-  it('persists create, edit, session status, and delete across the public API', async () => {
-    const identity = await createRegisteredIdentity();
-    const create: IssueChallengeInput = {
-      action: 'note.create',
-      draft: { title: `Lifecycle ${crypto.randomUUID()}`, body: 'First version.' },
-    };
-    const created = await authorize(identity, create);
-    expect(created.note).toMatchObject({ authorSubject: identity.subject, version: 1 });
-    if (created.note === null) throw new Error('Expected a created note.');
-
-    const sessionResponse = await SELF.fetch(`${AUDIENCE}/api/session`, {
-      headers: { Authorization: `NexusSession ${created.session.token}` },
-    });
-    expect(sessionResponse.status).toBe(200);
-    await expect(sessionResponse.json()).resolves.toMatchObject({
+    const current = await fetchWithCookie('/api/session', cookie);
+    expect(current.status).toBe(200);
+    await expect(current.json()).resolves.toMatchObject({
       session: { subject: identity.subject, state: 'active' },
     });
+  });
 
-    const edit: IssueChallengeInput = {
+  it('keeps private notes creator-only and exposes edit/delete authority only through that session', async () => {
+    const owner = await login(await createRegisteredIdentity());
+    const other = await login(await createRegisteredIdentity());
+    const privateNote = await createNote(owner.cookie, 'private');
+
+    await expect(fetchNotes()).resolves.toEqual([]);
+    await expect(fetchNotes(other.cookie)).resolves.toEqual([]);
+    expect((await fetchWithCookie(`/api/notes/${privateNote.id}`, other.cookie)).status).toBe(404);
+    await expect(fetchNote(privateNote.id, owner.cookie)).resolves.toMatchObject({
+      id: privateNote.id,
+      authorSubject: owner.identity.subject,
+      visibility: 'private',
+    });
+
+    const denied = await sessionOperation(other.cookie, {
       action: 'note.edit',
-      noteId: created.note.id,
-      expectedVersion: created.note.version,
-      draft: { title: created.note.title, body: 'Second version.' },
-    };
-    const edited = await authorize(identity, edit);
-    expect(edited.note).toMatchObject({
-      authorSubject: identity.subject,
-      version: 2,
-      body: 'Second version.',
+      noteId: privateNote.id,
+      expectedVersion: privateNote.version,
+      draft: { title: 'Takeover', body: 'This must fail.', visibility: 'public' },
     });
-    if (edited.note === null) throw new Error('Expected an edited note.');
+    expect(denied.status).toBe(403);
 
-    const remove: IssueChallengeInput = {
-      action: 'note.delete',
-      noteId: edited.note.id,
-      expectedVersion: edited.note.version,
-    };
-    const deleted = await authorize(identity, remove);
-    expect(deleted.note).toBeNull();
-    expect((await SELF.fetch(`${AUDIENCE}/api/notes/${edited.note.id}`)).status).toBe(404);
+    const publicNote = await createNote(owner.cookie, 'public');
+    await expect(fetchNotes()).resolves.toEqual([
+      expect.objectContaining({ id: publicNote.id, visibility: 'public' }),
+    ]);
   });
 
-  it('denies create, edit, and delete after authoritative revocation', async () => {
-    const identity = await createRegisteredIdentity();
-    const initial = await authorize(identity, {
-      action: 'note.create',
-      draft: { title: `Before revoke ${crypto.randomUUID()}`, body: 'Still active.' },
-    });
-    if (initial.note === null) throw new Error('Expected a created note.');
-    await lifecycleControl('/__test/revoke', identity);
+  it('supports replies and enforces reply-author or note-author removal', async () => {
+    const owner = await login(await createRegisteredIdentity());
+    const visitor = await login(await createRegisteredIdentity());
+    const stranger = await login(await createRegisteredIdentity());
+    const note = await createNote(owner.cookie, 'public');
 
-    const operations: IssueChallengeInput[] = [
-      {
-        action: 'note.create',
-        draft: { title: `Denied ${crypto.randomUUID()}`, body: 'Must not be created.' },
-      },
-      {
-        action: 'note.edit',
-        noteId: initial.note.id,
-        expectedVersion: initial.note.version,
-        draft: { title: initial.note.title, body: 'Must not be changed.' },
-      },
-      {
-        action: 'note.delete',
-        noteId: initial.note.id,
-        expectedVersion: initial.note.version,
-      },
-    ];
-    for (const operation of operations) {
-      const challenge = await issueChallenge(operation);
-      const response = await postJson('/api/operations', {
-        challengeId: challenge.challengeId,
-        operation,
-        proof: await createProof(identity, challenge),
-      });
-      expect(response.status).toBe(403);
-      await expect(response.json()).resolves.toMatchObject({ error: { code: 'IDENTITY_REVOKED' } });
-    }
+    const replied = await expectSessionSuccess(
+      await sessionOperation(visitor.cookie, {
+        action: 'reply.create',
+        noteId: note.id,
+        body: 'A visitor reply.',
+      }),
+    );
+    const reply = replied.note?.replies[0];
+    if (reply === undefined) throw new Error('Expected a reply.');
 
-    const unchanged = await SELF.fetch(`${AUDIENCE}/api/notes/${initial.note.id}`);
-    await expect(unchanged.json()).resolves.toMatchObject({
-      note: { version: 1, body: 'Still active.', authorSubject: identity.subject },
-    });
+    expect(
+      (
+        await sessionOperation(stranger.cookie, {
+          action: 'reply.delete',
+          noteId: note.id,
+          replyId: reply.id,
+        })
+      ).status,
+    ).toBe(403);
+    const removed = await expectSessionSuccess(
+      await sessionOperation(owner.cookie, {
+        action: 'reply.delete',
+        noteId: note.id,
+        replyId: reply.id,
+      }),
+    );
+    expect(removed.note?.replies).toEqual([]);
+
+    const privateNote = await createNote(owner.cookie, 'private');
+    expect(
+      (
+        await sessionOperation(visitor.cookie, {
+          action: 'reply.create',
+          noteId: privateNote.id,
+          body: 'Invisible reply.',
+        })
+      ).status,
+    ).toBe(404);
+    expect(
+      (
+        await expectSessionSuccess(
+          await sessionOperation(owner.cookie, {
+            action: 'reply.create',
+            noteId: privateNote.id,
+            body: 'Owner self-reply.',
+          }),
+        )
+      ).note?.replies,
+    ).toHaveLength(1);
   });
 
-  it('survives Durable Object eviction and enforces immutable author_subject in SQLite', async () => {
-    // Pool 0.21 gracefully waits on in-flight runInDurableObject facets during
-    // eviction. Clear facets retained by earlier tests, then exercise an actual
-    // graceful eviction of the clean instance created below.
+  it('counts one like per subject, supports unlike, and never likes a private note', async () => {
+    const owner = await login(await createRegisteredIdentity());
+    const visitor = await login(await createRegisteredIdentity());
+    const note = await createNote(owner.cookie, 'public');
+
+    await expectSessionSuccess(
+      await sessionOperation(visitor.cookie, { action: 'note.like', noteId: note.id }),
+    );
+    const duplicate = await expectSessionSuccess(
+      await sessionOperation(visitor.cookie, { action: 'note.like', noteId: note.id }),
+    );
+    expect(duplicate.note).toMatchObject({ likeCount: 1, likedByViewer: true });
+    const unliked = await expectSessionSuccess(
+      await sessionOperation(visitor.cookie, { action: 'note.unlike', noteId: note.id }),
+    );
+    expect(unliked.note).toMatchObject({ likeCount: 0, likedByViewer: false });
+
+    const privateNote = await createNote(owner.cookie, 'private');
+    expect(
+      (await sessionOperation(owner.cookie, { action: 'note.like', noteId: privateNote.id }))
+        .status,
+    ).toBe(403);
+  });
+
+  it('rejects every session mutation after revocation and survives Durable Object eviction', async () => {
     await abortAllDurableObjects();
-    const identity = await createRegisteredIdentity();
-    const result = await authorize(identity, {
-      action: 'note.create',
-      draft: { title: `Durable ${crypto.randomUUID()}`, body: 'Persist this note.' },
-    });
-    if (result.note === null) throw new Error('Expected a created note.');
-
+    const owner = await login(await createRegisteredIdentity());
+    const note = await createNote(owner.cookie, 'public');
     const stub = env.RP_STATE.getByName('reference-rp-primary');
     await evictDurableObject(stub);
-    const persisted = await SELF.fetch(`${AUDIENCE}/api/notes/${result.note.id}`);
-    await expect(persisted.json()).resolves.toMatchObject({
-      note: { id: result.note.id, authorSubject: identity.subject, body: 'Persist this note.' },
+    await expect(fetchNote(note.id)).resolves.toMatchObject({
+      id: note.id,
+      authorSubject: owner.identity.subject,
     });
+
+    await lifecycleControl('/__test/revoke', owner.identity);
+    const denied = await sessionOperation(owner.cookie, {
+      action: 'note.delete',
+      noteId: note.id,
+      expectedVersion: note.version,
+    });
+    expect(denied.status).toBe(401);
+    await expect(denied.json()).resolves.toMatchObject({ error: { code: 'SESSION_INVALID' } });
 
     await expect(
       runInDurableObject(stub, (_instance, state) => {
         state.storage.sql.exec(
           'UPDATE notes SET author_subject = ? WHERE id = ?',
           `nx1_${'Z'.repeat(43)}`,
-          result.note?.id ?? '',
+          note.id,
         );
       }),
     ).rejects.toThrow();
-    const afterAttempt = await SELF.fetch(`${AUDIENCE}/api/notes/${result.note.id}`);
-    await expect(afterAttempt.json()).resolves.toMatchObject({
-      note: { authorSubject: identity.subject },
-    });
+    const schema = await runInDurableObject(stub, (_instance, state) => ({
+      version: state.storage.sql
+        .exec<{ version: number }>('SELECT version FROM schema_meta WHERE singleton = 1')
+        .one().version,
+      replyTable: state.storage.sql
+        .exec<{ count: number }>(
+          "SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'table' AND name = 'replies'",
+        )
+        .one().count,
+      likesTable: state.storage.sql
+        .exec<{ count: number }>(
+          "SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'table' AND name = 'note_likes'",
+        )
+        .one().count,
+    }));
+    expect(schema).toEqual({ version: 2, replyTable: 1, likesTable: 1 });
   });
 });
 
@@ -389,25 +415,77 @@ async function lifecycleControl(
   expect(response.ok).toBe(true);
 }
 
-async function issueChallenge(operation: IssueChallengeInput): Promise<IssuedChallenge> {
-  const response = await postJson('/api/challenges', operation);
-  expect(response.status).toBe(201);
+async function issueChallenge(): Promise<IssuedChallenge> {
+  const response = await postJson('/api/challenges', { action: 'session.start' });
+  expect(response.status, await response.clone().text()).toBe(201);
   const body: { challenge: IssuedChallenge } = await response.json();
   return body.challenge;
 }
 
-async function authorize(
-  identity: TestIdentity,
-  operation: IssueChallengeInput,
-): Promise<OperationResult> {
-  const challenge = await issueChallenge(operation);
+async function login(identity: TestIdentity): Promise<LoggedInIdentity> {
+  const challenge = await issueChallenge();
   const response = await postJson('/api/operations', {
     challengeId: challenge.challengeId,
-    operation,
+    operation: { action: 'session.start' },
     proof: await createProof(identity, challenge),
   });
   expect(response.status, await response.clone().text()).toBe(200);
+  return {
+    identity,
+    cookie: cookiePair(response.headers.get('Set-Cookie')),
+    result: await response.json(),
+  };
+}
+
+async function createNote(cookie: string, visibility: 'public' | 'private'): Promise<NoteView> {
+  const result = await expectSessionSuccess(
+    await sessionOperation(cookie, {
+      action: 'note.create',
+      draft: { title: `${visibility} note`, body: 'A note body.', visibility },
+    }),
+  );
+  if (result.note === null) throw new Error('Expected a note.');
+  return result.note;
+}
+
+async function sessionOperation(
+  cookie: string,
+  operation: SessionOperationInput,
+): Promise<Response> {
+  return await SELF.fetch(`${AUDIENCE}/api/session-operations`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Cookie: cookie,
+      'X-Nexus-Notes-Session': '1',
+    },
+    body: JSON.stringify(operation),
+  });
+}
+
+async function expectSessionSuccess(response: Response): Promise<SessionOperationResult> {
+  expect(response.status, await response.clone().text()).toBe(200);
   return await response.json();
+}
+
+async function fetchNotes(cookie?: string): Promise<NoteView[]> {
+  const response = await fetchWithCookie('/api/notes', cookie);
+  expect(response.status, await response.clone().text()).toBe(200);
+  const body: { notes: NoteView[] } = await response.json();
+  return body.notes;
+}
+
+async function fetchNote(id: string, cookie?: string): Promise<NoteView> {
+  const response = await fetchWithCookie(`/api/notes/${id}`, cookie);
+  expect(response.status, await response.clone().text()).toBe(200);
+  const body: { note: NoteView } = await response.json();
+  return body.note;
+}
+
+function fetchWithCookie(path: string, cookie?: string): Promise<Response> {
+  return SELF.fetch(`${AUDIENCE}${path}`, {
+    headers: cookie === undefined ? {} : { Cookie: cookie },
+  });
 }
 
 async function createProof(
@@ -431,6 +509,15 @@ async function createProof(
     payload,
     signature: (await signProtocolPayload(payload, identity.privateKey, provider)) as Base64Url64,
   };
+}
+
+function cookiePair(setCookie: string | null): string {
+  if (setCookie === null) throw new Error('Expected the session cookie.');
+  const pair = setCookie.split(';', 1)[0];
+  if (pair === undefined || !pair.startsWith('__Host-nexus_notes_session=')) {
+    throw new Error('The session cookie is malformed.');
+  }
+  return pair;
 }
 
 function postJson(path: string, value: unknown): Promise<Response> {

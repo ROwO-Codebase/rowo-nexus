@@ -6,9 +6,9 @@
 
 ## Context
 
-Browser and operating-system storage cannot guarantee physical secure deletion, and exported or old
-backup copies may survive. Local deletion alone therefore cannot establish that a subject has lost
-future control.
+Browser and operating-system storage cannot guarantee physical secure deletion, and previously
+copied key material may survive. Local deletion alone therefore cannot establish that a subject has
+lost future control.
 
 ## Decision
 
@@ -27,7 +27,7 @@ subjects even if an old private key can still make a valid signature.
 
 ## Consequences
 
-- Restored/exported keys cannot reactivate a disposed subject.
+- Surviving key copies cannot reactivate a disposed subject.
 - Offline signature verification may still succeed after revocation; signature validity and current
   authorization are distinct.
 - The user cannot recover or transfer a disposed identity through a new key.

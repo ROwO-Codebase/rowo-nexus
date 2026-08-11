@@ -19,8 +19,7 @@ configuration, not only in application code.
 | R2 transparency checkpoints/segments           | Hashes, roots, sizes, timestamps, signatures, and proofs                                          | Service lifetime and at least the full public verification promise.                                                                        |
 | Service public-key history                     | Public JWK and `kid`, activation/retirement/incident metadata                                     | At least as long as any supported receipt/checkpoint under the key; normally service lifetime.                                             |
 | Turnstile tokens                               | In-memory validation input only                                                                   | Never persisted after validation.                                                                                                          |
-| Coarse abuse events                            | Endpoint/category/result bucket without subject, IP, UA, RP, nonce, or backup ID                  | 7 days.                                                                                                                                    |
-| Encrypted vault backups                        | Disabled pending approval of [ADR-0011](../adr/0011-backup-security.md)                           | No production collection. The approved decision must define expiry and verified deletion before enablement.                                |
+| Coarse abuse events                            | Endpoint/category/result bucket without subject, IP, UA, RP, or nonce                             | 7 days.                                                                                                                                    |
 
 Cloudflare platform-level telemetry outside application control must be inventoried before
 production. Configure the minimum available retention and disable fields/products that add
@@ -32,11 +31,10 @@ privacy review records any provider-retained metadata and its contractual durati
 Application code never logs or stores in telemetry:
 
 - private identity or agreement keys;
-- revocation secrets or backup capability secrets;
-- backup decryption keys or plaintext vault contents;
+- revocation secrets or plaintext vault contents;
 - raw signed proof bodies or genesis documents in routine logs;
-- subjects, genesis hashes, event IDs, proof IDs, nonces, backup IDs, RP origins, IP addresses, user
-  agents, or device fingerprints as metric/log dimensions;
+- subjects, genesis hashes, event IDs, proof IDs, nonces, RP origins, IP addresses, user agents, or
+  device fingerprints as metric/log dimensions;
 - stable request, installation, controller, account, or user identifiers;
 - Turnstile tokens associated with subjects.
 
@@ -54,16 +52,12 @@ record and must not become an RP session or user identifier.
 
 Identity disposal publishes an irreversible revocation and then performs best-effort local
 crypto-shredding. Authoritative revocation and public receipt/checkpoint material are retained so
-restored keys cannot regain current control; they are not removed as a privacy deletion shortcut.
+surviving or copied keys cannot regain current control; they are not removed as a privacy deletion
+shortcut.
 
 Local wallet labels, scopes, key handles, and revocation secrets are erased after receipt
 verification where browser/OS storage permits. Nexus must be transparent that physical deletion from
-browser, device, backups, or storage media cannot be guaranteed.
-
-Optional encrypted backups remain disabled. Before enablement,
-[ADR-0011](../adr/0011-backup-security.md) must define capability lifecycle, inactivity/expiry
-policy, user-triggered deletion, R2 version cleanup, deletion verification, disaster-recovery
-copies, and how post-disposal backups are rewritten without revealing subjects.
+browser, device, or storage media cannot be guaranteed.
 
 ## Review and enforcement
 

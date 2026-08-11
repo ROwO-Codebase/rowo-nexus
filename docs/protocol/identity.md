@@ -5,8 +5,8 @@ This document summarizes the v1 identity contract. `NEXUS_SPEC.md` remains norma
 ## Suite
 
 `NX-25519-SHA256-JCS-v1` uses Ed25519 signing, SHA-256 subject hashing, optional X25519 agreement,
-HKDF-SHA-256 where needed, AES-256-GCM for local/backup envelopes, RFC 8785 JSON Canonicalization
-Scheme (JCS), and unpadded base64url binary fields.
+HKDF-SHA-256 where needed, AES-256-GCM for local envelopes, RFC 8785 JSON Canonicalization Scheme
+(JCS), and unpadded base64url binary fields.
 
 All signed inputs are strictly schema-validated before canonicalization. Unknown fields, protocols,
 or suites fail closed. Cryptographic algorithm names are enumerated by the schema and never passed
@@ -58,9 +58,8 @@ non-extractable `CryptoKey` objects where browser persistence is verified. Priva
 revocation secrets, local labels/scopes, stable installation IDs, or controller IDs must never reach
 an RP or Cloudflare service.
 
-An optional encrypted backup may contain portable key material only after blocked
-[ADR-0011](../adr/0011-backup-security.md) is approved. The service may store ciphertext and opaque
-capability metadata, but cannot receive its decryption key or a subject list.
+Nexus v1 provides no private-key export, import, backup, recovery, or server-side wallet storage
+path. Identity keys remain local and non-extractable in the wallet.
 
 ## Privacy properties and limits
 

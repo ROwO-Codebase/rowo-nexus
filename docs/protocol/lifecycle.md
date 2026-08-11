@@ -51,7 +51,7 @@ The wallet disposal order is mandatory:
 5. retain only minimal receipt/history data if the user chooses.
 
 If revocation fails, the wallet must not present disposal as complete. Browser/OS deletion is
-best-effort; registry revocation is what prevents surviving or restored key material from regaining
+best-effort; registry revocation is what prevents surviving or copied key material from regaining
 future control.
 
 ## Rotation and continuity

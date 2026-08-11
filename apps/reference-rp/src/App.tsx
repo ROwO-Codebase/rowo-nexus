@@ -15,10 +15,16 @@ import {
   Copy,
   FileKey2,
   Fingerprint,
+  Globe2,
+  Heart,
   Info,
   KeyRound,
   Loader2,
+  Lock,
   LockKeyhole,
+  LogIn,
+  LogOut,
+  MessageCircle,
   PenLine,
   Plus,
   ReceiptText,
@@ -32,17 +38,20 @@ import {
 import { motion } from 'motion/react';
 
 import {
+  executeSessionOperation,
   ReferenceRpApiError,
   getSession,
   issueChallenge,
   listNotes,
-  submitOperation,
+  logoutSession,
+  startSession,
 } from './api.js';
 import type {
   ApplicationReceipt,
-  IssueChallengeInput,
   NoteDraft,
   NoteView,
+  ReplyView,
+  SessionOperationInput,
   SessionStatus,
 } from './shared/contracts.js';
 
@@ -65,8 +74,8 @@ interface ProofFlow {
 
 const IDLE_PROOF: ProofFlow = {
   stage: 'idle',
-  title: 'Proof ready',
-  message: 'Protected changes ask your Nexus wallet for a short-lived ownership proof.',
+  title: 'Session ready',
+  message: 'Log in with Nexus to approve a five-minute Notes session.',
 };
 
 export function App(): React.ReactElement {
@@ -97,63 +106,105 @@ export function App(): React.ReactElement {
   }, []);
 
   useEffect(() => {
-    void refreshNotes();
+    let mounted = true;
+    void (async () => {
+      try {
+        const restored = await getSession();
+        if (mounted) setSession(restored);
+      } catch {
+        if (mounted) setSession(null);
+      } finally {
+        if (mounted) await refreshNotes();
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
   }, [refreshNotes]);
 
-  const runProtectedOperation = useCallback(
-    async (operation: IssueChallengeInput): Promise<void> => {
+  const startLogin = useCallback(async (): Promise<void> => {
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setProof({
+      stage: 'challenge',
+      title: 'Preparing session challenge',
+      message: 'Binding a five-minute Notes session to this exact RP origin and policy.',
+    });
+    try {
+      const operation = { action: 'session.start' as const };
+      const challenge = await issueChallenge(operation);
+      const request: ProofRequest = {
+        action: challenge.action,
+        resource: challenge.resource,
+        nonce: challenge.nonce,
+        expiresAt: challenge.expiresAt,
+        ...(challenge.contextHash === undefined ? {} : { contextHash: challenge.contextHash }),
+      };
+
+      setProof({
+        stage: 'wallet',
+        title: 'Approve Notes session',
+        message: 'Review session.start and the Nexus Notes session resource in your wallet.',
+      });
+      const result = await nexus.requestProof(request, { signal: controller.signal });
+      setProof({
+        stage: 'verifying',
+        title: 'Starting secure session',
+        message: 'Checking the proof and authoritative identity lifecycle.',
+      });
+      const started = await startSession({
+        challengeId: challenge.challengeId,
+        proof: result.proof,
+        operation,
+      });
+      setSession(started.session);
+      setReceipts((current) => [started.receipt, ...current].slice(0, 6));
+      setProof({
+        stage: 'approved',
+        title: 'Session active',
+        message: 'Create, edit, reply, and like without another popup for five minutes.',
+      });
+      await refreshNotes(false);
+    } catch (error) {
+      if (
+        error instanceof NexusClientError &&
+        (error.code === 'USER_CANCELLED' || error.code === 'POPUP_CLOSED')
+      ) {
+        setProof({
+          stage: 'cancelled',
+          title: 'Login cancelled',
+          message: 'No session was created.',
+          code: error.code,
+        });
+      } else {
+        setProof({
+          stage: 'error',
+          title: 'Login failed',
+          message: readErrorMessage(error),
+          code: readErrorCode(error),
+        });
+      }
+    } finally {
+      abortRef.current = null;
+    }
+  }, [refreshNotes]);
+
+  const runSessionOperation = useCallback(
+    async (operation: SessionOperationInput): Promise<void> => {
       const controller = new AbortController();
       abortRef.current = controller;
       setProof({
-        stage: 'challenge',
-        title: 'Preparing one-time challenge',
-        message: 'Binding the exact action, note, content, and this RP origin.',
+        stage: 'verifying',
+        title: 'Authorizing with session',
+        message: 'Checking session scope, active lifecycle, visibility, and ownership.',
       });
       try {
-        const challenge = await issueChallenge(operation);
-        const request: ProofRequest = {
-          action: challenge.action,
-          resource: challenge.resource,
-          nonce: challenge.nonce,
-          expiresAt: challenge.expiresAt,
-          ...(challenge.contextHash === undefined ? {} : { contextHash: challenge.contextHash }),
-        };
-
-        setProof({
-          stage: 'wallet',
-          title: 'Waiting for your approval',
-          message: 'Review the origin, action, and resource in the Nexus wallet popup.',
-        });
-        const result = await nexus.requestProof(request, { signal: controller.signal });
-
-        setProof({
-          stage: 'verifying',
-          title: 'Verifying proof',
-          message: 'Checking signature, live identity status, and one-time challenge use.',
-        });
-        const operationResult = await submitOperation({
-          challengeId: challenge.challengeId,
-          proof: result.proof,
-          operation,
-        });
+        const operationResult = await executeSessionOperation(operation);
         setReceipts((current) => [operationResult.receipt, ...current].slice(0, 4));
-
-        try {
-          setSession(await getSession(operationResult.session.token));
-        } catch {
-          setSession({
-            subject: operationResult.session.subject,
-            state: 'active',
-            sequence: 0,
-            expiresAt: operationResult.session.expiresAt,
-            checkedAt: Math.floor(Date.now() / 1000),
-          });
-        }
-
         setProof({
           stage: 'approved',
-          title: 'Proof approved',
-          message: `Receipt ${shortReceipt(operationResult.receipt.receiptId)} records the accepted proof hash.`,
+          title: 'Session action accepted',
+          message: `Receipt ${shortReceipt(operationResult.receipt.receiptId)} records RP-session authorization.`,
         });
         const refreshed = await refreshNotes(false);
         if (operationResult.note === null) {
@@ -165,24 +216,16 @@ export function App(): React.ReactElement {
           setView('detail');
         }
       } catch (error) {
-        if (
-          error instanceof NexusClientError &&
-          (error.code === 'USER_CANCELLED' || error.code === 'POPUP_CLOSED')
-        ) {
-          setProof({
-            stage: 'cancelled',
-            title: 'Approval cancelled',
-            message: 'Nothing was changed and the challenge will expire automatically.',
-            code: error.code,
-          });
-        } else {
-          setProof({
-            stage: 'error',
-            title: 'Proof rejected',
-            message: readErrorMessage(error),
-            code: readErrorCode(error),
-          });
+        if (error instanceof ReferenceRpApiError && error.code === 'SESSION_INVALID') {
+          setSession(null);
+          await refreshNotes(false);
         }
+        setProof({
+          stage: 'error',
+          title: 'Session action rejected',
+          message: readErrorMessage(error),
+          code: readErrorCode(error),
+        });
       } finally {
         abortRef.current = null;
       }
@@ -190,12 +233,42 @@ export function App(): React.ReactElement {
     [refreshNotes],
   );
 
+  const endLogin = useCallback(async (): Promise<void> => {
+    try {
+      await logoutSession();
+    } finally {
+      setSession(null);
+      setSelectedNote(null);
+      setView('feed');
+      setProof(IDLE_PROOF);
+      await refreshNotes(false);
+    }
+  }, [refreshNotes]);
+
+  useEffect(() => {
+    if (session === null) return;
+    const remaining = session.expiresAt * 1_000 - Date.now();
+    if (remaining <= 0) {
+      setSession(null);
+      void refreshNotes(false);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setSession(null);
+      setSelectedNote(null);
+      setView('feed');
+      void refreshNotes(false);
+    }, remaining);
+    return () => window.clearTimeout(timer);
+  }, [refreshNotes, session]);
+
   const isBusy =
     proof.stage === 'challenge' || proof.stage === 'wallet' || proof.stage === 'verifying';
   const ownNoteCount = useMemo(
     () => notes.filter((note) => note.authorSubject === session?.subject).length,
     [notes, session?.subject],
   );
+  const hasValidSession = session !== null && session.state === 'active';
 
   const openFeed = (): void => {
     setView('feed');
@@ -211,12 +284,20 @@ export function App(): React.ReactElement {
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <Header
         view={view}
+        session={session}
+        busy={isBusy}
         onNotes={openFeed}
         onSecurity={() => setView('security')}
         onCreate={() => {
+          if (!hasValidSession) {
+            void startLogin();
+            return;
+          }
           setProof(IDLE_PROOF);
           setView('create');
         }}
+        onLogin={() => void startLogin()}
+        onLogout={() => void endLogin()}
       />
 
       <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
@@ -239,13 +320,21 @@ export function App(): React.ReactElement {
             <button
               type="button"
               onClick={() => {
+                if (!hasValidSession) {
+                  void startLogin();
+                  return;
+                }
                 setProof(IDLE_PROOF);
                 setView('create');
               }}
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
             >
-              <Plus className="h-4 w-4" aria-hidden="true" />
-              Write a note
+              {hasValidSession ? (
+                <Plus className="h-4 w-4" aria-hidden="true" />
+              ) : (
+                <LogIn className="h-4 w-4" aria-hidden="true" />
+              )}
+              {hasValidSession ? 'Write a note' : 'Log in to write'}
             </button>
           ) : null}
         </div>
@@ -271,37 +360,56 @@ export function App(): React.ReactElement {
                   <DetailView
                     key={selectedNote.id}
                     note={selectedNote}
-                    owned={selectedNote.authorSubject === session?.subject}
+                    session={session}
                     busy={isBusy}
                     onBack={openFeed}
                     onEdit={() => setView('edit')}
                     onDelete={() => setDeleteTarget(selectedNote)}
-                  />
-                ) : null}
-                {view === 'create' ? (
-                  <Composer
-                    key="create"
-                    title="Write anonymously"
-                    description="Your wallet will choose a local identity and approve a proof for this exact content."
-                    submitLabel="Continue with Nexus"
-                    busy={isBusy}
-                    onCancel={openFeed}
-                    onSubmit={(draft) =>
-                      void runProtectedOperation({ action: 'note.create', draft })
+                    onLogin={() => void startLogin()}
+                    onLike={() =>
+                      void runSessionOperation({
+                        action: selectedNote.likedByViewer ? 'note.unlike' : 'note.like',
+                        noteId: selectedNote.id,
+                      })
+                    }
+                    onReply={(body) =>
+                      void runSessionOperation({
+                        action: 'reply.create',
+                        noteId: selectedNote.id,
+                        body,
+                      })
+                    }
+                    onDeleteReply={(replyId) =>
+                      void runSessionOperation({
+                        action: 'reply.delete',
+                        noteId: selectedNote.id,
+                        replyId,
+                      })
                     }
                   />
                 ) : null}
-                {view === 'edit' && selectedNote !== null ? (
+                {view === 'create' && hasValidSession ? (
+                  <Composer
+                    key="create"
+                    title="Write anonymously"
+                    description="Your active Notes session will own this note. Private notes are visible only to this subject."
+                    submitLabel="Publish note"
+                    busy={isBusy}
+                    onCancel={openFeed}
+                    onSubmit={(draft) => void runSessionOperation({ action: 'note.create', draft })}
+                  />
+                ) : null}
+                {view === 'edit' && selectedNote !== null && hasValidSession ? (
                   <Composer
                     key={`edit-${selectedNote.id}`}
                     title="Edit note"
-                    description="Only the immutable author subject can approve this update."
-                    submitLabel="Prove & save"
+                    description="Only the active immutable author session can save this update."
+                    submitLabel="Save note"
                     initial={selectedNote}
                     busy={isBusy}
                     onCancel={() => setView('detail')}
                     onSubmit={(draft) =>
-                      void runProtectedOperation({
+                      void runSessionOperation({
                         action: 'note.edit',
                         noteId: selectedNote.id,
                         expectedVersion: selectedNote.version,
@@ -314,7 +422,13 @@ export function App(): React.ReactElement {
             </section>
 
             <aside className="space-y-4 lg:sticky lg:top-24" aria-label="Nexus proof status">
-              <IdentityCard session={session} ownNoteCount={ownNoteCount} />
+              <IdentityCard
+                session={session}
+                ownNoteCount={ownNoteCount}
+                busy={isBusy}
+                onLogin={() => void startLogin()}
+                onLogout={() => void endLogin()}
+              />
               <ProofCard
                 flow={proof}
                 onCancel={() => abortRef.current?.abort()}
@@ -336,7 +450,7 @@ export function App(): React.ReactElement {
           onConfirm={() => {
             const target = deleteTarget;
             setDeleteTarget(null);
-            void runProtectedOperation({
+            void runSessionOperation({
               action: 'note.delete',
               noteId: target.id,
               expectedVersion: target.version,
@@ -350,14 +464,22 @@ export function App(): React.ReactElement {
 
 function Header({
   view,
+  session,
+  busy,
   onNotes,
   onSecurity,
   onCreate,
+  onLogin,
+  onLogout,
 }: {
   view: AppView;
+  session: SessionStatus | null;
+  busy: boolean;
   onNotes: () => void;
   onSecurity: () => void;
   onCreate: () => void;
+  onLogin: () => void;
+  onLogout: () => void;
 }): React.ReactElement {
   return (
     <header className="sticky top-0 z-30 border-b border-slate-200/90 bg-white/95 backdrop-blur">
@@ -369,10 +491,10 @@ function Header({
         >
           <img src="/logo.png" alt="" className="h-8 w-8 rounded-xl object-cover" />
           <div className="leading-none">
-            <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-indigo-600">
-              ROwO Nexus
+            <div className="text-lg font-semibold tracking-tight text-slate-800">
+              ROwO <span className="text-indigo-600">Nexus</span>
             </div>
-            <div className="mt-1 text-sm font-semibold tracking-tight text-slate-800">Notes</div>
+            <div className="mt-1 text-xs font-medium text-slate-500">Notes</div>
           </div>
         </button>
 
@@ -405,9 +527,27 @@ function Header({
             type="button"
             onClick={onCreate}
             aria-label="Write a note"
-            className="ml-1 rounded-lg bg-indigo-600 p-2 text-white transition-colors hover:bg-indigo-700 sm:hidden"
+            disabled={busy}
+            className="ml-1 rounded-lg bg-indigo-600 p-2 text-white transition-colors hover:bg-indigo-700 disabled:opacity-50 sm:hidden"
           >
-            <Plus className="h-4 w-4" />
+            {session === null ? <LogIn className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+          </button>
+          <button
+            type="button"
+            onClick={session === null ? onLogin : onLogout}
+            disabled={busy}
+            className={`ml-1 hidden items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50 sm:flex ${
+              session === null
+                ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            {session === null ? (
+              <LogIn className="h-4 w-4" aria-hidden="true" />
+            ) : (
+              <LogOut className="h-4 w-4" aria-hidden="true" />
+            )}
+            {session === null ? 'Log in' : 'Log out'}
           </button>
         </nav>
       </div>
@@ -458,15 +598,13 @@ function FeedView({
       transition={{ duration: 0.18 }}
       className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm"
     >
-      <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 sm:px-6">
+      <div className="border-b border-slate-100 px-5 py-4 sm:px-6">
         <div>
-          <h2 className="text-sm font-semibold text-slate-900">Public notebook</h2>
-          <p className="mt-0.5 text-xs text-slate-500">{notes.length} proof-backed notes</p>
+          <h2 className="text-sm font-semibold text-slate-900">Visible notes</h2>
+          <p className="mt-0.5 text-xs text-slate-500">
+            {notes.length} public and session-authorized notes
+          </p>
         </div>
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
-          <Circle className="h-2 w-2 fill-current" aria-hidden="true" />
-          Live demo
-        </span>
       </div>
       <div className="divide-y divide-slate-100">
         {notes.map((note) => {
@@ -489,6 +627,11 @@ function FeedView({
                         Yours
                       </span>
                     ) : null}
+                    {note.visibility === 'private' ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-700">
+                        <Lock className="h-2.5 w-2.5" aria-hidden="true" /> Private
+                      </span>
+                    ) : null}
                   </div>
                   <h3 className="text-base font-semibold tracking-tight text-slate-900 group-hover:text-indigo-700">
                     {note.title}
@@ -500,7 +643,15 @@ function FeedView({
                     <span>{relativeTime(note.updatedAt)}</span>
                     <span className="inline-flex items-center gap-1">
                       <BadgeCheck className="h-3.5 w-3.5 text-emerald-500" aria-hidden="true" />
-                      proof {note.proofFingerprint}
+                      {note.authorization === 'wallet-proof' ? 'proof' : 'session'}{' '}
+                      {note.proofFingerprint}
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <Heart className="h-3.5 w-3.5" aria-hidden="true" /> {note.likeCount}
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <MessageCircle className="h-3.5 w-3.5" aria-hidden="true" />{' '}
+                      {note.replies.length}
                     </span>
                   </div>
                 </div>
@@ -516,19 +667,28 @@ function FeedView({
 
 function DetailView({
   note,
-  owned,
+  session,
   busy,
   onBack,
   onEdit,
   onDelete,
+  onLogin,
+  onLike,
+  onReply,
+  onDeleteReply,
 }: {
   note: NoteView;
-  owned: boolean;
+  session: SessionStatus | null;
   busy: boolean;
   onBack: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onLogin: () => void;
+  onLike: () => void;
+  onReply: (body: string) => void;
+  onDeleteReply: (replyId: string) => void;
 }): React.ReactElement {
+  const owned = session !== null && note.authorSubject === session.subject;
   return (
     <motion.article
       initial={{ opacity: 0, y: 5 }}
@@ -556,45 +716,213 @@ function DetailView({
                 <Check className="h-3 w-3" /> Your current subject
               </span>
             ) : null}
+            <span
+              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium ${
+                note.visibility === 'private'
+                  ? 'bg-violet-50 text-violet-700'
+                  : 'bg-emerald-50 text-emerald-700'
+              }`}
+            >
+              {note.visibility === 'private' ? (
+                <Lock className="h-3 w-3" />
+              ) : (
+                <Globe2 className="h-3 w-3" />
+              )}
+              {note.visibility === 'private' ? 'Private' : 'Public'}
+            </span>
           </div>
           <h2 className="text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
             {note.title}
           </h2>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <button
-            type="button"
-            onClick={onEdit}
-            disabled={busy}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
-          >
-            <PenLine className="h-4 w-4" /> Edit
-          </button>
-          <button
-            type="button"
-            onClick={onDelete}
-            disabled={busy}
-            className="inline-flex items-center gap-2 rounded-xl border border-red-100 bg-red-50 px-3.5 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-100 disabled:opacity-50"
-          >
-            <Trash2 className="h-4 w-4" /> Delete
-          </button>
-        </div>
+        {owned ? (
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={onEdit}
+              disabled={busy}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+            >
+              <PenLine className="h-4 w-4" /> Edit
+            </button>
+            <button
+              type="button"
+              onClick={onDelete}
+              disabled={busy}
+              className="inline-flex items-center gap-2 rounded-xl border border-red-100 bg-red-50 px-3.5 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-100 disabled:opacity-50"
+            >
+              <Trash2 className="h-4 w-4" /> Delete
+            </button>
+          </div>
+        ) : null}
       </div>
 
       <p className="mt-8 whitespace-pre-wrap text-[15px] leading-7 text-slate-700">{note.body}</p>
 
-      <div className="mt-10 grid gap-3 border-t border-slate-100 pt-5 text-xs sm:grid-cols-3">
+      <div className="mt-8 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-5">
+        {note.visibility === 'public' ? (
+          <button
+            type="button"
+            onClick={session === null ? onLogin : onLike}
+            disabled={busy}
+            className={`inline-flex items-center gap-2 rounded-xl border px-3.5 py-2 text-sm font-medium transition-colors disabled:opacity-50 ${
+              note.likedByViewer
+                ? 'border-rose-100 bg-rose-50 text-rose-700 hover:bg-rose-100'
+                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            <Heart
+              className={`h-4 w-4 ${note.likedByViewer ? 'fill-current' : ''}`}
+              aria-hidden="true"
+            />
+            {session === null ? 'Log in to like' : note.likedByViewer ? 'Unlike' : 'Like'} ·{' '}
+            {note.likeCount}
+          </button>
+        ) : (
+          <span className="inline-flex items-center gap-2 rounded-xl bg-violet-50 px-3.5 py-2 text-sm font-medium text-violet-700">
+            <Lock className="h-4 w-4" /> Visible only to you
+          </span>
+        )}
+        <span className="inline-flex items-center gap-2 text-sm text-slate-500">
+          <MessageCircle className="h-4 w-4" /> {note.replies.length}{' '}
+          {note.replies.length === 1 ? 'reply' : 'replies'}
+        </span>
+      </div>
+
+      <div className="mt-6 grid gap-3 text-xs sm:grid-cols-3">
         <Meta label="Created" value={formatDate(note.createdAt)} />
         <Meta label="Resource" value={note.resource} mono />
-        <Meta label="Accepted proof" value={note.proofFingerprint} mono />
+        <Meta
+          label={note.authorization === 'wallet-proof' ? 'Accepted proof' : 'Session proof'}
+          value={note.proofFingerprint}
+          mono
+        />
       </div>
-      {!owned ? (
+
+      <section className="mt-8 border-t border-slate-100 pt-7" aria-labelledby="replies-title">
+        <h3 id="replies-title" className="text-base font-semibold text-slate-900">
+          Replies
+        </h3>
+        <div className="mt-4 space-y-3">
+          {note.replies.length === 0 ? (
+            <p className="rounded-2xl bg-slate-50 px-4 py-5 text-center text-sm text-slate-500">
+              No replies yet.
+            </p>
+          ) : (
+            note.replies.map((reply) => (
+              <ReplyRow
+                key={reply.id}
+                reply={reply}
+                canDelete={
+                  session !== null &&
+                  (reply.authorSubject === session.subject ||
+                    note.authorSubject === session.subject)
+                }
+                busy={busy}
+                onDelete={() => onDeleteReply(reply.id)}
+              />
+            ))
+          )}
+        </div>
+        {session === null ? (
+          <button
+            type="button"
+            onClick={onLogin}
+            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700"
+          >
+            <LogIn className="h-4 w-4" /> Log in to reply
+          </button>
+        ) : (
+          <ReplyComposer busy={busy} onSubmit={onReply} />
+        )}
+      </section>
+
+      {session === null ? (
         <div className="mt-6 flex items-start gap-2.5 rounded-2xl border border-amber-100 bg-amber-50 p-4 text-sm leading-5 text-amber-900">
-          <KeyRound className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-          <p>Editing is allowed only when the wallet proves the same immutable author subject.</p>
+          <LogIn className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+          <p>Log in with Nexus to reveal controls available to your current subject.</p>
         </div>
       ) : null}
     </motion.article>
+  );
+}
+
+function ReplyRow({
+  reply,
+  canDelete,
+  busy,
+  onDelete,
+}: {
+  reply: ReplyView;
+  canDelete: boolean;
+  busy: boolean;
+  onDelete: () => void;
+}): React.ReactElement {
+  return (
+    <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+            <span className="font-mono">{shortSubject(reply.authorSubject)}</span>
+            <span>{relativeTime(reply.createdAt)}</span>
+          </div>
+          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">{reply.body}</p>
+        </div>
+        {canDelete ? (
+          <button
+            type="button"
+            onClick={onDelete}
+            disabled={busy}
+            aria-label="Delete reply"
+            className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function ReplyComposer({
+  busy,
+  onSubmit,
+}: {
+  busy: boolean;
+  onSubmit: (body: string) => void;
+}): React.ReactElement {
+  const [body, setBody] = useState('');
+  const submit = (event: FormEvent<HTMLFormElement>): void => {
+    event.preventDefault();
+    const value = body.trim();
+    if (value.length === 0) return;
+    onSubmit(value);
+    setBody('');
+  };
+  return (
+    <form onSubmit={submit} className="mt-4">
+      <label className="block">
+        <span className="sr-only">Reply</span>
+        <textarea
+          value={body}
+          onChange={(event) => setBody(event.target.value)}
+          maxLength={1_000}
+          rows={3}
+          placeholder="Write a reply…"
+          className="block w-full resize-y rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm leading-6 text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+        />
+      </label>
+      <div className="mt-2 flex items-center justify-between gap-3">
+        <span className="text-[11px] text-slate-400">{body.length}/1,000</span>
+        <button
+          type="submit"
+          disabled={busy || body.trim().length === 0}
+          className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+        >
+          <MessageCircle className="h-4 w-4" /> Reply
+        </button>
+      </div>
+    </form>
   );
 }
 
@@ -617,10 +945,13 @@ function Composer({
 }): React.ReactElement {
   const [noteTitle, setNoteTitle] = useState(initial?.title ?? '');
   const [body, setBody] = useState(initial?.body ?? '');
+  const [visibility, setVisibility] = useState<'public' | 'private'>(
+    initial?.visibility ?? 'public',
+  );
 
   const submit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
-    const draft = { title: noteTitle.trim(), body: body.trim() };
+    const draft: NoteDraft = { title: noteTitle.trim(), body: body.trim(), visibility };
     if (draft.title.length > 0 && draft.body.length > 0) onSubmit(draft);
   };
 
@@ -650,6 +981,37 @@ function Composer({
       </div>
 
       <div className="mt-7 space-y-5">
+        <fieldset>
+          <legend className="mb-2 text-xs font-medium text-slate-700">Visibility</legend>
+          <div className="grid grid-cols-2 gap-2">
+            {(['public', 'private'] as const).map((option) => (
+              <button
+                key={option}
+                type="button"
+                onClick={() => setVisibility(option)}
+                className={`flex items-center gap-3 rounded-xl border p-3 text-left transition-colors ${
+                  visibility === option
+                    ? 'border-indigo-300 bg-indigo-50 ring-2 ring-indigo-100'
+                    : 'border-slate-200 bg-white hover:bg-slate-50'
+                }`}
+              >
+                {option === 'public' ? (
+                  <Globe2 className="h-4 w-4 text-emerald-600" />
+                ) : (
+                  <Lock className="h-4 w-4 text-violet-600" />
+                )}
+                <span>
+                  <span className="block text-sm font-medium capitalize text-slate-800">
+                    {option}
+                  </span>
+                  <span className="mt-0.5 block text-[11px] text-slate-500">
+                    {option === 'public' ? 'Everyone can read' : 'Only this subject'}
+                  </span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </fieldset>
         <label className="block">
           <span className="mb-1.5 block text-xs font-medium text-slate-700">Title</span>
           <input
@@ -696,8 +1058,8 @@ function Composer({
           disabled={busy || noteTitle.trim().length === 0 || body.trim().length === 0}
           className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-300"
         >
-          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
-          {busy ? 'Waiting for proof…' : submitLabel}
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+          {busy ? 'Authorizing…' : submitLabel}
         </button>
       </div>
     </motion.form>
@@ -707,9 +1069,15 @@ function Composer({
 function IdentityCard({
   session,
   ownNoteCount,
+  busy,
+  onLogin,
+  onLogout,
 }: {
   session: SessionStatus | null;
   ownNoteCount: number;
+  busy: boolean;
+  onLogin: () => void;
+  onLogout: () => void;
 }): React.ReactElement {
   const [copied, setCopied] = useState(false);
   const copySubject = (): void => {
@@ -745,8 +1113,16 @@ function IdentityCard({
         <div className="mt-5 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-center">
           <UserRoundX className="mx-auto h-5 w-5 text-slate-400" />
           <p className="mt-2 text-xs leading-5 text-slate-500">
-            There is no sign-in. Your subject appears here only after an approved proof.
+            Log in through your wallet to start a private five-minute Notes session.
           </p>
+          <button
+            type="button"
+            onClick={onLogin}
+            disabled={busy}
+            className="mt-3 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+          >
+            <LogIn className="h-3.5 w-3.5" /> Log in with Nexus
+          </button>
         </div>
       ) : (
         <div className="mt-5">
@@ -773,6 +1149,14 @@ function IdentityCard({
           <p className="mt-3 text-[11px] leading-4 text-slate-400">
             Status checked against the lifecycle authority · sequence {session.sequence}
           </p>
+          <button
+            type="button"
+            onClick={onLogout}
+            disabled={busy}
+            className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+          >
+            <LogOut className="h-3.5 w-3.5" /> End session
+          </button>
         </div>
       )}
     </div>
@@ -795,7 +1179,7 @@ function ProofCard({
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <LockKeyhole className={`h-4 w-4 ${tone.icon}`} />
-          <h2 className="text-sm font-semibold text-slate-900">Nexus proof</h2>
+          <h2 className="text-sm font-semibold text-slate-900">Nexus session</h2>
         </div>
         {flow.stage !== 'idle' && !busy ? (
           <button
@@ -856,7 +1240,8 @@ function ReceiptCard({ receipts }: { receipts: ApplicationReceipt[] }): React.Re
       </div>
       {receipts.length === 0 ? (
         <p className="mt-3 text-xs leading-5 text-slate-500">
-          Successful changes produce an app receipt containing a proof hash, never the raw proof.
+          Login records a proof hash. Later changes record RP-session authorization without claiming
+          a fresh operation proof.
         </p>
       ) : (
         <div className="mt-3 space-y-2">
@@ -886,13 +1271,13 @@ function SecurityView(): React.ReactElement {
   const steps = [
     {
       icon: FileKey2,
-      title: '1. Challenge',
-      body: 'The RP creates 256 random bits and stores only its SHA-256 hash.',
+      title: '1. Session challenge',
+      body: 'The RP creates a one-time challenge bound to its five-minute session policy.',
     },
     {
       icon: KeyRound,
       title: '2. Wallet approval',
-      body: 'The popup shows the real origin, exact action, resource, and content binding.',
+      body: 'The popup shows the real origin, session.start action, and Notes session resource.',
     },
     {
       icon: ShieldCheck,
@@ -901,8 +1286,8 @@ function SecurityView(): React.ReactElement {
     },
     {
       icon: ReceiptText,
-      title: '4. Atomic acceptance',
-      body: 'Lifecycle is checked, the nonce is consumed once, then the mutation and receipt land.',
+      title: '4. Scoped session',
+      body: 'Each mutation rechecks lifecycle, session scope, visibility, and immutable ownership.',
     },
   ];
   return (
@@ -959,15 +1344,16 @@ function SecurityView(): React.ReactElement {
         <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
           <div className="flex items-center gap-2">
             <LockKeyhole className="h-5 w-5 text-indigo-600" />
-            <h2 className="text-lg font-semibold text-slate-900">Every proof is narrowly bound</h2>
+            <h2 className="text-lg font-semibold text-slate-900">Proof and session boundaries</h2>
           </div>
           <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200">
             <BindingRow label="Audience" value="Exact configured HTTPS origin" />
-            <BindingRow label="Action" value="note.create / edit / delete" />
-            <BindingRow label="Resource" value="One provisional or existing note" />
-            <BindingRow label="Context" value="SHA-256 of content + version" />
+            <BindingRow label="Proof action" value="session.start only" />
+            <BindingRow label="Proof resource" value="Nexus Notes session" />
+            <BindingRow label="Session scope" value="Notes, replies, and public likes" />
             <BindingRow label="Lifetime" value="60 seconds, single-use" />
-            <BindingRow label="Lifecycle" value="Authoritative active status" />
+            <BindingRow label="Session" value="5 minutes, HttpOnly same-site cookie" />
+            <BindingRow label="Lifecycle" value="Authoritative active status per mutation" />
           </div>
           <div className="mt-5 flex items-start gap-2.5 rounded-2xl border border-amber-100 bg-amber-50 p-4 text-xs leading-5 text-amber-900">
             <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
@@ -1020,7 +1406,8 @@ function DeleteDialog({
           Delete this note?
         </h2>
         <p className="mt-2 text-sm leading-6 text-slate-600">
-          “{note.title}” will be removed only after the wallet proves the original author subject.
+          “{note.title}” will be removed only if this active session belongs to its immutable author
+          subject.
         </p>
         <div className="mt-6 flex justify-end gap-2">
           <button
@@ -1037,7 +1424,7 @@ function DeleteDialog({
             disabled={busy}
             className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
           >
-            <KeyRound className="h-4 w-4" /> Prove & delete
+            <Trash2 className="h-4 w-4" /> Delete note
           </button>
         </div>
       </motion.div>
@@ -1048,9 +1435,8 @@ function DeleteDialog({
 function Footer(): React.ReactElement {
   return (
     <footer className="mt-10 border-t border-slate-200 bg-white">
-      <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-6 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-6xl px-4 py-6 text-xs text-slate-400 sm:px-6 lg:px-8">
         <span>ROwO Nexus reference relying party · anonymous notes demo</span>
-        <span>Proof of control, not proof of personhood.</span>
       </div>
     </footer>
   );
@@ -1197,9 +1583,14 @@ function shortReceipt(receipt: string): string {
 }
 
 function receiptLabel(action: ApplicationReceipt['operation']): string {
+  if (action === 'session.start') return 'Session started';
   if (action === 'note.create') return 'Note created';
   if (action === 'note.edit') return 'Note updated';
-  return 'Note deleted';
+  if (action === 'note.delete') return 'Note deleted';
+  if (action === 'reply.create') return 'Reply added';
+  if (action === 'reply.delete') return 'Reply removed';
+  if (action === 'note.like') return 'Note liked';
+  return 'Note unliked';
 }
 
 function relativeTime(timestamp: number): string {

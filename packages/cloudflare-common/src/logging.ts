@@ -12,9 +12,6 @@ export const AGGREGATE_OPERATIONS = [
   'transparency_append',
   'transparency_include',
   'notary_stamp',
-  'backup_read',
-  'backup_write',
-  'backup_delete',
 ] as const;
 
 export type AggregateOperation = (typeof AGGREGATE_OPERATIONS)[number];

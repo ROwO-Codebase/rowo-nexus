@@ -31,8 +31,8 @@ If the user retains the independent revocation secret:
 5. assess RP acceptance receipts for activity during the exposure window.
 
 Before revocation, Nexus cannot distinguish the legitimate holder from a thief who has the signing
-key. After revocation, surviving or restored keys can still make mathematically valid signatures,
-but current-control authorization must fail.
+key. After revocation, surviving or copied keys can still make mathematically valid signatures, but
+current-control authorization must fail.
 
 ## Nexus registry receipt/status key compromise
 

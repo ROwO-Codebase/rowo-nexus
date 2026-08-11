@@ -29,21 +29,6 @@ interface LoggedRequest {
   body: string | null;
 }
 
-interface NoteDraft {
-  title: string;
-  body: string;
-}
-
-type NoteOperation =
-  | { action: 'note.create'; draft: NoteDraft }
-  | {
-      action: 'note.edit';
-      noteId: string;
-      expectedVersion: number;
-      draft: NoteDraft;
-    }
-  | { action: 'note.delete'; noteId: string; expectedVersion: number };
-
 interface IssuedChallenge extends ProofRequest {
   challengeId: string;
 }
@@ -52,8 +37,11 @@ interface NoteView {
   id: string;
   title: string;
   body: string;
+  visibility: 'public' | 'private';
   version: number;
   authorSubject: string;
+  likeCount: number;
+  replies: Array<{ id: string; body: string; authorSubject: string }>;
 }
 
 interface RawWalletResponse {
@@ -90,7 +78,7 @@ test.describe.serial('Nexus browser security boundary', () => {
     await context?.close();
   });
 
-  test('requires visible approval, binds aud to RP A, and rejects replay', async () => {
+  test('requires visible login approval, binds aud to RP A, and reuses only the scoped session', async () => {
     const wallet = await context.newPage();
     await wallet.goto(WALLET_ORIGIN);
     await expect(
@@ -102,66 +90,105 @@ test.describe.serial('Nexus browser security boundary', () => {
     await expect(wallet.getByRole('heading', { name: IDENTITY_LABEL }).first()).toBeVisible();
     await wallet.close();
 
-    const title = 'Audience A approval gate';
     const page = await context.newPage();
     await page.goto(RP_A_ORIGIN);
+    await expect(page.getByRole('heading', { name: 'Notes without accounts' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Log in', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Edit' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Delete' })).toHaveCount(0);
+
+    const popupPromise = page.waitForEvent('popup');
+    await page.getByRole('button', { name: 'Log in', exact: true }).click();
+    const popup = await popupPromise;
+    await expect(popup.getByRole('heading', { name: 'Allow a bound proof?' })).toBeVisible();
+    await expect(popup.getByText(RP_A_ORIGIN, { exact: true }).first()).toBeVisible();
+    await expect(popup.getByText('session.start', { exact: true })).toBeVisible();
+    await expect(popup.getByText('urn:rowo:nexus-notes:session', { exact: true })).toBeVisible();
+    await approveWallet(popup);
+    await expect(page.getByText('Session active', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Log out', exact: true })).toBeVisible();
+
+    const loginRequest = lastRequest('/api/operations');
+    expect(loginRequest).toBeDefined();
+    const loginBody = JSON.parse(loginRequest?.body ?? '') as {
+      challengeId: string;
+      operation: { action: string };
+      proof: OwnershipProofV1;
+    };
+    proofForA = loginBody.proof;
+    expect(loginBody.operation).toEqual({ action: 'session.start' });
+    expect(proofForA.payload.aud).toBe(RP_A_ORIGIN);
+    expect(proofForA.payload.act).toBe('session.start');
+    expect(proofForA.payload.resource).toBe('urn:rowo:nexus-notes:session');
+    expect(Object.hasOwn(proofForA.payload, 'localScopes')).toBe(false);
+
+    const replay = await context.request.post(`${RP_A_ORIGIN}/api/operations`, {
+      data: loginBody,
+    });
+    expect(replay.status()).toBe(409);
+    await expectApiCode(replay, 'CHALLENGE_EXPIRED');
+
+    const title = 'One approval, scoped session';
     await page.getByRole('button', { name: 'Write a note' }).click();
     await page.getByLabel('Title').fill(title);
     await page
       .getByRole('textbox', { name: /^Note/u })
-      .fill('The relying party must not mutate until the wallet visibly approves.');
-
-    const popupPromise = page.waitForEvent('popup');
-    await page.getByRole('button', { name: 'Continue with Nexus' }).click();
-    const popup = await popupPromise;
-    await expect(popup.getByRole('heading', { name: 'Allow a bound proof?' })).toBeVisible();
-    await expect(popup.getByText(RP_A_ORIGIN, { exact: true }).first()).toBeVisible();
-    await expect(popup.getByRole('button', { name: 'Approve new scope' })).toBeVisible();
-
-    const beforeApproval = await listNotes(RP_A_ORIGIN);
-    expect(beforeApproval.some((note) => note.title === title)).toBe(false);
-    expect(findOperationRequest(title)).toBeUndefined();
-
-    await popup.getByRole('button', { name: 'Approve new scope' }).click();
-    await expect(page.getByText('Proof approved', { exact: true })).toBeVisible();
-    await expect(page.getByText(title, { exact: true })).toBeVisible();
-
-    await expect.poll(() => findOperationRequest(title)).not.toBeUndefined();
-    const operationRequest = findOperationRequest(title) as LoggedRequest;
-    const operationBody = JSON.parse(operationRequest.body ?? '') as {
-      challengeId: string;
-      operation: NoteOperation;
-      proof: OwnershipProofV1;
-    };
-    proofForA = operationBody.proof;
-    expect(proofForA.payload.aud).toBe(RP_A_ORIGIN);
-    expect(Object.hasOwn(proofForA.payload, 'localScopes')).toBe(false);
-
-    const replay = await context.request.post(`${RP_A_ORIGIN}/api/operations`, {
-      data: operationBody,
-    });
-    expect(replay.status()).toBe(409);
-    await expectApiCode(replay, 'CHALLENGE_EXPIRED');
+      .fill('Creating this note must use the RP session without opening the wallet again.');
+    const unexpectedPopup = page.waitForEvent('popup', { timeout: 1_000 }).catch(() => null);
+    await page.getByRole('button', { name: 'Publish note' }).click();
+    expect(await unexpectedPopup).toBeNull();
+    await expect(page.getByRole('heading', { name: title })).toBeVisible();
+    expect(findSessionOperationRequest(title)).toBeDefined();
 
     ownedNote = (await listNotes(RP_A_ORIGIN)).find((note) => note.title === title) as NoteView;
     expect(ownedNote.authorSubject).toBe(proofForA.payload.subject);
     await page.close();
   });
 
-  test('rejects A proof at B and pins the wallet response to origin, source, and requestId', async () => {
-    const operation: NoteOperation = {
-      action: 'note.create',
-      draft: {
-        title: 'Audience B boundary',
-        body: 'A proof from RP A must not authorize this RP B operation.',
-      },
-    };
-    const challenge = await issueChallenge(RP_B_ORIGIN, operation);
+  test('supports private notes, replies, and idempotent likes in the browser', async () => {
+    const page = await context.newPage();
+    await page.goto(RP_A_ORIGIN);
+    await page.getByText(ownedNote.title, { exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Edit' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Delete' })).toBeVisible();
 
+    await page.getByRole('button', { name: /^Like · 0$/u }).click();
+    await expect(page.getByRole('button', { name: /^Unlike · 1$/u })).toBeVisible();
+    await page.getByRole('button', { name: /^Unlike · 1$/u }).click();
+    await expect(page.getByRole('button', { name: /^Like · 0$/u })).toBeVisible();
+
+    await page.getByPlaceholder('Write a reply…').fill('The creator can reply too.');
+    await page.getByRole('button', { name: 'Reply' }).click();
+    await expect(page.getByText('The creator can reply too.', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Delete reply' }).click();
+    await expect(page.getByText('The creator can reply too.', { exact: true })).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Notes', exact: true }).click();
+    await page.getByRole('button', { name: 'Write a note' }).click();
+    await page.getByRole('button', { name: /private Only this subject/iu }).click();
+    const privateTitle = 'Creator-only browser note';
+    await page.getByLabel('Title').fill(privateTitle);
+    await page.getByRole('textbox', { name: /^Note/u }).fill('This note is not public.');
+    await page.getByRole('button', { name: 'Publish note' }).click();
+    await expect(page.getByRole('heading', { name: privateTitle })).toBeVisible();
+    await expect(page.getByText('Private', { exact: true })).toBeVisible();
+
+    const browser = context.browser();
+    if (browser === null) throw new Error('Expected a browser.');
+    const anonymous = await browser.newContext({ ignoreHTTPSErrors: true });
+    const anonymousPage = await anonymous.newPage();
+    await anonymousPage.goto(RP_A_ORIGIN);
+    await expect(anonymousPage.getByText(privateTitle, { exact: true })).toHaveCount(0);
+    await anonymous.close();
+    await page.close();
+  });
+
+  test('rejects an A proof at B and pins the wallet response to origin, source, and requestId', async () => {
+    const challenge = await issueChallenge(RP_B_ORIGIN);
     const crossOriginReplay = await context.request.post(`${RP_B_ORIGIN}/api/operations`, {
       data: {
         challengeId: challenge.challengeId,
-        operation,
+        operation: { action: 'session.start' },
         proof: proofForA,
       },
     });
@@ -174,8 +201,7 @@ test.describe.serial('Nexus browser security boundary', () => {
     const opened = await openRawWalletRequest(page, toProofRequest(challenge));
     await expect(opened.popup.getByRole('heading', { name: 'Allow a bound proof?' })).toBeVisible();
     await expect(opened.popup.getByText(RP_B_ORIGIN, { exact: true }).first()).toBeVisible();
-    await expect(opened.popup.getByText('New app scope', { exact: true })).toBeVisible();
-    await opened.popup.getByRole('button', { name: 'Approve new scope' }).click();
+    await approveWallet(opened.popup);
 
     const response = await readRawWalletResponse(page);
     expect(response.origin).toBe(WALLET_ORIGIN);
@@ -187,26 +213,18 @@ test.describe.serial('Nexus browser security boundary', () => {
     const accepted = await context.request.post(`${RP_B_ORIGIN}/api/operations`, {
       data: {
         challengeId: challenge.challengeId,
-        operation,
+        operation: { action: 'session.start' },
         proof: response.data.proof,
       },
     });
     expect(accepted.status()).toBe(200);
-    expect(
-      (await listNotes(RP_B_ORIGIN)).some((note) => note.title === operation.draft.title),
-    ).toBe(true);
     await page.close();
   });
 
-  test('rejects an RP-supplied fake aud field and keeps the scope list local', async () => {
-    const operation: NoteOperation = {
-      action: 'note.create',
-      draft: { title: 'Rejected fake audience', body: 'This challenge must remain unused.' },
-    };
-    const challenge = await issueChallenge(RP_A_ORIGIN, operation);
+  test('rejects an RP-supplied fake aud field and keeps wallet scopes local', async () => {
+    const challenge = await issueChallenge(RP_A_ORIGIN);
     const page = await context.newPage();
     await page.goto(RP_A_ORIGIN);
-    await expect(page.getByRole('heading', { name: 'Notes without accounts' })).toBeVisible();
     const opened = await openRawWalletRequest(page, {
       ...toProofRequest(challenge),
       aud: RP_B_ORIGIN,
@@ -223,51 +241,42 @@ test.describe.serial('Nexus browser security boundary', () => {
     await opened.popup.close();
     await page.close();
 
-    const wallet = await context.newPage();
-    await wallet.goto(WALLET_ORIGIN);
-    await expect(wallet.getByText('2 app scopes', { exact: true })).toBeVisible();
-    await wallet.getByRole('button', { name: 'View details' }).click();
-    await expect(wallet.getByText(RP_A_ORIGIN, { exact: true })).toBeVisible();
-    await expect(wallet.getByText(RP_B_ORIGIN, { exact: true })).toBeVisible();
-    await wallet.close();
-
     assertNoWalletSecretsOrScopes(networkLog);
   });
 
-  test('denial and popup close leave the RP unchanged', async () => {
-    const deniedTitle = 'Denied request stays absent';
-    const deniedPage = await context.newPage();
-    await openComposer(deniedPage, deniedTitle);
-    const deniedPopupPromise = deniedPage.waitForEvent('popup');
-    await deniedPage.getByRole('button', { name: 'Continue with Nexus' }).click();
+  test('denial and popup close create no session', async () => {
+    await context.request.delete(`${RP_A_ORIGIN}/api/session`, {
+      headers: { 'X-Nexus-Notes-Session': '1' },
+    });
+    const loggedIn = await context.newPage();
+    await loggedIn.goto(RP_A_ORIGIN);
+    await expect(loggedIn.getByRole('button', { name: 'Log in', exact: true })).toBeVisible();
+
+    const deniedPopupPromise = loggedIn.waitForEvent('popup');
+    await loggedIn.getByRole('button', { name: 'Log in', exact: true }).click();
     const deniedPopup = await deniedPopupPromise;
     await expect(deniedPopup.getByRole('heading', { name: 'Allow a bound proof?' })).toBeVisible();
     await deniedPopup.getByRole('button', { name: 'Deny' }).click();
-    await expect(deniedPage.getByText('Approval cancelled', { exact: true })).toBeVisible();
-    expect((await listNotes(RP_A_ORIGIN)).some((note) => note.title === deniedTitle)).toBe(false);
-    expect(findOperationRequest(deniedTitle)).toBeUndefined();
-    await deniedPage.close();
+    await expect(loggedIn.getByText('Login cancelled', { exact: true })).toBeVisible();
+    expect((await context.request.get(`${RP_A_ORIGIN}/api/session`)).status()).toBe(401);
 
-    const closedTitle = 'Closed popup stays absent';
-    const closedPage = await context.newPage();
-    await openComposer(closedPage, closedTitle);
-    const closedPopupPromise = closedPage.waitForEvent('popup');
-    await closedPage.getByRole('button', { name: 'Continue with Nexus' }).click();
+    const closedPopupPromise = loggedIn.waitForEvent('popup');
+    await loggedIn.getByRole('button', { name: 'Log in', exact: true }).click();
     const closedPopup = await closedPopupPromise;
     await expect(closedPopup.getByRole('heading', { name: 'Allow a bound proof?' })).toBeVisible();
     await closedPopup.close();
-    await expect(closedPage.getByText('Approval cancelled', { exact: true })).toBeVisible();
-    expect((await listNotes(RP_A_ORIGIN)).some((note) => note.title === closedTitle)).toBe(false);
-    expect(findOperationRequest(closedTitle)).toBeUndefined();
-    await closedPage.close();
+    await expect(loggedIn.getByText('Login cancelled', { exact: true })).toBeVisible();
+    expect((await context.request.get(`${RP_A_ORIGIN}/api/session`)).status()).toBe(401);
+    await loggedIn.close();
   });
 
-  test('serves production CSP and makes no third-party requests', async () => {
+  test('serves production CSP, makes no third-party requests, and captures visual QA', async () => {
     const observed: Request[] = [];
     const onRequest = (request: Request): void => {
       observed.push(request);
     };
     context.on('request', onRequest);
+    await mkdir(VISUAL_QA_DIR, { recursive: true });
 
     const page = await context.newPage();
     for (const origin of [RP_A_ORIGIN, RP_B_ORIGIN, WALLET_ORIGIN]) {
@@ -283,6 +292,29 @@ test.describe.serial('Nexus browser security boundary', () => {
       }
       await expect(page.locator('body')).toBeVisible();
     }
+
+    await page.goto(RP_A_ORIGIN);
+    await page.screenshot({
+      path: resolve(VISUAL_QA_DIR, 'reference-rp-desktop.png'),
+      fullPage: true,
+      animations: 'disabled',
+    });
+    const challenge = await issueChallenge(RP_A_ORIGIN);
+    const opened = await openRawWalletRequest(page, toProofRequest(challenge));
+    await expect(opened.popup.getByRole('heading', { name: 'Allow a bound proof?' })).toBeVisible();
+    await opened.popup.screenshot({
+      path: resolve(VISUAL_QA_DIR, 'proof-consent.png'),
+      fullPage: true,
+      animations: 'disabled',
+    });
+    await opened.popup.getByRole('button', { name: 'Deny' }).click();
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({
+      path: resolve(VISUAL_QA_DIR, 'reference-rp-mobile.png'),
+      fullPage: true,
+      animations: 'disabled',
+    });
     await page.close();
     context.off('request', onRequest);
 
@@ -295,100 +327,14 @@ test.describe.serial('Nexus browser security boundary', () => {
     expect(unexpected.map((request) => request.url())).toEqual([]);
   });
 
-  test('captures deterministic desktop, consent, wallet, and mobile visual QA', async () => {
-    await mkdir(VISUAL_QA_DIR, { recursive: true });
-
-    const wallet = await context.newPage();
-    await wallet.goto(WALLET_ORIGIN);
-    await expect(wallet.getByRole('heading', { name: 'Identity wallet' })).toBeVisible();
-    await wallet.screenshot({
-      path: resolve(VISUAL_QA_DIR, 'wallet-dashboard.png'),
-      fullPage: true,
-      animations: 'disabled',
-    });
-    await wallet.close();
-
-    const rp = await context.newPage();
-    await rp.goto(RP_A_ORIGIN);
-    await expect(rp.getByText(/proof-backed notes/u)).toBeVisible();
-    await rp.screenshot({
-      path: resolve(VISUAL_QA_DIR, 'reference-rp-desktop.png'),
-      fullPage: true,
-      animations: 'disabled',
-    });
-
-    const operation: NoteOperation = {
-      action: 'note.create',
-      draft: {
-        title: 'Visual consent fixture',
-        body: 'Public fixture content used only for visual quality assurance.',
-      },
-    };
-    const challenge = await issueChallenge(RP_A_ORIGIN, operation);
-    const opened = await openRawWalletRequest(rp, toProofRequest(challenge));
-    await expect(opened.popup.getByRole('heading', { name: 'Allow a bound proof?' })).toBeVisible();
-    await opened.popup.screenshot({
-      path: resolve(VISUAL_QA_DIR, 'proof-consent.png'),
-      fullPage: true,
-      animations: 'disabled',
-    });
-    await opened.popup.getByRole('button', { name: 'Deny' }).click();
-    await rp.close();
-
-    const mobile = await context.newPage();
-    await mobile.setViewportSize({ width: 390, height: 844 });
-    await mobile.goto(RP_A_ORIGIN);
-    await expect(mobile.getByText(/proof-backed notes/u)).toBeVisible();
-    await mobile.screenshot({
-      path: resolve(VISUAL_QA_DIR, 'reference-rp-mobile.png'),
-      fullPage: true,
-      animations: 'disabled',
-    });
-    await mobile.close();
-  });
-
-  test('authoritative revocation blocks create, edit, and delete with pre-revocation proofs', async () => {
-    const operations: NoteOperation[] = [
-      {
-        action: 'note.create',
-        draft: {
-          title: 'Blocked after revocation',
-          body: 'This proof was signed before disposal but submitted after it.',
-        },
-      },
-      {
-        action: 'note.edit',
-        noteId: ownedNote.id,
-        expectedVersion: ownedNote.version,
-        draft: { title: ownedNote.title, body: 'A revoked identity must not edit this note.' },
-      },
-      {
-        action: 'note.delete',
-        noteId: ownedNote.id,
-        expectedVersion: ownedNote.version,
-      },
-    ];
-
-    const pending: Array<{
-      challenge: IssuedChallenge;
-      operation: NoteOperation;
-      proof: OwnershipProofV1;
-    }> = [];
-    const rp = await context.newPage();
-    await rp.goto(RP_A_ORIGIN);
-    await expect(rp.getByRole('heading', { name: 'Notes without accounts' })).toBeVisible();
-    for (const operation of operations) {
-      const challenge = await issueChallenge(RP_A_ORIGIN, operation);
-      const opened = await openRawWalletRequest(rp, toProofRequest(challenge));
-      await expect(
-        opened.popup.getByRole('heading', { name: 'Allow a bound proof?' }),
-      ).toBeVisible();
-      await opened.popup.getByRole('button', { name: 'Approve and sign' }).click();
-      const response = await readRawWalletResponse(rp);
-      expect(response.data.proof).toBeDefined();
-      pending.push({ challenge, operation, proof: response.data.proof as OwnershipProofV1 });
-    }
-    await rp.close();
+  test('authoritative revocation invalidates the existing session before its next mutation', async () => {
+    const page = await context.newPage();
+    await page.goto(RP_A_ORIGIN);
+    const popupPromise = page.waitForEvent('popup');
+    await page.getByRole('button', { name: 'Log in', exact: true }).click();
+    const popup = await popupPromise;
+    await approveWallet(popup);
+    await expect(page.getByText('Session active', { exact: true })).toBeVisible();
 
     const wallet = await context.newPage();
     await wallet.goto(WALLET_ORIGIN);
@@ -399,40 +345,33 @@ test.describe.serial('Nexus browser security boundary', () => {
     await expect(wallet.getByText('Disposed', { exact: true })).toBeVisible();
     await wallet.close();
 
-    for (const item of pending) {
-      const response = await context.request.post(`${RP_A_ORIGIN}/api/operations`, {
-        data: {
-          challengeId: item.challenge.challengeId,
-          operation: item.operation,
-          proof: item.proof,
-        },
-      });
-      expect(response.status()).toBe(403);
-      await expectApiCode(response, 'IDENTITY_REVOKED');
-    }
-
-    const after = await listNotes(RP_A_ORIGIN);
-    expect(after.some((note) => note.title === 'Blocked after revocation')).toBe(false);
-    const unchanged = after.find((note) => note.id === ownedNote.id);
+    const response = await context.request.post(`${RP_A_ORIGIN}/api/session-operations`, {
+      headers: { 'X-Nexus-Notes-Session': '1' },
+      data: {
+        action: 'note.delete',
+        noteId: ownedNote.id,
+        expectedVersion: ownedNote.version,
+      },
+    });
+    expect(response.status()).toBe(401);
+    await expectApiCode(response, 'SESSION_INVALID');
+    const unchanged = (await listNotes(RP_A_ORIGIN)).find((note) => note.id === ownedNote.id);
     expect(unchanged?.body).toBe(ownedNote.body);
     assertNoWalletSecretsOrScopes(networkLog);
+    await page.close();
   });
 });
 
-async function openComposer(page: Page, title: string): Promise<void> {
-  await page.goto(RP_A_ORIGIN);
-  await expect(page.getByText(/proof-backed notes/u)).toBeVisible();
-  await page.getByRole('button', { name: 'Write a note' }).click();
-  await expect(page.getByRole('heading', { name: 'Write anonymously' })).toBeVisible();
-  await page.waitForTimeout(250);
-  await page.getByLabel('Title').fill(title);
-  await page
-    .getByRole('textbox', { name: /^Note/u })
-    .fill('Cancelling or closing the popup must leave no protected mutation.');
+async function approveWallet(popup: Page): Promise<void> {
+  const button = popup.getByRole('button', { name: /Approve (new scope|and sign)/u });
+  await expect(button).toBeVisible();
+  await button.click();
 }
 
-async function issueChallenge(origin: string, operation: NoteOperation): Promise<IssuedChallenge> {
-  const response = await context.request.post(`${origin}/api/challenges`, { data: operation });
+async function issueChallenge(origin: string): Promise<IssuedChallenge> {
+  const response = await context.request.post(`${origin}/api/challenges`, {
+    data: { action: 'session.start' },
+  });
   expect(response.status()).toBe(201);
   const value = (await response.json()) as { challenge: IssuedChallenge };
   return value.challenge;
@@ -468,10 +407,7 @@ async function openRawWalletRequest(
       if (target.__nexusE2e !== undefined) {
         window.removeEventListener('message', target.__nexusE2e.listener);
       }
-      const state = {
-        popup: null,
-        requestSent: false,
-      } as E2eState;
+      const state = { popup: null, requestSent: false } as E2eState;
       state.listener = (event: MessageEvent<unknown>): void => {
         if (event.source !== state.popup || event.origin !== walletOrigin) return;
         const data = event.data as { type?: string; requestId?: string };
@@ -552,12 +488,27 @@ function hasRawWalletResponse(page: Page): Promise<boolean> {
   });
 }
 
-function findOperationRequest(title: string): LoggedRequest | undefined {
-  return networkLog.find((request) => {
-    if (request.method !== 'POST' || new URL(request.url).pathname !== '/api/operations')
-      return false;
-    return request.body?.includes(title) === true;
-  });
+function lastRequest(pathname: string): LoggedRequest | undefined {
+  for (let index = networkLog.length - 1; index >= 0; index -= 1) {
+    const request = networkLog[index];
+    if (
+      request !== undefined &&
+      request.method === 'POST' &&
+      new URL(request.url).pathname === pathname
+    ) {
+      return request;
+    }
+  }
+  return undefined;
+}
+
+function findSessionOperationRequest(text: string): LoggedRequest | undefined {
+  return networkLog.find(
+    (request) =>
+      request.method === 'POST' &&
+      new URL(request.url).pathname === '/api/session-operations' &&
+      request.body?.includes(text) === true,
+  );
 }
 
 function toProofRequest(challenge: IssuedChallenge): ProofRequest {
@@ -571,10 +522,11 @@ function toProofRequest(challenge: IssuedChallenge): ProofRequest {
 }
 
 function assertNoWalletSecretsOrScopes(requests: LoggedRequest[]): void {
-  const bodies = requests
+  const serialized = requests
     .filter((request) => request.body !== null)
-    .map((request) => request.body as string);
-  const serialized = bodies.join('\n').toLowerCase();
+    .map((request) => request.body as string)
+    .join('\n')
+    .toLowerCase();
   for (const forbidden of [
     '"localid"',
     '"localscopes"',
@@ -595,7 +547,5 @@ function assertNoWalletSecretsOrScopes(requests: LoggedRequest[]): void {
     request.url.startsWith(`${REGISTRY_ORIGIN}/v1/identity/`),
   );
   expect(registryRequests.length).toBeGreaterThan(0);
-  for (const request of registryRequests) {
-    expect(new URL(request.url).search).toBe('');
-  }
+  for (const request of registryRequests) expect(new URL(request.url).search).toBe('');
 }

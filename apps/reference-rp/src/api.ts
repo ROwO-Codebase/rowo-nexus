@@ -1,10 +1,12 @@
 import type {
-  IssueChallengeInput,
   IssuedChallenge,
   NoteView,
-  OperationResult,
+  SessionOperationInput,
+  SessionOperationResult,
+  SessionStartResult,
   SessionStatus,
-  SubmitOperationInput,
+  StartSessionOperation,
+  SubmitProofInput,
 } from './shared/contracts.js';
 
 export class ReferenceRpApiError extends Error {
@@ -28,7 +30,7 @@ export async function getNote(id: string): Promise<NoteView> {
   return response.note;
 }
 
-export async function issueChallenge(operation: IssueChallengeInput): Promise<IssuedChallenge> {
+export async function issueChallenge(operation: StartSessionOperation): Promise<IssuedChallenge> {
   const response = await apiRequest<{ challenge: IssuedChallenge }>('/api/challenges', {
     method: 'POST',
     body: JSON.stringify(operation),
@@ -36,18 +38,33 @@ export async function issueChallenge(operation: IssueChallengeInput): Promise<Is
   return response.challenge;
 }
 
-export function submitOperation(input: SubmitOperationInput): Promise<OperationResult> {
-  return apiRequest<OperationResult>('/api/operations', {
+export function startSession(input: SubmitProofInput): Promise<SessionStartResult> {
+  return apiRequest<SessionStartResult>('/api/operations', {
     method: 'POST',
     body: JSON.stringify(input),
   });
 }
 
-export async function getSession(token: string): Promise<SessionStatus> {
-  const response = await apiRequest<{ session: SessionStatus }>('/api/session', {
-    headers: { Authorization: `NexusSession ${token}` },
+export function executeSessionOperation(
+  operation: SessionOperationInput,
+): Promise<SessionOperationResult> {
+  return apiRequest<SessionOperationResult>('/api/session-operations', {
+    method: 'POST',
+    headers: { 'X-Nexus-Notes-Session': '1' },
+    body: JSON.stringify(operation),
   });
+}
+
+export async function getSession(): Promise<SessionStatus> {
+  const response = await apiRequest<{ session: SessionStatus }>('/api/session');
   return response.session;
+}
+
+export async function logoutSession(): Promise<void> {
+  await apiRequest<{ ok: true }>('/api/session', {
+    method: 'DELETE',
+    headers: { 'X-Nexus-Notes-Session': '1' },
+  });
 }
 
 async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {

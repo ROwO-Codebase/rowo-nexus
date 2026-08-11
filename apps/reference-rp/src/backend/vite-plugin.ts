@@ -3,11 +3,13 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Plugin, PreviewServer, ViteDevServer } from 'vite';
 
 import type { ApiErrorBody } from '../shared/contracts.js';
-import { toSafeApiError } from './errors.js';
+import { RpError, toSafeApiError } from './errors.js';
 import { AuthoritativeRegistryLifecycleProvider, LocalLifecycleAuthority } from './lifecycle.js';
 import { ReferenceRpRepository } from './repository.js';
 
 const MAX_BODY_BYTES = 64 * 1024;
+const SESSION_TTL_SECONDS = 5 * 60;
+const SESSION_COOKIE_NAME = '__Host-nexus_notes_session';
 const SECURITY_HEADERS: Readonly<Record<string, string>> = {
   'Content-Security-Policy':
     "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws: wss:; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
@@ -62,12 +64,12 @@ async function routeApi(
       return;
     }
     if (request.method === 'GET' && url.pathname === '/api/notes') {
-      sendJson(response, 200, { notes: repository.listNotes() });
+      sendJson(response, 200, { notes: await repository.listNotes(readSessionToken(request)) });
       return;
     }
     if (request.method === 'GET' && url.pathname.startsWith('/api/notes/')) {
       const id = decodeURIComponent(url.pathname.slice('/api/notes/'.length));
-      sendJson(response, 200, { note: repository.getNote(id) });
+      sendJson(response, 200, { note: await repository.getNote(id, readSessionToken(request)) });
       return;
     }
     if (request.method === 'POST' && url.pathname === '/api/challenges') {
@@ -77,12 +79,30 @@ async function routeApi(
     }
     if (request.method === 'POST' && url.pathname === '/api/operations') {
       const body = await readJson(request);
-      sendJson(response, 200, await repository.submitOperation(body));
+      const started = await repository.startSession(body);
+      response.setHeader('Set-Cookie', createSessionCookie(started.token));
+      sendJson(response, 200, started.result);
+      return;
+    }
+    if (request.method === 'POST' && url.pathname === '/api/session-operations') {
+      assertSessionMutationRequest(request);
+      const body = await readJson(request);
+      sendJson(
+        response,
+        200,
+        await repository.executeSessionOperation(body, readSessionToken(request)),
+      );
       return;
     }
     if (request.method === 'GET' && url.pathname === '/api/session') {
-      const token = readSessionToken(request.headers.authorization);
-      sendJson(response, 200, { session: await repository.getSession(token) });
+      sendJson(response, 200, { session: await repository.getSession(readSessionToken(request)) });
+      return;
+    }
+    if (request.method === 'DELETE' && url.pathname === '/api/session') {
+      assertSessionMutationRequest(request);
+      repository.endSession(readSessionToken(request));
+      response.setHeader('Set-Cookie', clearSessionCookie());
+      sendJson(response, 200, { ok: true });
       return;
     }
     sendJson(response, 404, { error: { code: 'NOT_FOUND', message: 'API route not found.' } });
@@ -93,9 +113,30 @@ async function routeApi(
   }
 }
 
-function readSessionToken(header: string | undefined): string {
-  if (header === undefined || !header.startsWith('NexusSession ')) return '';
-  return header.slice('NexusSession '.length);
+function readSessionToken(request: IncomingMessage): string {
+  const header = request.headers.cookie;
+  if (header === undefined) return '';
+  for (const segment of header.split(';')) {
+    const [rawName, ...rawValue] = segment.trim().split('=');
+    if (rawName !== SESSION_COOKIE_NAME) continue;
+    const token = rawValue.join('=');
+    return /^[A-Za-z0-9_-]{43}$/u.test(token) ? token : '';
+  }
+  return '';
+}
+
+function createSessionCookie(token: string): string {
+  return `${SESSION_COOKIE_NAME}=${token}; Path=/; Max-Age=${String(SESSION_TTL_SECONDS)}; Secure; HttpOnly; SameSite=Strict`;
+}
+
+function clearSessionCookie(): string {
+  return `${SESSION_COOKIE_NAME}=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Strict`;
+}
+
+function assertSessionMutationRequest(request: IncomingMessage): void {
+  if (request.headers['x-nexus-notes-session'] !== '1') {
+    throw new RpError('BAD_REQUEST', 'The session request marker is missing.', 400);
+  }
 }
 
 async function readJson(request: IncomingMessage): Promise<unknown> {

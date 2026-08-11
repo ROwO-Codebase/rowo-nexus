@@ -77,7 +77,7 @@ Nexus MUST provide:
    - Durable Objects provide authoritative per-subject lifecycle coordination.
    - D1 is a non-authoritative projection/index.
    - Queues handle asynchronous projection/logging work.
-   - R2 stores opaque encrypted backup blobs and transparency artifacts.
+   - R2 stores transparency artifacts and restricted operational D1 export archives.
 
 10. **Algorithm and protocol versioning**
     - Every signed object and identity suite is versioned from day one.
@@ -91,7 +91,7 @@ Version 1 does NOT attempt to provide:
 - Proof that one human controls only one identity.
 - Sybil resistance solely from cryptography.
 - Guaranteed network anonymity from Cloudflare, ISPs, Tor exit nodes, or timing correlation.
-- Recovery of a disposed private key.
+- Identity-key export, backup, cloud recovery, or recovery of lost or disposed identity key material.
 - A way for a user to destroy a private key and later still prove live possession of that destroyed key.
 - A universal cross-application user ID.
 - A social graph shared by Nexus.
@@ -180,7 +180,7 @@ The mapping:
 RP origin -> locally selected Nexus identities
 ```
 
-MUST remain in the local wallet manifest or opaque encrypted backup. It MUST NOT be stored in plaintext in the Nexus registry.
+MUST remain in the local wallet manifest. It MUST NOT be stored in plaintext in the Nexus registry.
 
 ### P4 — No RP audience in identity genesis
 
@@ -200,7 +200,6 @@ Application logs MUST NOT contain:
 
 - private keys;
 - revocation secrets;
-- backup capability secrets;
 - raw signed proof bodies;
 - identity Genesis Documents unless explicitly running a local debug build;
 - subject identifiers in routine access logs;
@@ -232,7 +231,7 @@ Expected protection:
 
 - no real-person mapping exists;
 - no user private identity keys exist server-side;
-- backup objects are encrypted client-side;
+- R2 contains only transparency artifacts and explicitly configured restricted operational exports;
 - D1 contains only public cryptographic state/projections and operational metadata permitted by this spec.
 
 ### T2 — Identity forger
@@ -265,7 +264,7 @@ Expected protection:
 
 ### T5 — Post-disposal key holder
 
-An attacker later obtains an old exported key or backup copy.
+An attacker later obtains private key material copied before disposal.
 
 Expected protection:
 
@@ -309,7 +308,6 @@ Protection boundary:
 - protocol/data design denies direct real-person mappings;
 - registry does not receive RP audience during identity registration;
 - wallet/RP proofs do not need to transit Nexus;
-- optional backup is opaque ciphertext.
 
 Limitation:
 
@@ -347,7 +345,7 @@ Signing: Ed25519
 Subject hash: SHA-256
 Optional key agreement: X25519
 KDF where needed: HKDF-SHA-256
-Local/backup AEAD: AES-256-GCM
+Local AEAD: AES-256-GCM
 Canonicalization: RFC 8785 JSON Canonicalization Scheme (JCS)
 Binary encoding in JSON: base64url without padding
 Randomness: Web Crypto CSPRNG only
@@ -440,7 +438,7 @@ revocationCommitment =
   )
 ```
 
-`R` is private until terminal revocation through the recovery/revocation-secret path.
+`R` is private until terminal secret-mode revocation.
 
 ### 9.3 Subject derivation
 
@@ -661,8 +659,7 @@ The wallet MUST:
 4. require a cryptographically valid registry receipt confirming `REVOKED`;
 5. delete the signing private key, agreement private key, and revocation secret from active local storage;
 6. mark local identity `revoked` or remove it according to user preference;
-7. if encrypted backup is enabled, publish a new backup version that excludes active private material for the disposed identity;
-8. retain only public genesis/receipts if the user wants historical reference.
+7. retain only public genesis/receipts if the user wants historical reference.
 
 The UI MUST NOT claim secure physical erasure. It SHOULD say the identity is *cryptographically disabled for future control*.
 
@@ -721,7 +718,7 @@ Nexus registry SHOULD NOT store these links by default. Relying parties or users
 
 A critical subtlety:
 
-If an old private key survives in a backup and is obtained after revocation, the holder can create a new signature with a fake old `iat` value. Therefore:
+If old private key material survives disposal and is obtained later, the holder can create a new signature with a fake old `iat` value. Therefore:
 
 > A private-key signature alone proves key possession, not trustworthy wall-clock creation time.
 
@@ -762,24 +759,22 @@ The Nexus repository is a monorepo that deploys multiple narrowly scoped Workers
                 |                                 |
                 |                         Service Bindings
                 |                                 |
-                |                  +--------------+--------------+
-                |                  |                             |
-                |          Registry Service              Backup Service
-                |                  |                             |
-                |          Durable Objects                      R2
-                |          IdentityState                        |
-                |                  |                             |
-                |             DO Outbox                         |
-                |                  |
-                |                Queue
-                |                  |
-                |        +---------+----------+
-                |        |                    |
-                |    D1 Projector       Transparency Worker
-                |                             |
-                |                   TransparencyShard DOs
-                |                             |
-                |                        R2 snapshots
+                |                         Registry Service
+                |                                 |
+                |                         Durable Objects
+                |                         IdentityState
+                |                                 |
+                |                            DO Outbox
+                |                                 |
+                |                               Queue
+                |                                 |
+                |                       +---------+----------+
+                |                       |                    |
+                |                   D1 Projector       Transparency Worker
+                |                                            |
+                |                                  TransparencyShard DOs
+                |                                            |
+                |                                       R2 snapshots
                 |
                 +---- client-side keys only
 ```
@@ -825,7 +820,6 @@ Recommended internal services:
 
 ```text
 REGISTRY_SERVICE
-BACKUP_SERVICE
 TRANSPARENCY_SERVICE
 ```
 
@@ -893,23 +887,21 @@ Consumers MUST be idempotent because delivery can be retried.
 
 Every event has a deterministic `eventId`.
 
-### 19.6 R2 — opaque blobs and audit artifacts
+### 19.6 R2 — audit and operational artifacts
 
-Use separate buckets:
+Use a dedicated transparency bucket:
 
 ```text
-nexus-vault-backups
 nexus-transparency
 ```
 
 R2 stores:
 
-- encrypted client vault backups only;
 - transparency log segment snapshots;
 - signed checkpoint manifests;
-- long-term D1 export archives if operationally desired.
+- restricted D1 export archives if operationally desired.
 
-The backup bucket MUST NOT be public.
+Operational D1 export archives MUST remain restricted and MUST NOT be exposed through public object listings.
 
 The transparency bucket MAY be exposed only through a Worker/custom domain with explicit cache/security policy.
 
@@ -944,7 +936,6 @@ Use for endpoint-level limits such as:
 
 - registration attempts;
 - status batch requests;
-- backup writes;
 - notary submissions.
 
 It MUST NOT be treated as a global cryptographic quota or uniqueness guarantee.
@@ -968,7 +959,6 @@ Forbidden dimensions:
 - subject;
 - IP;
 - user agent;
-- backup ID;
 - RP origin;
 - raw nonce;
 - proof ID.
@@ -987,7 +977,6 @@ Workflows MAY automate:
 
 - periodic D1 export to R2;
 - long-running audit jobs;
-- cleanup of expired encrypted backups;
 - transparency checkpoint publication.
 
 Workflows MUST NOT sit in the live signature verification or revocation correctness path.
@@ -1521,8 +1510,6 @@ nexus.createIdentity()
 nexus.chooseIdentity()
 nexus.disposeIdentity()
 nexus.getLocalIdentitySummaries()
-nexus.exportIdentity()   // optional/phase 2; user gesture required
-nexus.importIdentity()   // optional/phase 2
 ```
 
 RP pages MUST NOT receive `getLocalIdentitySummaries()` results; that method is wallet UI/internal only.
@@ -1565,7 +1552,7 @@ No consumer outside wallet internals gets a raw key by default.
 
 Prefer non-extractable `CryptoKey` objects for normal local operation where browser support/IndexedDB persistence is verified by test.
 
-Portable export/backup is a separate mode and may require an explicitly exportable encrypted key representation.
+Private identity keys remain non-extractable in v1.
 
 ### 37.4 XSS statement
 
@@ -1731,79 +1718,9 @@ An RP MUST NOT provide a generic “claim this old resource” endpoint that rep
 
 ---
 
-# Part VII — Optional Opaque Encrypted Backup
+# Part VII — Transparency and Notary
 
-## 44. Backup privacy model
-
-Backup is optional and MUST be designed so Cloudflare stores only ciphertext plus minimal opaque version metadata.
-
-The backup service MUST NOT parse the wallet manifest or learn which subjects it contains.
-
-The server MUST NOT have the vault decryption key.
-
----
-
-## 45. Backup object
-
-Versioned envelope example:
-
-```ts
-interface EncryptedVaultBackupV1 {
-  protocol: "nexus.vault-backup.v1";
-  kdf: {
-    name: "argon2id";
-    version: 1;
-    salt: string;
-    memoryKiB: number;
-    iterations: number;
-    parallelism: number;
-  };
-  aead: {
-    name: "AES-256-GCM";
-    iv: string;
-  };
-  ciphertext: string;
-}
-```
-
-KDF parameters MUST be versioned and MUST be selected by a dedicated security review before Phase 2 implementation. Codex MUST NOT invent parameters silently.
-
-Alternative recovery methods may be added behind a new envelope version.
-
----
-
-## 46. Backup capability
-
-Backup authentication is independent of any Nexus identity.
-
-Generate:
-
-```text
-backupId = SecureRandom(16 bytes)
-backupSecret = SecureRandom(32 bytes)
-```
-
-Server stores only a hash of `backupSecret` and an opaque R2 object key.
-
-No subject list is stored next to the backup metadata.
-
-Updating a backup does not require presenting any Nexus identity proof.
-
----
-
-## 47. Backup disposal caveat
-
-An old backup may contain a private key for an identity that is later disposed.
-
-This does not reactivate the identity because the registry is terminally revoked.
-
-However, old key material could create fake **backdated self-signed** claims. Therefore historical authorship systems MUST rely on trusted pre-revocation acceptance timestamps/receipts, not merely a claimed `iat` inside a user signature.
-
----
-
-# Part VIII — Transparency and Notary
-
-## 48. Transparency goals
+## 44. Transparency goals
 
 The transparency system SHOULD make it difficult for the Nexus operator to silently rewrite registry history.
 
@@ -1813,7 +1730,7 @@ Therefore v1 transparency is **hash-first**, not a public chronological director
 
 ---
 
-## 49. Scalable sharded transparency log
+## 45. Scalable sharded transparency log
 
 Production design:
 
@@ -1844,7 +1761,7 @@ A single-shard implementation MAY be used in development/MVP, but code interface
 
 ---
 
-## 50. Hash-only public exposure
+## 46. Hash-only public exposure
 
 Public transparency artifacts SHOULD expose:
 
@@ -1861,7 +1778,7 @@ The user already knows their event hash from the Registry Receipt and can reques
 
 ---
 
-## 51. Optional generic Notary Service
+## 47. Optional generic Notary Service
 
 Nexus MAY expose:
 
@@ -1898,9 +1815,9 @@ to provide stronger historical evidence without publishing content to Nexus.
 
 ---
 
-# Part IX — Anti-Abuse Without Identity Accounts
+# Part VIII — Anti-Abuse Without Identity Accounts
 
-## 52. Layered abuse model
+## 48. Layered abuse model
 
 Nexus identity creation is intentionally cheap. Anti-abuse must be separate from identity ownership.
 
@@ -1917,7 +1834,7 @@ Never make “passed Turnstile” a durable person identifier.
 
 ---
 
-## 53. Future anonymous quota tokens
+## 49. Future anonymous quota tokens
 
 Do not improvise a blind-signature scheme in v1.
 
@@ -1927,9 +1844,9 @@ The identity verifier MUST remain independent from the quota-token verifier.
 
 ---
 
-# Part X — Repository Architecture
+# Part IX — Repository Architecture
 
-## 54. Repository layout
+## 50. Repository layout
 
 Use a pnpm workspace/monorepo inside the standalone Nexus repository.
 
@@ -2013,12 +1930,9 @@ nexus/
 │   ├── projector/
 │   │   ├── src/index.ts
 │   │   └── wrangler.jsonc
-│   ├── transparency/
-│   │   ├── src/index.ts
-│   │   ├── src/transparency-shard-do.ts
-│   │   └── wrangler.jsonc
-│   └── backup/
+│   └── transparency/
 │       ├── src/index.ts
+│       ├── src/transparency-shard-do.ts
 │       └── wrangler.jsonc
 │
 ├── migrations/
@@ -2042,7 +1956,7 @@ nexus/
 
 ---
 
-## 55. Package boundaries
+## 51. Package boundaries
 
 ### `@nexus/protocol`
 
@@ -2092,7 +2006,7 @@ Language/runtime-neutral expected values.
 
 ---
 
-## 56. No circular authority
+## 52. No circular authority
 
 Dependency direction MUST remain:
 
@@ -2107,9 +2021,9 @@ Workers MUST NOT become the only place where protocol behavior is defined.
 
 ---
 
-# Part XI — Cloudflare Configuration
+# Part X — Cloudflare Configuration
 
-## 57. Example edge Worker bindings
+## 53. Example edge Worker bindings
 
 Illustrative `wrangler.jsonc`:
 
@@ -2120,8 +2034,7 @@ Illustrative `wrangler.jsonc`:
   "main": "src/index.ts",
   "compatibility_date": "2026-08-11",
   "services": [
-    { "binding": "REGISTRY_SERVICE", "service": "nexus-registry" },
-    { "binding": "BACKUP_SERVICE", "service": "nexus-backup" }
+    { "binding": "REGISTRY_SERVICE", "service": "nexus-registry" }
   ],
   "ratelimits": [
     {
@@ -2143,13 +2056,13 @@ Illustrative `wrangler.jsonc`:
 
 Values are examples. Codex MUST verify the exact current Wrangler schema during implementation rather than copying configuration blindly.
 
-### 57.1 Logging rule
+### 53.1 Logging rule
 
 Even with sampling enabled, application code must emit only privacy-safe structured values. Do not assume sampling makes sensitive logging acceptable.
 
 ---
 
-## 58. Registry Worker bindings
+## 54. Registry Worker bindings
 
 Conceptually:
 
@@ -2176,7 +2089,7 @@ Conceptually:
 
 ---
 
-## 59. Projector Worker bindings
+## 55. Projector Worker bindings
 
 Conceptually:
 
@@ -2205,9 +2118,9 @@ Conceptually:
 
 ---
 
-# Part XII — Service Signing Keys
+# Part XI — Service Signing Keys
 
-## 60. Key purposes
+## 56. Key purposes
 
 Separate server keys by purpose where practical:
 
@@ -2219,17 +2132,17 @@ notary signing key (optional)
 
 Never reuse user identity primitives as server keys.
 
-### 60.1 Storage
+### 56.1 Storage
 
 Private service keys are stored in Workers secrets or Secrets Store.
 
 Recommended secret representation: base64url/PEM PKCS#8 imported into WebCrypto at runtime.
 
-### 60.2 Runtime caching
+### 56.2 Runtime caching
 
 A Worker isolate MAY cache an imported non-exportable `CryptoKey` in module scope for performance. This cache is not authoritative state and must be reconstructable from the secret binding after isolate restart.
 
-### 60.3 Public key distribution
+### 56.3 Public key distribution
 
 Publish public key history using `kid`.
 
@@ -2237,9 +2150,9 @@ Do not remove a historical public key while receipts under that key are expected
 
 ---
 
-# Part XIII — Observability, Retention, and Privacy
+# Part XII — Observability, Retention, and Privacy
 
-## 61. Structured metrics only
+## 57. Structured metrics only
 
 Code may emit:
 
@@ -2253,7 +2166,7 @@ Code must not emit:
 {"subject":"nx1_...","ip":"...","proof":{...}}
 ```
 
-### 61.1 Request IDs
+### 57.1 Request IDs
 
 A random request ID MAY be generated per request for debugging.
 
@@ -2264,23 +2177,22 @@ It MUST:
 - not be derived from subject/IP/device;
 - not be returned or stored as a user identifier.
 
-### 61.2 Retention policy
+### 57.2 Retention policy
 
 Define explicit retention for:
 
 - Worker logs;
 - D1 registry projection;
 - R2 transparency artifacts;
-- encrypted backups;
 - abuse events.
 
 Public cryptographic registry state may be permanent by protocol design; network telemetry should be minimized and short-lived.
 
 ---
 
-# Part XIV — Security Headers and Edge Rules
+# Part XIII — Security Headers and Edge Rules
 
-## 62. API headers
+## 58. API headers
 
 API responses SHOULD include:
 
@@ -2293,7 +2205,7 @@ Referrer-Policy: no-referrer
 
 Well-known public key/discovery endpoints MAY be cached with short controlled TTLs and ETags because their content is public.
 
-### 62.1 CORS
+### 58.1 CORS
 
 - Public read/status APIs MAY use `Access-Control-Allow-Origin: *` only because they use no cookies/credentials and return public cryptographic state.
 - Mutation APIs used by wallet SHOULD allow the wallet origin and approved native/CLI clients as appropriate.
@@ -2301,9 +2213,9 @@ Well-known public key/discovery endpoints MAY be cached with short controlled TT
 
 ---
 
-# Part XV — Testing Strategy
+# Part XIV — Testing Strategy
 
-## 63. Test layers
+## 59. Test layers
 
 Use Cloudflare's Workers Vitest integration for Worker-runtime unit/integration tests and browser E2E tests for wallet popup behavior.
 
@@ -2324,7 +2236,7 @@ Required categories:
 
 ---
 
-## 64. Mandatory cryptographic test vectors
+## 60. Mandatory cryptographic test vectors
 
 Commit deterministic vectors for:
 
@@ -2345,7 +2257,7 @@ Private test keys in vectors MUST be explicitly documented as non-production fix
 
 ---
 
-## 65. Mandatory negative tests
+## 61. Mandatory negative tests
 
 Codex MUST implement tests proving rejection of:
 
@@ -2376,7 +2288,7 @@ Codex MUST implement tests proving rejection of:
 
 ---
 
-## 66. Disposal acceptance tests
+## 62. Disposal acceptance tests
 
 Scenario:
 
@@ -2397,7 +2309,7 @@ This test demonstrates the central post-disposal property.
 
 ---
 
-## 67. Concurrency tests
+## 63. Concurrency tests
 
 At minimum:
 
@@ -2409,7 +2321,7 @@ At minimum:
 
 ---
 
-## 68. Browser security E2E tests
+## 64. Browser security E2E tests
 
 Use two test origins:
 
@@ -2431,9 +2343,9 @@ Verify:
 
 ---
 
-# Part XVI — Codex Implementation Rules
+# Part XV — Codex Implementation Rules
 
-## 69. Hard guardrails
+## 65. Hard guardrails
 
 Codex MUST NOT:
 
@@ -2454,13 +2366,12 @@ Codex MUST NOT:
 15. implement “claim old identity with new key”;
 16. silently change canonicalization or crypto algorithms;
 17. add third-party JavaScript to wallet origin without explicit architectural approval;
-18. implement backup KDF parameters without a reviewed versioned decision;
-19. treat Turnstile as authentication;
-20. conflate cryptographic pseudonymity with network anonymity.
+18. treat Turnstile as authentication;
+19. conflate cryptographic pseudonymity with network anonymity.
 
 ---
 
-## 70. Coding conventions
+## 66. Coding conventions
 
 - TypeScript strict mode.
 - No `any` in protocol/crypto/verifier packages except tightly isolated interoperability boundaries.
@@ -2475,9 +2386,9 @@ Codex MUST NOT:
 
 ---
 
-# Part XVII — Implementation Phases
+# Part XVI — Implementation Phases
 
-## 71. Phase 0 — Scaffold and ADRs
+## 67. Phase 0 — Scaffold and ADRs
 
 Codex deliverables:
 
@@ -2497,7 +2408,7 @@ Exit criteria:
 
 ---
 
-## 72. Phase 1 — Protocol + Crypto + Test Vectors
+## 68. Phase 1 — Protocol + Crypto + Test Vectors
 
 Implement:
 
@@ -2521,7 +2432,7 @@ Do not begin UI before this phase is stable.
 
 ---
 
-## 73. Phase 2 — Authoritative Registry
+## 69. Phase 2 — Authoritative Registry
 
 Implement:
 
@@ -2543,7 +2454,7 @@ Exit criteria:
 
 ---
 
-## 74. Phase 3 — Queue + D1 Projection
+## 70. Phase 3 — Queue + D1 Projection
 
 Implement:
 
@@ -2562,7 +2473,7 @@ Exit criteria:
 
 ---
 
-## 75. Phase 4 — Wallet
+## 71. Phase 4 — Wallet
 
 Implement:
 
@@ -2584,7 +2495,7 @@ Exit criteria:
 
 ---
 
-## 76. Phase 5 — RP SDK + Reference RP
+## 72. Phase 5 — RP SDK + Reference RP
 
 Implement:
 
@@ -2603,7 +2514,7 @@ Exit criteria:
 
 ---
 
-## 77. Phase 6 — Privacy Rotation and Explicit Linking
+## 73. Phase 6 — Privacy Rotation and Explicit Linking
 
 Implement:
 
@@ -2618,7 +2529,7 @@ Exit criteria:
 
 ---
 
-## 78. Phase 7 — Transparency / Notary
+## 74. Phase 7 — Transparency / Notary
 
 Implement:
 
@@ -2638,31 +2549,7 @@ Exit criteria:
 
 ---
 
-## 79. Phase 8 — Encrypted Backup
-
-Only after a separate KDF/backup security ADR is approved.
-
-Implement:
-
-- portable encrypted vault serialization;
-- reviewed password/recovery KDF;
-- AES-GCM envelope;
-- opaque backup capability;
-- R2 storage;
-- restore;
-- deletion;
-- post-disposal backup update.
-
-Exit criteria:
-
-- server cannot decrypt fixture backup;
-- tampered ciphertext fails authentication;
-- backup metadata contains no subject list;
-- restoring disposed key does not restore registry control.
-
----
-
-## 80. Phase 9 — Security hardening
+## 75. Phase 8 — Security hardening
 
 Required before production:
 
@@ -2678,9 +2565,9 @@ Required before production:
 
 ---
 
-# Part XVIII — CI/CD
+# Part XVII — CI/CD
 
-## 81. Pull request checks
+## 76. Pull request checks
 
 Required:
 
@@ -2704,7 +2591,7 @@ Additionally:
 
 ---
 
-## 82. Deployment environments
+## 77. Deployment environments
 
 Use separate Cloudflare resources for:
 
@@ -2715,13 +2602,13 @@ staging
 production
 ```
 
-Never point preview Workers at production DO namespaces, D1 databases, R2 backup buckets, or service-signing secrets.
+Never point preview Workers at production DO namespaces, D1 databases, R2 transparency/export buckets, Queues, or service-signing secrets.
 
 Each environment has a distinct service receipt signing key.
 
 ---
 
-## 83. Database migrations
+## 78. Database migrations
 
 - D1 migrations are version-controlled.
 - DO SQLite class schema migrations are versioned with Durable Object migrations and application-level schema migration code as required.
@@ -2731,9 +2618,9 @@ Each environment has a distinct service receipt signing key.
 
 ---
 
-# Part XIX — Incident Response
+# Part XVIII — Incident Response
 
-## 84. User key compromise
+## 79. User key compromise
 
 If signing key is compromised but user has revocation secret:
 
@@ -2746,7 +2633,7 @@ Nexus cannot distinguish legitimate holder from thief before revocation solely f
 
 ---
 
-## 85. Nexus service signing key compromise
+## 80. Nexus service signing key compromise
 
 Procedure:
 
@@ -2758,7 +2645,7 @@ Procedure:
 
 ---
 
-## 86. D1 loss/corruption
+## 81. D1 loss/corruption
 
 D1 is a projection.
 
@@ -2774,7 +2661,7 @@ Do not mutate subject DOs to match D1.
 
 ---
 
-## 87. Queue outage
+## 82. Queue outage
 
 Identity state changes may still commit because Queue is not authoritative.
 
@@ -2786,9 +2673,9 @@ D1/transparency may lag; operational status endpoints remain authoritative throu
 
 ---
 
-# Part XX — Reference Integration with the Anonymous Platform Repo
+# Part XIX — Reference Integration with the Anonymous Platform Repo
 
-## 88. Repo boundary
+## 83. Repo boundary
 
 Two separate repositories:
 
@@ -2811,7 +2698,7 @@ The platform MUST NOT import `wallet-core`.
 
 ---
 
-## 89. Anonymous Platform responsibilities
+## 84. Anonymous Platform responsibilities
 
 The platform owns:
 
@@ -2829,7 +2716,7 @@ Nexus owns only cryptographic identity/control primitives and lifecycle.
 
 ---
 
-## 90. Platform example
+## 85. Platform example
 
 Database:
 
@@ -2861,9 +2748,9 @@ Edit/delete follow the same pattern against immutable `author_subject`.
 
 ---
 
-# Part XXI — Design Decisions to Preserve
+# Part XX — Design Decisions to Preserve
 
-## 91. ADR summary
+## 86. ADR summary
 
 The following are foundational decisions and MUST require an explicit ADR + protocol/security review to change.
 
@@ -2909,9 +2796,9 @@ Avoid creating a public chronological pseudonym directory.
 
 ---
 
-# Part XXII — Definition of Done
+# Part XXI — Definition of Done
 
-## 92. MVP definition of done
+## 87. MVP definition of done
 
 Nexus v1 MVP is complete only when all are true:
 
@@ -2939,9 +2826,9 @@ Nexus v1 MVP is complete only when all are true:
 
 ---
 
-# Part XXIII — Codex Execution Instructions
+# Part XXII — Codex Execution Instructions
 
-## 93. How Codex should work from this specification
+## 88. How Codex should work from this specification
 
 Codex should implement in phases and treat this document as the architectural contract.
 
@@ -3056,7 +2943,7 @@ Application code must ensure the challenge consumption and protected mutation ha
 | Durable Objects + SQLite | Per-subject lifecycle + outbox | **Yes** | Store cryptographic state only |
 | D1 | Queryable projection/index | **No** | No real-person/RP mapping |
 | Queues | Async projection/transparency | No | Idempotent consumers |
-| R2 | Encrypted backups + transparency artifacts | No | Backup is client ciphertext |
+| R2 | Transparency artifacts + restricted D1 export archives | No | No public subject directory; operational exports remain restricted |
 | KV | Immutable/cache/config only | **Never for revocation** | Eventual consistency |
 | Turnstile | Optional anti-abuse | No | Never becomes user identity |
 | Rate Limiting binding | Coarse edge throttling | No | Not a global quota guarantee |
@@ -3116,14 +3003,14 @@ The reviewer must answer at least:
 7. Can a disposed identity ever transition back to active?
 8. Can the server reconstruct a disposed identity from a master secret?
 9. Can Cloudflare or application logs contain subject/private proof material unnecessarily?
-10. Can an old key restored from backup produce a falsely “historical” claim that the product accepts without a trusted pre-revocation receipt?
+10. Can old key material obtained after revocation produce a falsely “historical” claim that the product accepts without a trusted pre-revocation receipt?
 11. Can a compromise of the Nexus server receipt key forge user identity signatures? The answer must be no.
 12. Does the wallet load any third-party JavaScript capable of requesting signatures?
 13. Are all protocol encodings canonical and cross-runtime deterministic?
 14. Are all algorithm/version failures fail-closed?
 15. Is every use of KV demonstrably non-authoritative?
 16. Can a Queue retry duplicate a transparency leaf or D1 logical event?
-17. Does backup storage reveal a subject list or RP scope mapping?
+17. Do public transparency artifacts avoid exposing a chronological subject directory or plaintext identity inventory?
 18. Does the product clearly distinguish pseudonymity from network anonymity?
 
 If any answer is uncertain, production release is blocked pending review.

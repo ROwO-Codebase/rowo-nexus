@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-08-11
-- Scope: wallet key vault, identity creation, rotation, backup
+- Scope: wallet key vault, identity creation, rotation
 
 ## Context
 
@@ -22,8 +22,8 @@ The normal wallet key vault uses isolated key references and prefers non-extract
 objects where persistence is verified. No consumer outside wallet internals receives a raw private
 key by default.
 
-Portable export or backup is a separate, explicit security mode. It cannot introduce a master seed
-that silently regenerates identities and remains blocked until ADR-0011 is approved.
+The v1 wallet exposes no portable private-key export/import or recovery path and cannot introduce a
+master seed that silently regenerates identities.
 
 ## Consequences
 

@@ -91,7 +91,7 @@ async function generateKeyRecord(
 
 /**
  * Stores non-extractable private CryptoKey objects and revocation secrets in
- * IndexedDB. Key export/backup is intentionally outside this implementation.
+ * IndexedDB. Private-key export/import and recovery are intentionally unsupported.
  */
 export class WebCryptoIndexedDbKeyVault implements KeyVault {
   readonly #databaseName: string;
