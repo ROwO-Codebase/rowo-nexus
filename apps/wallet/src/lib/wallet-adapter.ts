@@ -181,9 +181,11 @@ export const walletAdapter = {
     request: ProofRequest,
     addScope: boolean,
   ): Promise<OwnershipProofV1> {
-    const proof = await walletCore.prove(localId, boundary, request);
-    if (addScope) await walletCore.addScope(localId, boundary);
-    return proof;
+    return walletCore.proveAndRecordAuthorization(localId, boundary, request, addScope);
+  },
+
+  clearAuthorizationHistory(localId: string): Promise<void> {
+    return walletCore.clearAuthorizationHistory(localId);
   },
 
   dispose(localId: string): Promise<RegistryReceiptV1> {

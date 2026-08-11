@@ -18,6 +18,7 @@ export {
 export { captureWalletEventBoundary } from './trusted-wallet-event.js';
 export { WalletCore, type WalletCoreOptions } from './wallet-core.js';
 export type {
+  AuthorizationHistoryEntry,
   Clock,
   ContinuityLinkOptions,
   CreatedLocalIdentity,

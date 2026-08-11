@@ -37,10 +37,25 @@ export interface LocalIdentityRecordV1 {
   agreementPrivateKeyRef?: KeyRef;
   revocationSecretRef?: SecretRef;
   localScopes: string[];
+  /**
+   * A bounded, wallet-local record of proof approvals. Older v1 records may
+   * omit this field; callers must treat an absent value as an empty history.
+   */
+  authorizationHistory?: AuthorizationHistoryEntry[];
   label?: string;
   localState: 'active' | 'revoked';
   registrationReceipt?: RegistryReceiptV1;
   revocationReceipt?: RegistryReceiptV1;
+}
+
+export interface AuthorizationHistoryEntry {
+  authorizationId: string;
+  approvedAt: number;
+  audience: string;
+  action: string;
+  resource: string;
+  introducedScope: boolean;
+  contextBound: boolean;
 }
 
 export interface IdentityStore {
@@ -103,6 +118,7 @@ export interface LocalIdentitySummary {
   subject: NexusSubject;
   label?: string;
   localScopes: readonly string[];
+  authorizationHistory: readonly AuthorizationHistoryEntry[];
   localState: 'active' | 'revoked';
   registered: boolean;
   hasAgreementKey: boolean;
@@ -143,6 +159,13 @@ export interface WalletCoreApi {
     boundary: TrustedWalletEventBoundary,
     request: ProofRequest,
   ): Promise<OwnershipProofV1>;
+  proveAndRecordAuthorization(
+    localId: string,
+    boundary: TrustedWalletEventBoundary,
+    request: ProofRequest,
+    rememberScope: boolean,
+  ): Promise<OwnershipProofV1>;
+  clearAuthorizationHistory(localId: string): Promise<void>;
   revoke(localId: string, options?: RevokeIdentityOptions): Promise<RegistryReceiptV1>;
   dispose(localId: string, options?: DisposeIdentityOptions): Promise<RegistryReceiptV1>;
   rotate(

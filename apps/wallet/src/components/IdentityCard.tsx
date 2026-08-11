@@ -1,5 +1,14 @@
 import { useState } from 'react';
-import { AlertTriangle, Check, Copy, KeyRound, Loader2, LockKeyhole, Unplug } from 'lucide-react';
+import {
+  AlertTriangle,
+  Check,
+  Copy,
+  History,
+  KeyRound,
+  Loader2,
+  LockKeyhole,
+  Unplug,
+} from 'lucide-react';
 import { motion } from 'motion/react';
 import type { LocalIdentitySummary } from '@nexus/wallet-core';
 
@@ -124,11 +133,19 @@ export function IdentityCard({
         )}
 
         <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4">
-          <div className="flex items-center gap-1.5 text-xs text-slate-500">
-            <LockKeyhole className="h-3.5 w-3.5" aria-hidden="true" />
-            {identity.localScopes.length === 0
-              ? 'No app scopes'
-              : `${String(identity.localScopes.length)} app ${identity.localScopes.length === 1 ? 'scope' : 'scopes'}`}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+            <span className="inline-flex items-center gap-1.5">
+              <LockKeyhole className="h-3.5 w-3.5" aria-hidden="true" />
+              {identity.localScopes.length === 0
+                ? 'No app scopes'
+                : `${String(identity.localScopes.length)} app ${identity.localScopes.length === 1 ? 'scope' : 'scopes'}`}
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <History className="h-3.5 w-3.5" aria-hidden="true" />
+              {identity.authorizationHistory.length === 0
+                ? 'No history'
+                : `${String(identity.authorizationHistory.length)} ${identity.authorizationHistory.length === 1 ? 'authorization' : 'authorizations'}`}
+            </span>
           </div>
           <button
             type="button"

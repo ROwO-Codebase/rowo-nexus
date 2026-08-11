@@ -55,6 +55,7 @@ function App() {
   const [notice, setNotice] = useState<Notice>();
   const [pending, setPending] = useState<PendingProofRequest>();
   const [retryingRegistrationId, setRetryingRegistrationId] = useState<string>();
+  const [clearingHistoryId, setClearingHistoryId] = useState<string>();
   const pendingRef = useRef<PendingProofRequest | undefined>(undefined);
 
   const refresh = useCallback(async () => {
@@ -150,6 +151,24 @@ function App() {
         ? 'Unrelated identity created; the old identity was disposed.'
         : 'Unrelated identity created. No old/new link was published.',
     });
+  };
+
+  const clearAuthorizationHistory = async (identity: LocalIdentitySummary) => {
+    if (clearingHistoryId !== undefined) return;
+    setClearingHistoryId(identity.localId);
+    try {
+      await walletAdapter.clearAuthorizationHistory(identity.localId);
+      await refresh();
+      setNotice({ kind: 'success', message: 'Local authorization history cleared.' });
+    } catch (error) {
+      setNotice({
+        kind: 'error',
+        message:
+          error instanceof Error ? error.message : 'The wallet could not clear local history.',
+      });
+    } finally {
+      setClearingHistoryId(undefined);
+    }
   };
 
   const approveProof = async (localId: string, rememberScope: boolean) => {
@@ -343,6 +362,7 @@ function App() {
         {selectedIdentity !== undefined && (
           <div className="mt-6">
             <IdentityDetail
+              key={selectedIdentity.localId}
               identity={selectedIdentity}
               onClose={() => setSelectedId(undefined)}
               onRotate={() => setFlow({ type: 'rotate', identity: selectedIdentity })}
@@ -350,6 +370,8 @@ function App() {
               onContinuity={() => setFlow({ type: 'continuity', identity: selectedIdentity })}
               retryingRegistration={retryingRegistrationId === selectedIdentity.localId}
               onRetryRegistration={() => void retryRegistration(selectedIdentity)}
+              clearingHistory={clearingHistoryId === selectedIdentity.localId}
+              onClearHistory={() => clearAuthorizationHistory(selectedIdentity)}
             />
           </div>
         )}

@@ -14,6 +14,7 @@ function identity(
     localId: 'local-id',
     subject: 'nx1_test',
     localScopes: [],
+    authorizationHistory: [],
     localState,
     registered,
     hasAgreementKey: false,

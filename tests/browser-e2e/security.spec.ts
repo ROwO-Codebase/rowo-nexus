@@ -150,6 +150,21 @@ test.describe.serial('Nexus browser security boundary', () => {
     ownedNote = (await listNotes(RP_A_ORIGIN)).find((note) => note.title === title) as NoteView;
     expect(ownedNote.authorSubject).toBe(proofForA.payload.subject);
     expect(ownedNote.authorFriendlyName).toBe('friendly_name');
+
+    const historyPage = await context.newPage();
+    await historyPage.goto(WALLET_ORIGIN);
+    await expect(historyPage.getByText('1 authorization', { exact: true })).toBeVisible();
+    await historyPage.getByRole('button', { name: 'View details' }).click();
+    await expect(historyPage.getByRole('heading', { name: 'Authorization history' })).toBeVisible();
+    const authorizationHistory = historyPage.locator('ol');
+    await expect(authorizationHistory.getByText(RP_A_ORIGIN, { exact: true })).toBeVisible();
+    await expect(historyPage.getByText('session.start', { exact: true })).toBeVisible();
+    await expect(
+      historyPage.getByText('urn:rowo:nexus-notes:session', { exact: true }),
+    ).toBeVisible();
+    await expect(historyPage.getByText('New app scope', { exact: true })).toBeVisible();
+    await expect(historyPage.getByText(proofForA.payload.nonce, { exact: true })).toHaveCount(0);
+    await historyPage.close();
     await page.close();
   });
 
