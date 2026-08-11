@@ -162,7 +162,8 @@ export function App(): React.ReactElement {
       setProof({
         stage: 'approved',
         title: 'Session active',
-        message: 'Create, edit, reply, and like without another popup for five minutes.',
+        message:
+          'Create, edit, reply, like, and manage your Notes pseudonym without another popup for five minutes.',
       });
       await refreshNotes(false);
     } catch (error) {
@@ -200,6 +201,7 @@ export function App(): React.ReactElement {
       });
       try {
         const operationResult = await executeSessionOperation(operation);
+        if (operationResult.session !== undefined) setSession(operationResult.session);
         setReceipts((current) => [operationResult.receipt, ...current].slice(0, 4));
         setProof({
           stage: 'approved',
@@ -207,6 +209,12 @@ export function App(): React.ReactElement {
           message: `Receipt ${shortReceipt(operationResult.receipt.receiptId)} records RP-session authorization.`,
         });
         const refreshed = await refreshNotes(false);
+        if (operation.action === 'profile.set-name') {
+          if (selectedNote !== null) {
+            setSelectedNote(refreshed.find((note) => note.id === selectedNote.id) ?? selectedNote);
+          }
+          return;
+        }
         if (operationResult.note === null) {
           setSelectedNote(null);
           setView('feed');
@@ -230,7 +238,7 @@ export function App(): React.ReactElement {
         abortRef.current = null;
       }
     },
-    [refreshNotes],
+    [refreshNotes, selectedNote],
   );
 
   const endLogin = useCallback(async (): Promise<void> => {
@@ -316,26 +324,20 @@ export function App(): React.ReactElement {
                 : 'A small anonymous publishing demo where a cryptographic subject—not a user profile—owns each note.'}
             </p>
           </div>
-          {view !== 'security' && view !== 'create' ? (
+          {view !== 'security' && view !== 'create' && hasValidSession ? (
             <button
               type="button"
               onClick={() => {
-                if (!hasValidSession) {
-                  void startLogin();
-                  return;
-                }
                 setProof(IDLE_PROOF);
                 setView('create');
               }}
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
             >
-              {hasValidSession ? (
-                <Plus className="h-4 w-4" aria-hidden="true" />
-              ) : (
-                <LogIn className="h-4 w-4" aria-hidden="true" />
-              )}
-              {hasValidSession ? 'Write a note' : 'Log in to write'}
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              Write a note
             </button>
+          ) : view !== 'security' && view !== 'create' ? (
+            <p className="text-sm font-medium text-slate-500">Log in to write.</p>
           ) : null}
         </div>
 
@@ -365,7 +367,6 @@ export function App(): React.ReactElement {
                     onBack={openFeed}
                     onEdit={() => setView('edit')}
                     onDelete={() => setDeleteTarget(selectedNote)}
-                    onLogin={() => void startLogin()}
                     onLike={() =>
                       void runSessionOperation({
                         action: selectedNote.likedByViewer ? 'note.unlike' : 'note.like',
@@ -426,8 +427,10 @@ export function App(): React.ReactElement {
                 session={session}
                 ownNoteCount={ownNoteCount}
                 busy={isBusy}
-                onLogin={() => void startLogin()}
                 onLogout={() => void endLogin()}
+                onSetFriendlyName={(friendlyName) =>
+                  void runSessionOperation({ action: 'profile.set-name', friendlyName })
+                }
               />
               <ProofCard
                 flow={proof}
@@ -490,11 +493,8 @@ function Header({
           className="flex items-center gap-2.5 rounded-xl text-left"
         >
           <img src="/logo.png" alt="" className="h-8 w-8 rounded-xl object-cover" />
-          <div className="leading-none">
-            <div className="text-lg font-semibold tracking-tight text-slate-800">
-              ROwO <span className="text-indigo-600">Nexus</span>
-            </div>
-            <div className="mt-1 text-xs font-medium text-slate-500">Notes</div>
+          <div className="text-lg font-semibold tracking-tight text-slate-800">
+            ROwO <span className="text-indigo-600">Notes</span>
           </div>
         </button>
 
@@ -525,8 +525,8 @@ function Header({
           </button>
           <button
             type="button"
-            onClick={onCreate}
-            aria-label="Write a note"
+            onClick={session === null ? onLogin : onCreate}
+            aria-label={session === null ? 'Log in' : 'Write a note'}
             disabled={busy}
             className="ml-1 rounded-lg bg-indigo-600 p-2 text-white transition-colors hover:bg-indigo-700 disabled:opacity-50 sm:hidden"
           >
@@ -619,8 +619,8 @@ function FeedView({
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
                   <div className="mb-2 flex flex-wrap items-center gap-2">
-                    <span className="font-mono text-[11px] text-slate-400">
-                      {shortSubject(note.authorSubject)}
+                    <span className="text-[11px] font-medium text-slate-500">
+                      {displayPseudonym(note.authorFriendlyName, note.authorSubject)}
                     </span>
                     {owned ? (
                       <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-700">
@@ -672,7 +672,6 @@ function DetailView({
   onBack,
   onEdit,
   onDelete,
-  onLogin,
   onLike,
   onReply,
   onDeleteReply,
@@ -683,7 +682,6 @@ function DetailView({
   onBack: () => void;
   onEdit: () => void;
   onDelete: () => void;
-  onLogin: () => void;
   onLike: () => void;
   onReply: (body: string) => void;
   onDeleteReply: (replyId: string) => void;
@@ -708,12 +706,12 @@ function DetailView({
       <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-slate-100 px-2.5 py-1 font-mono text-[11px] text-slate-600">
-              {shortSubject(note.authorSubject)}
+            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600">
+              {displayPseudonym(note.authorFriendlyName, note.authorSubject)}
             </span>
             {owned ? (
               <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-[11px] font-medium text-indigo-700">
-                <Check className="h-3 w-3" /> Your current subject
+                <Check className="h-3 w-3" /> Your note
               </span>
             ) : null}
             <span
@@ -761,23 +759,28 @@ function DetailView({
 
       <div className="mt-8 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-5">
         {note.visibility === 'public' ? (
-          <button
-            type="button"
-            onClick={session === null ? onLogin : onLike}
-            disabled={busy}
-            className={`inline-flex items-center gap-2 rounded-xl border px-3.5 py-2 text-sm font-medium transition-colors disabled:opacity-50 ${
-              note.likedByViewer
-                ? 'border-rose-100 bg-rose-50 text-rose-700 hover:bg-rose-100'
-                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-            }`}
-          >
-            <Heart
-              className={`h-4 w-4 ${note.likedByViewer ? 'fill-current' : ''}`}
-              aria-hidden="true"
-            />
-            {session === null ? 'Log in to like' : note.likedByViewer ? 'Unlike' : 'Like'} ·{' '}
-            {note.likeCount}
-          </button>
+          session === null ? (
+            <span className="inline-flex items-center gap-2 text-sm font-medium text-slate-500">
+              <Heart className="h-4 w-4" aria-hidden="true" /> Log in to like · {note.likeCount}
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={onLike}
+              disabled={busy}
+              className={`inline-flex items-center gap-2 rounded-xl border px-3.5 py-2 text-sm font-medium transition-colors disabled:opacity-50 ${
+                note.likedByViewer
+                  ? 'border-rose-100 bg-rose-50 text-rose-700 hover:bg-rose-100'
+                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <Heart
+                className={`h-4 w-4 ${note.likedByViewer ? 'fill-current' : ''}`}
+                aria-hidden="true"
+              />
+              {note.likedByViewer ? 'Unlike' : 'Like'} · {note.likeCount}
+            </button>
+          )
         ) : (
           <span className="inline-flex items-center gap-2 rounded-xl bg-violet-50 px-3.5 py-2 text-sm font-medium text-violet-700">
             <Lock className="h-4 w-4" /> Visible only to you
@@ -825,24 +828,11 @@ function DetailView({
           )}
         </div>
         {session === null ? (
-          <button
-            type="button"
-            onClick={onLogin}
-            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700"
-          >
-            <LogIn className="h-4 w-4" /> Log in to reply
-          </button>
+          <p className="mt-4 text-sm font-medium text-slate-500">Log in to reply.</p>
         ) : (
           <ReplyComposer busy={busy} onSubmit={onReply} />
         )}
       </section>
-
-      {session === null ? (
-        <div className="mt-6 flex items-start gap-2.5 rounded-2xl border border-amber-100 bg-amber-50 p-4 text-sm leading-5 text-amber-900">
-          <LogIn className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-          <p>Log in with Nexus to reveal controls available to your current subject.</p>
-        </div>
-      ) : null}
     </motion.article>
   );
 }
@@ -863,7 +853,9 @@ function ReplyRow({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
-            <span className="font-mono">{shortSubject(reply.authorSubject)}</span>
+            <span className="font-medium">
+              {displayPseudonym(reply.authorFriendlyName, reply.authorSubject)}
+            </span>
             <span>{relativeTime(reply.createdAt)}</span>
           </div>
           <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">{reply.body}</p>
@@ -1070,16 +1062,18 @@ function IdentityCard({
   session,
   ownNoteCount,
   busy,
-  onLogin,
   onLogout,
+  onSetFriendlyName,
 }: {
   session: SessionStatus | null;
   ownNoteCount: number;
   busy: boolean;
-  onLogin: () => void;
   onLogout: () => void;
+  onSetFriendlyName: (friendlyName: string) => void;
 }): React.ReactElement {
   const [copied, setCopied] = useState(false);
+  const [friendlyName, setFriendlyName] = useState(session?.friendlyName ?? '');
+  useEffect(() => setFriendlyName(session?.friendlyName ?? ''), [session?.friendlyName]);
   const copySubject = (): void => {
     if (session === null) return;
     void navigator.clipboard.writeText(session.subject).then(() => {
@@ -1113,35 +1107,70 @@ function IdentityCard({
         <div className="mt-5 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-center">
           <UserRoundX className="mx-auto h-5 w-5 text-slate-400" />
           <p className="mt-2 text-xs leading-5 text-slate-500">
-            Log in through your wallet to start a private five-minute Notes session.
+            Log in from the header to write or reply with a five-minute Notes session.
           </p>
-          <button
-            type="button"
-            onClick={onLogin}
-            disabled={busy}
-            className="mt-3 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
-          >
-            <LogIn className="h-3.5 w-3.5" /> Log in with Nexus
-          </button>
         </div>
       ) : (
         <div className="mt-5">
           <div className="rounded-2xl bg-slate-950 p-4 text-white">
             <div className="flex items-center justify-between gap-2">
               <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-slate-400">
-                Current subject
+                Notes pseudonym
               </span>
               <button
                 type="button"
                 onClick={copySubject}
                 className="rounded-md p-1 text-slate-400 transition hover:bg-white/10 hover:text-white"
-                aria-label="Copy subject"
+                aria-label="Copy cryptographic subject"
               >
                 {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
               </button>
             </div>
-            <p className="mt-2 truncate font-mono text-xs text-slate-200">{session.subject}</p>
+            <p className="mt-2 truncate text-sm font-semibold text-white">
+              {displayPseudonym(session.friendlyName, session.subject)}
+            </p>
+            <p className="mt-1 text-[10px] leading-4 text-slate-400">
+              Friendly names are public Notes aliases, not verified real-world identities.
+            </p>
           </div>
+          <form
+            className="mt-3 rounded-2xl border border-slate-200 p-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const value = friendlyName.trim();
+              if (isValidFriendlyName(value)) onSetFriendlyName(value);
+            }}
+          >
+            <label className="block text-[11px] font-medium text-slate-600" htmlFor="friendly-name">
+              Friendly name
+            </label>
+            <div className="mt-1.5 flex gap-2">
+              <input
+                id="friendly-name"
+                value={friendlyName}
+                onChange={(event) => setFriendlyName(event.target.value)}
+                minLength={3}
+                maxLength={24}
+                pattern="[A-Za-z0-9][A-Za-z0-9_-]{2,23}"
+                placeholder="friendly_name"
+                className="min-w-0 flex-1 rounded-lg border border-slate-300 px-2.5 py-2 text-xs text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+              />
+              <button
+                type="submit"
+                disabled={
+                  busy ||
+                  friendlyName.trim() === session.friendlyName ||
+                  !isValidFriendlyName(friendlyName.trim())
+                }
+                className="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+              >
+                Save
+              </button>
+            </div>
+            <p className="mt-1.5 text-[10px] leading-4 text-slate-400">
+              Unique, 3–24 letters, numbers, underscores, or hyphens; cannot start with nx1_.
+            </p>
+          </form>
           <div className="mt-3 grid grid-cols-2 gap-2">
             <MiniStat label="Notes" value={String(ownNoteCount)} />
             <MiniStat label="Session" value={expiresIn(session.expiresAt)} />
@@ -1578,6 +1607,14 @@ function shortSubject(subject: string): string {
   return `${subject.slice(0, 11)}…${subject.slice(-6)}`;
 }
 
+function displayPseudonym(friendlyName: string | null, subject: string): string {
+  return friendlyName ?? shortSubject(subject);
+}
+
+function isValidFriendlyName(value: string): boolean {
+  return /^[A-Za-z0-9][A-Za-z0-9_-]{2,23}$/u.test(value) && !value.toLowerCase().startsWith('nx1_');
+}
+
 function shortReceipt(receipt: string): string {
   return `${receipt.slice(0, 10)}…${receipt.slice(-6)}`;
 }
@@ -1590,7 +1627,8 @@ function receiptLabel(action: ApplicationReceipt['operation']): string {
   if (action === 'reply.create') return 'Reply added';
   if (action === 'reply.delete') return 'Reply removed';
   if (action === 'note.like') return 'Note liked';
-  return 'Note unliked';
+  if (action === 'note.unlike') return 'Note unliked';
+  return 'Friendly name updated';
 }
 
 function relativeTime(timestamp: number): string {

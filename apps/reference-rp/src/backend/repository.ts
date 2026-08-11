@@ -39,6 +39,7 @@ const SESSION_POLICY = Object.freeze({
     'reply.delete',
     'note.like',
     'note.unlike',
+    'profile.set-name',
   ],
   resourcePolicy: 'public-notes-and-private-notes-owned-by-session-subject',
   ttlSeconds: SESSION_TTL_SECONDS,
@@ -73,6 +74,13 @@ interface StoredSession {
   readonly proofHash: string;
 }
 
+interface StoredProfile {
+  readonly subject: NexusSubject;
+  readonly friendlyName: string;
+  readonly nameKey: string;
+  readonly updatedAt: number;
+}
+
 interface ActiveSession {
   readonly stored: StoredSession;
   readonly status: SessionStatus;
@@ -101,6 +109,7 @@ export class ReferenceRpRepository {
   readonly #likes = new Map<string, Map<NexusSubject, number>>();
   readonly #receipts = new Map<string, ApplicationReceipt>();
   readonly #sessions = new Map<string, StoredSession>();
+  readonly #profiles = new Map<NexusSubject, StoredProfile>();
   #exclusive: Promise<void> = Promise.resolve();
 
   public constructor(options: ReferenceRpRepositoryOptions) {
@@ -171,6 +180,7 @@ export class ReferenceRpRepository {
     likes: readonly { readonly noteId: string; readonly subject: NexusSubject }[];
     receipts: readonly Readonly<ApplicationReceipt>[];
     sessions: readonly Readonly<StoredSession>[];
+    profiles: readonly Readonly<StoredProfile>[];
     challenges: ReturnType<HashOnlyChallengeStore['debugSnapshot']>;
   } {
     return {
@@ -181,6 +191,7 @@ export class ReferenceRpRepository {
       ),
       receipts: [...this.#receipts.values()].map((receipt) => ({ ...receipt })),
       sessions: [...this.#sessions.values()].map((session) => ({ ...session })),
+      profiles: [...this.#profiles.values()].map((profile) => ({ ...profile })),
       challenges: this.challenges.debugSnapshot(),
     };
   }
@@ -258,6 +269,7 @@ export class ReferenceRpRepository {
         receipt,
         session: {
           subject: verified.subject,
+          friendlyName: this.#profiles.get(verified.subject)?.friendlyName ?? null,
           state: 'active',
           sequence: lifecycle.sequence,
           expiresAt: stored.expiresAt,
@@ -284,6 +296,7 @@ export class ReferenceRpRepository {
       stored,
       status: {
         subject: stored.subject,
+        friendlyName: this.#profiles.get(stored.subject)?.friendlyName ?? null,
         state: 'active',
         sequence: lifecycle.sequence,
         expiresAt: stored.expiresAt,
@@ -311,7 +324,25 @@ export class ReferenceRpRepository {
     let resource: string;
     let resultingVersion: number | null;
 
-    if (operation.action === 'note.create') {
+    if (operation.action === 'profile.set-name') {
+      const nameKey = friendlyNameKey(operation.friendlyName);
+      const claimed = [...this.#profiles.values()].find((profile) => profile.nameKey === nameKey);
+      if (claimed !== undefined && claimed.subject !== subject) {
+        throw new RpError('NAME_TAKEN', 'That friendly name is already in use.', 409);
+      }
+      this.#profiles.set(
+        subject,
+        Object.freeze({
+          subject,
+          friendlyName: operation.friendlyName,
+          nameKey,
+          updatedAt: now,
+        }),
+      );
+      resource = `profile:${subject}`;
+      note = null;
+      resultingVersion = null;
+    } else if (operation.action === 'note.create') {
       const id = `nt_${secureToken(9)}`;
       resource = `note:${id}`;
       note = Object.freeze({
@@ -413,7 +444,19 @@ export class ReferenceRpRepository {
       proofHash: session.stored.proofHash,
       resultingVersion,
     });
-    return { note: note === null ? null : this.#toNoteView(note, subject), receipt };
+    return {
+      note: note === null ? null : this.#toNoteView(note, subject),
+      receipt,
+      ...(operation.action === 'profile.set-name'
+        ? {
+            session: {
+              ...session.status,
+              friendlyName: operation.friendlyName,
+              checkedAt: now,
+            },
+          }
+        : {}),
+    };
   }
 
   #recordReceipt(input: Omit<ApplicationReceipt, 'acceptedAt' | 'receiptId'>): ApplicationReceipt {
@@ -452,12 +495,13 @@ export class ReferenceRpRepository {
     const replies = [...this.#replies.values()]
       .filter((reply) => reply.noteId === note.id)
       .sort((left, right) => left.createdAt - right.createdAt)
-      .map(toReplyView);
+      .map((reply) => this.#toReplyView(reply));
     const likes = this.#likes.get(note.id);
     return {
       id: note.id,
       resource: note.resource,
       authorSubject: note.authorSubject,
+      authorFriendlyName: this.#profiles.get(note.authorSubject)?.friendlyName ?? null,
       title: note.title,
       body: note.body,
       visibility: note.visibility,
@@ -469,6 +513,17 @@ export class ReferenceRpRepository {
       likeCount: likes?.size ?? 0,
       likedByViewer: viewer !== undefined && (likes?.has(viewer) ?? false),
       replies,
+    };
+  }
+
+  #toReplyView(reply: StoredReply): ReplyView {
+    return {
+      id: reply.id,
+      noteId: reply.noteId,
+      authorSubject: reply.authorSubject,
+      authorFriendlyName: this.#profiles.get(reply.authorSubject)?.friendlyName ?? null,
+      body: reply.body,
+      createdAt: reply.createdAt,
     };
   }
 
@@ -592,7 +647,23 @@ function parseSessionOperation(value: unknown): SessionOperationInput {
     const record = requireRecord(value, ['action', 'noteId']);
     return { action: value['action'], noteId: parseNoteId(record['noteId']) };
   }
+  if (value['action'] === 'profile.set-name') {
+    const record = requireRecord(value, ['action', 'friendlyName']);
+    return { action: 'profile.set-name', friendlyName: parseFriendlyName(record['friendlyName']) };
+  }
   throw new RpError('BAD_REQUEST', 'The requested note session action is unsupported.', 400);
+}
+
+function parseFriendlyName(value: unknown): string {
+  const name = typeof value === 'string' ? value.trim() : '';
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{2,23}$/u.test(name) || name.toLowerCase().startsWith('nx1_')) {
+    throw new RpError(
+      'BAD_REQUEST',
+      'Friendly name must be 3–24 letters, numbers, underscores, or hyphens and cannot start with nx1_.',
+      400,
+    );
+  }
+  return name;
 }
 
 function parseDraft(value: unknown): NoteDraft {
@@ -658,12 +729,6 @@ function seedSubject(label: string): NexusSubject {
   return `nx1_${sha256Base64Url(`seed-subject:${label}`)}`;
 }
 
-function toReplyView(reply: StoredReply): ReplyView {
-  return {
-    id: reply.id,
-    noteId: reply.noteId,
-    authorSubject: reply.authorSubject,
-    body: reply.body,
-    createdAt: reply.createdAt,
-  };
+function friendlyNameKey(name: string): string {
+  return name.toLowerCase();
 }

@@ -1,6 +1,6 @@
 # Nexus reference relying party
 
-Nexus Notes demonstrates a relying-party session built from one explicit wallet proof. The wallet
+ROwO Notes demonstrates a relying-party session built from one explicit wallet proof. The wallet
 approves `session.start` for the exact Notes origin and the fixed `urn:rowo:nexus-notes:session`
 resource. After verification, the RP stores only hashes and issues a five-minute `Secure`,
 `HttpOnly`, `SameSite=Strict` cookie. Every later mutation rechecks the authoritative Nexus
@@ -13,6 +13,12 @@ The session can:
 - reply to public notes and to the subject's own private notes;
 - remove a reply authored by the active subject, or any reply beneath its own note; and
 - like or unlike public notes once per subject.
+
+An active subject can also claim a unique, case-insensitive friendly name using 3–24 ASCII letters,
+numbers, underscores, or hyphens. Notes resolves that RP-local alias dynamically on every note and
+reply, so renaming updates historical content for every viewer. The alias is presentation only:
+authorization and immutable ownership continue to use the self-certifying Nexus subject, and the UI
+does not represent the alias as a verified real-world identity.
 
 It is an RP-local convenience session, not a Nexus account or a reusable bearer authorization for
 another origin. Revocation invalidates it before the next protected operation, and expiration never

@@ -73,8 +73,42 @@ describe('ReferenceRpRepository', () => {
       'likes',
       'receipts',
       'sessions',
+      'profiles',
       'challenges',
     ]);
+  });
+
+  it('publishes one unique friendly name across existing notes and replies', async () => {
+    const repository = createRepository();
+    const owner = await login(repository, await createIdentity());
+    const visitor = await login(repository, await createIdentity());
+    const note = await createNote(repository, owner.token, 'public');
+    await repository.executeSessionOperation(
+      { action: 'reply.create', noteId: note.id, body: 'An owner reply.' },
+      owner.token,
+    );
+
+    const named = await repository.executeSessionOperation(
+      { action: 'profile.set-name', friendlyName: 'friendly_name' },
+      owner.token,
+    );
+    expect(named.session?.friendlyName).toBe('friendly_name');
+    const publicView = await repository.getNote(note.id);
+    expect(publicView.authorFriendlyName).toBe('friendly_name');
+    expect(publicView.replies[0]?.authorFriendlyName).toBe('friendly_name');
+
+    await expect(
+      repository.executeSessionOperation(
+        { action: 'profile.set-name', friendlyName: 'FRIENDLY_NAME' },
+        visitor.token,
+      ),
+    ).rejects.toMatchObject({ code: 'NAME_TAKEN' });
+
+    await repository.executeSessionOperation(
+      { action: 'profile.set-name', friendlyName: 'renamed_writer' },
+      owner.token,
+    );
+    expect((await repository.getNote(note.id)).authorFriendlyName).toBe('renamed_writer');
   });
 
   it('returns private notes only to their active creator session', async () => {
