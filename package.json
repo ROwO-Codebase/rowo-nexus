@@ -1,0 +1,50 @@
+{
+  "name": "rowo-nexus",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "ROwO Nexus anonymous identity protocol, wallet, and Cloudflare reference architecture.",
+  "license": "MIT",
+  "packageManager": "pnpm@11.16.0",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "dev:wallet": "pnpm --filter @nexus/wallet dev",
+    "dev:rp": "pnpm --filter @nexus/reference-rp dev",
+    "build:packages": "pnpm --filter \"./packages/**\" -r --workspace-concurrency=1 --if-present build",
+    "build": "pnpm -r --if-present build",
+    "pretypecheck": "pnpm build:packages",
+    "typecheck": "pnpm -r --if-present typecheck && tsc -p scripts/tsconfig.json && tsc -p tests/protocol/tsconfig.json && tsc -p tests/security/tsconfig.json && tsc -p tests/browser-e2e/tsconfig.json && tsc -p tests/concurrency/tsconfig.json && tsc -p tests/worker-integration/tsconfig.json && tsc -p workers/projector/test/tsconfig.json",
+    "prelint": "pnpm build:packages",
+    "lint": "eslint . --max-warnings=0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "pretest": "pnpm build:packages",
+    "test": "pnpm -r --if-present test && vitest run tests/protocol tests/security",
+    "pretest:workers": "pnpm build:packages",
+    "test:workers": "pnpm --filter @nexus/registry-worker test:worker && pnpm --filter @nexus/projector-worker test && pnpm --filter @nexus/transparency-worker test:workers && pnpm --filter @nexus/reference-rp test:worker && vitest run --config tests/worker-integration/vitest.config.ts",
+    "pretest:e2e": "pnpm build:packages",
+    "test:e2e": "playwright test",
+    "pretest:vectors": "pnpm build:packages",
+    "test:vectors": "pnpm --filter @nexus/test-vectors test",
+    "cf:dry-run": "pnpm -r --if-present dry-run",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm test:workers && pnpm test:vectors && pnpm test:e2e && pnpm build && pnpm cf:dry-run"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.21.0",
+    "@cloudflare/workers-types": "^5.20260811.1",
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.62.1",
+    "@types/node": "^26.2.0",
+    "@vitest/coverage-v8": "^4.1.10",
+    "eslint": "^10.8.1",
+    "fast-check": "^4.9.0",
+    "prettier": "^3.9.6",
+    "tsx": "^4.23.11",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.66.0",
+    "vitest": "^4.1.10",
+    "wrangler": "^4.120.1"
+  }
+}

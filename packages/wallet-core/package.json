@@ -1,0 +1,31 @@
+{
+  "name": "@nexus/wallet-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "description": "Private identity operations and local scope storage for the Nexus wallet.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@nexus/crypto": "workspace:*",
+    "@nexus/protocol": "workspace:*"
+  },
+  "devDependencies": {
+    "fake-indexeddb": "^6.0.0",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

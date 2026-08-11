@@ -1,0 +1,37 @@
+{
+  "name": "@nexus/wallet",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 5173",
+    "build": "vite build",
+    "preview": "vite preview --port 5173",
+    "dry-run": "vite build && wrangler deploy --dry-run --outdir .wrangler/dry-run",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@nexus/protocol": "workspace:*",
+    "@nexus/verifier": "workspace:*",
+    "@nexus/wallet-core": "workspace:*",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.546.0",
+    "motion": "^12.23.24",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tailwind-merge": "^3.5.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.14",
+    "@types/node": "^24.10.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^5.0.4",
+    "tailwindcss": "^4.1.14",
+    "typescript": "^5.9.2",
+    "vite": "^6.2.0",
+    "vitest": "^3.2.4",
+    "wrangler": "^4.120.1"
+  }
+}

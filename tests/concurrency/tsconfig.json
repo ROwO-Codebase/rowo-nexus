@@ -1,0 +1,27 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": "../..",
+    "paths": {
+      "@nexus/cloudflare-common": ["packages/cloudflare-common/src/index.ts"],
+      "@nexus/crypto": ["packages/crypto/src/index.ts"],
+      "@nexus/protocol": ["packages/protocol/src/index.ts"],
+      "@nexus/verifier": ["packages/verifier/src/index.ts"]
+    },
+    "declaration": false,
+    "declarationMap": false,
+    "types": [
+      "@cloudflare/workers-types",
+      "@cloudflare/vitest-pool-workers/types",
+      "vitest/globals"
+    ],
+    "noEmit": true
+  },
+  "include": [
+    "./**/*.ts",
+    "../worker-integration/env.d.ts",
+    "../worker-integration/helpers.ts",
+    "../../workers/edge-api/src/**/*.ts",
+    "../../workers/registry/src/**/*.ts"
+  ]
+}

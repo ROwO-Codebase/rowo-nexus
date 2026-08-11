@@ -1,0 +1,24 @@
+{
+  "name": "@nexus/transparency-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "wrangler deploy --dry-run --outdir dist",
+    "dry-run": "wrangler deploy --dry-run --outdir dist",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --config vitest.unit.config.ts",
+    "test:workers": "vitest run --config vitest.config.ts"
+  },
+  "dependencies": {
+    "@nexus/crypto": "workspace:*",
+    "@nexus/protocol": "workspace:*"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.21.0",
+    "@cloudflare/workers-types": "^5.20260811.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10",
+    "wrangler": "^4.120.1"
+  }
+}

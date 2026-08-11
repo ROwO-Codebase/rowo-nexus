@@ -1,0 +1,44 @@
+{
+  "schema": "nexus.test-vectors.v1",
+  "signingKeyId": "service-registry",
+  "keyset": {
+    "keys": [
+      {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "alg": "EdDSA",
+        "kid": "registry-fixture-2026-01",
+        "x": "_FHNjmIYoaONpH7QAjDwWAgW7RO6MwOsXeuRFUiQgCU",
+        "use": "sig"
+      }
+    ]
+  },
+  "payload": {
+    "protocol": "nexus.registry-receipt.v1",
+    "eventId": "nxe1_o3qONN-DcU4wHS99OgVGdHmAh1XBSRlbtM70q1tak4M",
+    "subject": "nx1_NZxiwvOxD3WCQ66ho5k9hF2vvDnhtZ7DsH9w4HnUWeo",
+    "genesisHash": "NZxiwvOxD3WCQ66ho5k9hF2vvDnhtZ7DsH9w4HnUWeo",
+    "eventType": "registered",
+    "sequence": 0,
+    "state": "active",
+    "acceptedAt": 1786400005,
+    "signerKid": "registry-fixture-2026-01"
+  },
+  "canonicalPayloadJcs": "{\"acceptedAt\":1786400005,\"eventId\":\"nxe1_o3qONN-DcU4wHS99OgVGdHmAh1XBSRlbtM70q1tak4M\",\"eventType\":\"registered\",\"genesisHash\":\"NZxiwvOxD3WCQ66ho5k9hF2vvDnhtZ7DsH9w4HnUWeo\",\"protocol\":\"nexus.registry-receipt.v1\",\"sequence\":0,\"signerKid\":\"registry-fixture-2026-01\",\"state\":\"active\",\"subject\":\"nx1_NZxiwvOxD3WCQ66ho5k9hF2vvDnhtZ7DsH9w4HnUWeo\"}",
+  "signaturePreimageHex": "4e455855532d5349474e4154555245006e657875732e72656769737472792d726563656970742e7631007b2261636365707465644174223a313738363430303030352c226576656e744964223a226e7865315f6f33714f4e4e2d4463553477485339394f67564764486d416831584253526c62744d3730713174616b344d222c226576656e7454797065223a2272656769737465726564222c2267656e6573697348617368223a224e5a786977764f7844335743513636686f356b396846327676446e68745a37447348397734486e5557656f222c2270726f746f636f6c223a226e657875732e72656769737472792d726563656970742e7631222c2273657175656e6365223a302c227369676e65724b6964223a2272656769737472792d666978747572652d323032362d3031222c227374617465223a22616374697665222c227375626a656374223a226e78315f4e5a786977764f7844335743513636686f356b396846327676446e68745a37447348397734486e5557656f227d",
+  "signatureBase64Url": "qySVpbhGW9DjGJnxsjmu82-A-bZ1zN20jQoKEdRIlD0JtIgD3t5OIHQCr6uf6mY1pzjm4u12kHJEJ0HKD-nVBA",
+  "receipt": {
+    "payload": {
+      "protocol": "nexus.registry-receipt.v1",
+      "eventId": "nxe1_o3qONN-DcU4wHS99OgVGdHmAh1XBSRlbtM70q1tak4M",
+      "subject": "nx1_NZxiwvOxD3WCQ66ho5k9hF2vvDnhtZ7DsH9w4HnUWeo",
+      "genesisHash": "NZxiwvOxD3WCQ66ho5k9hF2vvDnhtZ7DsH9w4HnUWeo",
+      "eventType": "registered",
+      "sequence": 0,
+      "state": "active",
+      "acceptedAt": 1786400005,
+      "signerKid": "registry-fixture-2026-01"
+    },
+    "signature": "qySVpbhGW9DjGJnxsjmu82-A-bZ1zN20jQoKEdRIlD0JtIgD3t5OIHQCr6uf6mY1pzjm4u12kHJEJ0HKD-nVBA"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": "../..",
+    "declaration": false,
+    "declarationMap": false,
+    "paths": {
+      "@nexus/crypto": ["packages/crypto/src/index.ts"],
+      "@nexus/protocol": ["packages/protocol/src/index.ts"],
+      "@nexus/verifier": ["packages/verifier/src/index.ts"]
+    },
+    "types": ["node", "@playwright/test"]
+  },
+  "include": ["./**/*.ts"]
+}

@@ -1,0 +1,40 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "nexus-projector",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-11",
+  "workers_dev": false,
+  "d1_databases": [
+    {
+      "binding": "INDEX_DB",
+      "database_name": "nexus-index",
+      "database_id": "acaf0206-77f9-4ea0-90d0-9e7aaaf2c0ec",
+      "migrations_dir": "../../migrations/d1",
+    },
+  ],
+  "queues": {
+    "consumers": [
+      {
+        "queue": "nexus-registry-events",
+        "max_batch_size": 100,
+        "max_batch_timeout": 5,
+        "max_retries": 5,
+        "dead_letter_queue": "nexus-registry-events-dlq",
+      },
+    ],
+  },
+  "services": [
+    {
+      "binding": "TRANSPARENCY_SERVICE",
+      "service": "nexus-transparency",
+    },
+  ],
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+      "invocation_logs": true,
+      "head_sampling_rate": 0.01,
+    },
+  },
+}

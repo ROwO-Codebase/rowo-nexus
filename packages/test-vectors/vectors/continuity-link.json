@@ -1,0 +1,90 @@
+{
+  "schema": "nexus.test-vectors.v1",
+  "signingKeyIds": ["identity-a", "identity-b"],
+  "verification": {
+    "subjectA": "nx1_NZxiwvOxD3WCQ66ho5k9hF2vvDnhtZ7DsH9w4HnUWeo",
+    "subjectB": "nx1_rLQ9sbiOHJLQwBFMOAOTbYf1MyaMH4fm7L3iMlLvkJ0",
+    "scope": "rp.example:portfolio",
+    "nonce": "MDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZH",
+    "now": 1786400030,
+    "maxClockSkewSeconds": 0
+  },
+  "payload": {
+    "protocol": "nexus.continuity-link.v1",
+    "subjectA": "nx1_NZxiwvOxD3WCQ66ho5k9hF2vvDnhtZ7DsH9w4HnUWeo",
+    "genesisA": {
+      "protocol": "nexus.identity.v1",
+      "suite": "NX-25519-SHA256-JCS-v1",
+      "signingKey": {
+        "alg": "Ed25519",
+        "publicKey": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"
+      },
+      "agreementKey": {
+        "alg": "X25519",
+        "publicKey": "hSDwCYkwp1R0i33ctD73Wg2_Og0mOBr066SpjqqbTmo"
+      },
+      "revocationCommitment": "_W__y81RfxyMr7yZ6dIpNYYBOkmq1iMTYB_mXUfAjyU"
+    },
+    "subjectB": "nx1_rLQ9sbiOHJLQwBFMOAOTbYf1MyaMH4fm7L3iMlLvkJ0",
+    "genesisB": {
+      "protocol": "nexus.identity.v1",
+      "suite": "NX-25519-SHA256-JCS-v1",
+      "signingKey": {
+        "alg": "Ed25519",
+        "publicKey": "PUAXw-hDiVqStwqnTRt-vJyYLM8uxJaMwM1V8Sr0Zgw"
+      },
+      "agreementKey": {
+        "alg": "X25519",
+        "publicKey": "3p7bfXt9wbTTW2HC7OQ1Nz-DQ8hbeGdNrfx-FG-IK08"
+      },
+      "revocationCommitment": "dw0phNdwTWGHKm0HN74LjkiZyq00pJza_3HC2z2-yfg"
+    },
+    "scope": "rp.example:portfolio",
+    "iat": 1786400030,
+    "exp": 1786400090,
+    "nonce": "MDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZH"
+  },
+  "canonicalPayloadJcs": "{\"exp\":1786400090,\"genesisA\":{\"agreementKey\":{\"alg\":\"X25519\",\"publicKey\":\"hSDwCYkwp1R0i33ctD73Wg2_Og0mOBr066SpjqqbTmo\"},\"protocol\":\"nexus.identity.v1\",\"revocationCommitment\":\"_W__y81RfxyMr7yZ6dIpNYYBOkmq1iMTYB_mXUfAjyU\",\"signingKey\":{\"alg\":\"Ed25519\",\"publicKey\":\"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo\"},\"suite\":\"NX-25519-SHA256-JCS-v1\"},\"genesisB\":{\"agreementKey\":{\"alg\":\"X25519\",\"publicKey\":\"3p7bfXt9wbTTW2HC7OQ1Nz-DQ8hbeGdNrfx-FG-IK08\"},\"protocol\":\"nexus.identity.v1\",\"revocationCommitment\":\"dw0phNdwTWGHKm0HN74LjkiZyq00pJza_3HC2z2-yfg\",\"signingKey\":{\"alg\":\"Ed25519\",\"publicKey\":\"PUAXw-hDiVqStwqnTRt-vJyYLM8uxJaMwM1V8Sr0Zgw\"},\"suite\":\"NX-25519-SHA256-JCS-v1\"},\"iat\":1786400030,\"nonce\":\"MDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZH\",\"protocol\":\"nexus.continuity-link.v1\",\"scope\":\"rp.example:portfolio\",\"subjectA\":\"nx1_NZxiwvOxD3WCQ66ho5k9hF2vvDnhtZ7DsH9w4HnUWeo\",\"subjectB\":\"nx1_rLQ9sbiOHJLQwBFMOAOTbYf1MyaMH4fm7L3iMlLvkJ0\"}",
+  "signaturePreimageHex": "4e455855532d5349474e4154555245006e657875732e636f6e74696e756974792d6c696e6b2e7631007b22657870223a313738363430303039302c2267656e6573697341223a7b2261677265656d656e744b6579223a7b22616c67223a22583235353139222c227075626c69634b6579223a226853447743596b777031523069333363744437335767325f4f67306d4f427230363653706a717162546d6f227d2c2270726f746f636f6c223a226e657875732e6964656e746974792e7631222c227265766f636174696f6e436f6d6d69746d656e74223a225f575f5f793831526678794d7237795a366449704e5959424f6b6d7131694d5459425f6d585566416a7955222c227369676e696e674b6579223a7b22616c67223a2245643235353139222c227075626c69634b6579223a223131715941594b7843726656535f3754795751484f6737686376506170694d6c727749616150634855526f227d2c227375697465223a224e582d32353531392d5348413235362d4a43532d7631227d2c2267656e6573697342223a7b2261677265656d656e744b6579223a7b22616c67223a22583235353139222c227075626c69634b6579223a2233703762665874397762545457324843374f51314e7a2d44513868626547644e7266782d46472d494b3038227d2c2270726f746f636f6c223a226e657875732e6964656e746974792e7631222c227265766f636174696f6e436f6d6d69746d656e74223a2264773070684e6477545747484b6d30484e37344c6a6b695a79713030704a7a615f334843327a322d796667222c227369676e696e674b6579223a7b22616c67223a2245643235353139222c227075626c69634b6579223a2250554158772d6844695671537477716e5452742d764a79594c4d3875784a614d774d3156385372305a6777227d2c227375697465223a224e582d32353531392d5348413235362d4a43532d7631227d2c22696174223a313738363430303033302c226e6f6e6365223a224d4445794d7a51314e6a63344f546f375044302d50304242516b4e4552555a48222c2270726f746f636f6c223a226e657875732e636f6e74696e756974792d6c696e6b2e7631222c2273636f7065223a2272702e6578616d706c653a706f7274666f6c696f222c227375626a65637441223a226e78315f4e5a786977764f7844335743513636686f356b396846327676446e68745a37447348397734486e5557656f222c227375626a65637442223a226e78315f724c51397362694f484a4c517742464d4f414f54625966314d79614d4834666d374c33694d6c4c766b4a30227d",
+  "signatureABase64Url": "EP9jpnW-_ej1abSl_lUhn2nuYJcyv-n3hp2jVKvQoYIdEwcC3uE8YC4NV1DEobUePmCAhwNsjDC_z1hDITnTCQ",
+  "signatureBBase64Url": "Yj5cUmV0V8eB-7Z8g-jofIuVpIwcbTQoap5mACsvCEAMwppSFpJ5FT2SBaqQEyN6ulIkqt4NLyI0T8Zf-e1cDQ",
+  "link": {
+    "payload": {
+      "protocol": "nexus.continuity-link.v1",
+      "subjectA": "nx1_NZxiwvOxD3WCQ66ho5k9hF2vvDnhtZ7DsH9w4HnUWeo",
+      "genesisA": {
+        "protocol": "nexus.identity.v1",
+        "suite": "NX-25519-SHA256-JCS-v1",
+        "signingKey": {
+          "alg": "Ed25519",
+          "publicKey": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"
+        },
+        "agreementKey": {
+          "alg": "X25519",
+          "publicKey": "hSDwCYkwp1R0i33ctD73Wg2_Og0mOBr066SpjqqbTmo"
+        },
+        "revocationCommitment": "_W__y81RfxyMr7yZ6dIpNYYBOkmq1iMTYB_mXUfAjyU"
+      },
+      "subjectB": "nx1_rLQ9sbiOHJLQwBFMOAOTbYf1MyaMH4fm7L3iMlLvkJ0",
+      "genesisB": {
+        "protocol": "nexus.identity.v1",
+        "suite": "NX-25519-SHA256-JCS-v1",
+        "signingKey": {
+          "alg": "Ed25519",
+          "publicKey": "PUAXw-hDiVqStwqnTRt-vJyYLM8uxJaMwM1V8Sr0Zgw"
+        },
+        "agreementKey": {
+          "alg": "X25519",
+          "publicKey": "3p7bfXt9wbTTW2HC7OQ1Nz-DQ8hbeGdNrfx-FG-IK08"
+        },
+        "revocationCommitment": "dw0phNdwTWGHKm0HN74LjkiZyq00pJza_3HC2z2-yfg"
+      },
+      "scope": "rp.example:portfolio",
+      "iat": 1786400030,
+      "exp": 1786400090,
+      "nonce": "MDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZH"
+    },
+    "signatureA": "EP9jpnW-_ej1abSl_lUhn2nuYJcyv-n3hp2jVKvQoYIdEwcC3uE8YC4NV1DEobUePmCAhwNsjDC_z1hDITnTCQ",
+    "signatureB": "Yj5cUmV0V8eB-7Z8g-jofIuVpIwcbTQoap5mACsvCEAMwppSFpJ5FT2SBaqQEyN6ulIkqt4NLyI0T8Zf-e1cDQ"
+  }
+}

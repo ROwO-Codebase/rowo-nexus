@@ -1,0 +1,2703 @@
+{
+  "schema": "nexus.test-vectors.v1",
+  "warning": "NON-PRODUCTION TEST FIXTURE: public RFC 8032 key material; never use for real identities or services.",
+  "signingKeyId": "service-transparency",
+  "keyset": {
+    "keys": [
+      {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "alg": "EdDSA",
+        "kid": "transparency-fixture-2026-01",
+        "x": "J4EX_BRMcjQPZ9DyMW6Dhs7_vyskKMnFH-98WX8dQm4",
+        "use": "sig"
+      }
+    ]
+  },
+  "merkle": {
+    "algorithm": "RFC6962-SHA256",
+    "leafDomainHex": "00",
+    "nodeDomainHex": "01",
+    "eventHashesHex": [
+      "f580318e58cddbf08c2628a014f1610b8828f04ec22ca0809743581bec9b17ee",
+      "a37a8e34df83714e301d2f7d3a05467479808755c149195bb4cef4ab5b5a9383",
+      "5750c55268834f18c77e69853507efa27613b0c7f447d8b9c062d854d93cee50"
+    ],
+    "leafHashesHex": [
+      "98f60277a3bf29d9bd5ae0f81b5a1738d2bbc489620eee3a40b26e7255e35eb5",
+      "00e7bb54e196f752e2168960afcc1a7c093953aee51c78cbe83b942182f40c57",
+      "a332caab2aa95091d4675d131087bf03fa7cbe3dada9143b33af2dff878cf570"
+    ],
+    "targetLeafIndex": 1,
+    "auditPathHex": [
+      "98f60277a3bf29d9bd5ae0f81b5a1738d2bbc489620eee3a40b26e7255e35eb5",
+      "a332caab2aa95091d4675d131087bf03fa7cbe3dada9143b33af2dff878cf570"
+    ],
+    "rootHashHex": "11f01f143b93c7f256bcd0634aa71cd57726dfb5fd34de4a5e619db54f5f9313",
+    "rootHashBase64Url": "EfAfFDuTx_JWvNBjSqcc1Xcm37X9NN5KXmGdtU9fkxM"
+  },
+  "checkpoint": {
+    "payload": {
+      "protocol": "nexus.transparency-checkpoint.v1",
+      "shardId": "a3",
+      "treeSize": 3,
+      "rootHash": "EfAfFDuTx_JWvNBjSqcc1Xcm37X9NN5KXmGdtU9fkxM",
+      "checkpointedAt": 1786400025,
+      "signerKid": "transparency-fixture-2026-01"
+    },
+    "canonicalPayloadJcs": "{\"checkpointedAt\":1786400025,\"protocol\":\"nexus.transparency-checkpoint.v1\",\"rootHash\":\"EfAfFDuTx_JWvNBjSqcc1Xcm37X9NN5KXmGdtU9fkxM\",\"shardId\":\"a3\",\"signerKid\":\"transparency-fixture-2026-01\",\"treeSize\":3}",
+    "signaturePreimageHex": "4e455855532d5349474e4154555245006e657875732e7472616e73706172656e63792d636865636b706f696e742e7631007b22636865636b706f696e7465644174223a313738363430303032352c2270726f746f636f6c223a226e657875732e7472616e73706172656e63792d636865636b706f696e742e7631222c22726f6f7448617368223a224566416646447554785f4a57764e426a537163633158636d333758394e4e354b586d4764745539666b784d222c2273686172644964223a226133222c227369676e65724b6964223a227472616e73706172656e63792d666978747572652d323032362d3031222c227472656553697a65223a337d",
+    "signatureBase64Url": "JAMLz2ky8LYM37MFIv9KV6Tk85w2nBWVCYj5Es56w5fnpekC1yYb_xa7ES_TJTL2kC-vQTArqyU4LN8-n9LyDw",
+    "signed": {
+      "payload": {
+        "protocol": "nexus.transparency-checkpoint.v1",
+        "shardId": "a3",
+        "treeSize": 3,
+        "rootHash": "EfAfFDuTx_JWvNBjSqcc1Xcm37X9NN5KXmGdtU9fkxM",
+        "checkpointedAt": 1786400025,
+        "signerKid": "transparency-fixture-2026-01"
+      },
+      "signature": "JAMLz2ky8LYM37MFIv9KV6Tk85w2nBWVCYj5Es56w5fnpekC1yYb_xa7ES_TJTL2kC-vQTArqyU4LN8-n9LyDw"
+    }
+  },
+  "globalCheckpoint": {
+    "payload": {
+      "protocol": "nexus.transparency-global-checkpoint.v1",
+      "checkpointedAt": 1786400026,
+      "shards": [
+        {
+          "shardId": "00",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "01",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "02",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "03",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "04",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "05",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "06",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "07",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "08",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "09",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "0a",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "0b",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "0c",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "0d",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "0e",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "0f",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "10",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "11",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "12",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "13",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "14",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "15",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "16",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "17",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "18",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "19",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "1a",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "1b",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "1c",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "1d",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "1e",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "1f",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "20",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "21",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "22",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "23",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "24",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "25",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "26",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "27",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "28",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "29",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "2a",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "2b",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "2c",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "2d",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "2e",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "2f",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "30",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "31",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "32",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "33",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "34",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "35",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "36",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "37",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "38",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "39",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "3a",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "3b",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "3c",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "3d",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "3e",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "3f",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "40",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "41",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "42",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "43",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "44",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "45",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "46",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "47",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "48",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "49",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "4a",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "4b",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "4c",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "4d",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "4e",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "4f",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "50",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "51",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "52",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "53",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "54",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "55",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "56",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "57",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "58",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "59",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "5a",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "5b",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "5c",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "5d",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "5e",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "5f",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "60",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "61",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "62",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "63",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "64",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "65",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "66",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "67",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "68",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "69",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "6a",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "6b",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "6c",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "6d",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "6e",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "6f",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "70",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "71",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "72",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "73",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "74",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "75",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "76",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "77",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "78",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "79",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "7a",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "7b",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "7c",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "7d",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "7e",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "7f",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "80",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "81",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "82",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "83",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "84",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "85",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "86",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "87",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "88",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "89",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "8a",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "8b",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "8c",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "8d",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "8e",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "8f",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "90",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "91",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "92",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "93",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "94",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "95",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "96",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "97",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "98",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "99",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "9a",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "9b",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "9c",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "9d",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "9e",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "9f",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "a0",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "a1",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "a2",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "a3",
+          "treeSize": 3,
+          "rootHash": "EfAfFDuTx_JWvNBjSqcc1Xcm37X9NN5KXmGdtU9fkxM"
+        },
+        {
+          "shardId": "a4",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "a5",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "a6",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "a7",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "a8",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "a9",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "aa",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "ab",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "ac",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "ad",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "ae",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "af",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "b0",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "b1",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "b2",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "b3",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "b4",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "b5",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "b6",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "b7",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "b8",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "b9",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "ba",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "bb",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "bc",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "bd",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "be",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "bf",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "c0",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "c1",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "c2",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "c3",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "c4",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "c5",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "c6",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "c7",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "c8",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "c9",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "ca",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "cb",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "cc",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "cd",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "ce",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "cf",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "d0",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "d1",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "d2",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "d3",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "d4",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "d5",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "d6",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "d7",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "d8",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "d9",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "da",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "db",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "dc",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "dd",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "de",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "df",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "e0",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "e1",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "e2",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "e3",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "e4",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "e5",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "e6",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "e7",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "e8",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "e9",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "ea",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "eb",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "ec",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "ed",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "ee",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "ef",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "f0",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "f1",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "f2",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "f3",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "f4",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "f5",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "f6",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "f7",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "f8",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "f9",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "fa",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "fb",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "fc",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "fd",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "fe",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        },
+        {
+          "shardId": "ff",
+          "treeSize": 0,
+          "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+        }
+      ],
+      "signerKid": "transparency-fixture-2026-01"
+    },
+    "canonicalPayloadJcs": "{\"checkpointedAt\":1786400026,\"protocol\":\"nexus.transparency-global-checkpoint.v1\",\"shards\":[{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"00\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"01\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"02\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"03\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"04\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"05\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"06\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"07\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"08\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"09\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"0a\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"0b\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"0c\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"0d\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"0e\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"0f\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"10\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"11\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"12\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"13\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"14\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"15\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"16\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"17\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"18\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"19\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"1a\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"1b\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"1c\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"1d\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"1e\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"1f\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"20\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"21\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"22\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"23\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"24\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"25\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"26\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"27\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"28\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"29\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"2a\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"2b\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"2c\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"2d\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"2e\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"2f\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"30\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"31\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"32\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"33\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"34\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"35\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"36\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"37\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"38\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"39\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"3a\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"3b\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"3c\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"3d\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"3e\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"3f\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"40\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"41\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"42\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"43\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"44\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"45\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"46\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"47\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"48\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"49\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"4a\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"4b\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"4c\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"4d\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"4e\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"4f\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"50\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"51\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"52\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"53\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"54\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"55\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"56\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"57\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"58\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"59\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"5a\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"5b\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"5c\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"5d\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"5e\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"5f\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"60\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"61\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"62\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"63\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"64\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"65\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"66\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"67\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"68\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"69\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"6a\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"6b\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"6c\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"6d\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"6e\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"6f\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"70\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"71\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"72\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"73\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"74\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"75\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"76\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"77\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"78\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"79\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"7a\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"7b\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"7c\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"7d\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"7e\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"7f\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"80\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"81\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"82\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"83\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"84\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"85\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"86\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"87\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"88\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"89\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"8a\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"8b\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"8c\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"8d\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"8e\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"8f\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"90\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"91\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"92\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"93\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"94\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"95\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"96\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"97\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"98\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"99\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"9a\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"9b\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"9c\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"9d\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"9e\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"9f\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"a0\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"a1\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"a2\",\"treeSize\":0},{\"rootHash\":\"EfAfFDuTx_JWvNBjSqcc1Xcm37X9NN5KXmGdtU9fkxM\",\"shardId\":\"a3\",\"treeSize\":3},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"a4\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"a5\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"a6\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"a7\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"a8\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"a9\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"aa\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"ab\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"ac\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"ad\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"ae\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"af\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"b0\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"b1\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"b2\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"b3\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"b4\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"b5\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"b6\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"b7\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"b8\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"b9\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"ba\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"bb\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"bc\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"bd\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"be\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"bf\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"c0\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"c1\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"c2\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"c3\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"c4\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"c5\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"c6\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"c7\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"c8\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"c9\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"ca\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"cb\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"cc\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"cd\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"ce\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"cf\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"d0\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"d1\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"d2\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"d3\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"d4\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"d5\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"d6\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"d7\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"d8\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"d9\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"da\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"db\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"dc\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"dd\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"de\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"df\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"e0\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"e1\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"e2\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"e3\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"e4\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"e5\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"e6\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"e7\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"e8\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"e9\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"ea\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"eb\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"ec\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"ed\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"ee\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"ef\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"f0\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"f1\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"f2\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"f3\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"f4\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"f5\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"f6\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"f7\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"f8\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"f9\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"fa\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"fb\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"fc\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"fd\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"fe\",\"treeSize\":0},{\"rootHash\":\"47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU\",\"shardId\":\"ff\",\"treeSize\":0}],\"signerKid\":\"transparency-fixture-2026-01\"}",
+    "signaturePreimageHex": "4e455855532d5349474e4154555245006e657875732e7472616e73706172656e63792d676c6f62616c2d636865636b706f696e742e7631007b22636865636b706f696e7465644174223a313738363430303032362c2270726f746f636f6c223a226e657875732e7472616e73706172656e63792d676c6f62616c2d636865636b706f696e742e7631222c22736861726473223a5b7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223030222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223031222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223032222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223033222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223034222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223035222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223036222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223037222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223038222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223039222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223061222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223062222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223063222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223064222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223065222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223066222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223130222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223131222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223132222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223133222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223134222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223135222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223136222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223137222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223138222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223139222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223161222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223162222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223163222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223164222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223165222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223166222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223230222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223231222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223232222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223233222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223234222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223235222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223236222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223237222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223238222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223239222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223261222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223262222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223263222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223264222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223265222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223266222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223330222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223331222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223332222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223333222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223334222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223335222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223336222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223337222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223338222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223339222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223361222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223362222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223363222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223364222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223365222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223366222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223430222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223431222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223432222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223433222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223434222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223435222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223436222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223437222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223438222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223439222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223461222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223462222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223463222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223464222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223465222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223466222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223530222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223531222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223532222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223533222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223534222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223535222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223536222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223537222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223538222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223539222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223561222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223562222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223563222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223564222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223565222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223566222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223630222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223631222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223632222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223633222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223634222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223635222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223636222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223637222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223638222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223639222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223661222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223662222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223663222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223664222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223665222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223666222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223730222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223731222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223732222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223733222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223734222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223735222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223736222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223737222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223738222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223739222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223761222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223762222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223763222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223764222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223765222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223766222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223830222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223831222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223832222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223833222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223834222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223835222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223836222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223837222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223838222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223839222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223861222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223862222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223863222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223864222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223865222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223866222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223930222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223931222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223932222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223933222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223934222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223935222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223936222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223937222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223938222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223939222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223961222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223962222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223963222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223964222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223965222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a223966222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226130222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226131222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226132222c227472656553697a65223a307d2c7b22726f6f7448617368223a224566416646447554785f4a57764e426a537163633158636d333758394e4e354b586d4764745539666b784d222c2273686172644964223a226133222c227472656553697a65223a337d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226134222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226135222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226136222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226137222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226138222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226139222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226161222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226162222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226163222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226164222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226165222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226166222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226230222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226231222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226232222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226233222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226234222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226235222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226236222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226237222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226238222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226239222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226261222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226262222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226263222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226264222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226265222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226266222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226330222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226331222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226332222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226333222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226334222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226335222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226336222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226337222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226338222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226339222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226361222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226362222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226363222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226364222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226365222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226366222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226430222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226431222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226432222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226433222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226434222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226435222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226436222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226437222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226438222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226439222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226461222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226462222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226463222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226464222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226465222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226466222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226530222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226531222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226532222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226533222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226534222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226535222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226536222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226537222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226538222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226539222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226561222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226562222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226563222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226564222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226565222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226566222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226630222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226631222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226632222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226633222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226634222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226635222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226636222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226637222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226638222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226639222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226661222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226662222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226663222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226664222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226665222c227472656553697a65223a307d2c7b22726f6f7448617368223a223437444551706a38484253612d5f54496d572d354a4365755165526b6d354e4d704a575a47336853754655222c2273686172644964223a226666222c227472656553697a65223a307d5d2c227369676e65724b6964223a227472616e73706172656e63792d666978747572652d323032362d3031227d",
+    "signatureBase64Url": "Li9kKHCLBt9I2K2cr7zobXschrsE0yzYtqNI4aTK3a5-CUH5Gk5j0zI_b8TvSRC2UnRgajujRGLUJKlysusyCA",
+    "signed": {
+      "payload": {
+        "protocol": "nexus.transparency-global-checkpoint.v1",
+        "checkpointedAt": 1786400026,
+        "shards": [
+          {
+            "shardId": "00",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "01",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "02",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "03",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "04",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "05",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "06",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "07",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "08",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "09",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "0a",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "0b",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "0c",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "0d",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "0e",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "0f",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "10",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "11",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "12",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "13",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "14",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "15",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "16",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "17",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "18",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "19",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "1a",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "1b",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "1c",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "1d",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "1e",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "1f",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "20",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "21",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "22",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "23",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "24",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "25",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "26",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "27",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "28",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "29",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "2a",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "2b",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "2c",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "2d",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "2e",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "2f",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "30",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "31",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "32",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "33",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "34",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "35",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "36",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "37",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "38",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "39",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "3a",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "3b",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "3c",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "3d",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "3e",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "3f",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "40",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "41",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "42",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "43",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "44",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "45",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "46",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "47",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "48",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "49",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "4a",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "4b",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "4c",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "4d",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "4e",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "4f",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "50",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "51",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "52",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "53",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "54",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "55",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "56",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "57",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "58",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "59",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "5a",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "5b",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "5c",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "5d",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "5e",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "5f",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "60",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "61",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "62",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "63",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "64",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "65",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "66",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "67",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "68",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "69",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "6a",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "6b",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "6c",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "6d",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "6e",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "6f",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "70",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "71",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "72",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "73",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "74",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "75",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "76",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "77",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "78",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "79",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "7a",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "7b",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "7c",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "7d",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "7e",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "7f",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "80",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "81",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "82",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "83",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "84",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "85",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "86",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "87",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "88",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "89",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "8a",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "8b",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "8c",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "8d",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "8e",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "8f",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "90",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "91",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "92",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "93",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "94",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "95",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "96",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "97",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "98",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "99",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "9a",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "9b",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "9c",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "9d",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "9e",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "9f",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "a0",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "a1",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "a2",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "a3",
+            "treeSize": 3,
+            "rootHash": "EfAfFDuTx_JWvNBjSqcc1Xcm37X9NN5KXmGdtU9fkxM"
+          },
+          {
+            "shardId": "a4",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "a5",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "a6",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "a7",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "a8",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "a9",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "aa",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "ab",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "ac",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "ad",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "ae",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "af",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "b0",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "b1",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "b2",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "b3",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "b4",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "b5",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "b6",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "b7",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "b8",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "b9",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "ba",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "bb",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "bc",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "bd",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "be",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "bf",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "c0",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "c1",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "c2",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "c3",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "c4",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "c5",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "c6",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "c7",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "c8",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "c9",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "ca",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "cb",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "cc",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "cd",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "ce",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "cf",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "d0",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "d1",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "d2",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "d3",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "d4",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "d5",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "d6",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "d7",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "d8",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "d9",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "da",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "db",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "dc",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "dd",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "de",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "df",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "e0",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "e1",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "e2",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "e3",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "e4",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "e5",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "e6",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "e7",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "e8",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "e9",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "ea",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "eb",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "ec",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "ed",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "ee",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "ef",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "f0",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "f1",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "f2",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "f3",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "f4",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "f5",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "f6",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "f7",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "f8",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "f9",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "fa",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "fb",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "fc",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "fd",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "fe",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          },
+          {
+            "shardId": "ff",
+            "treeSize": 0,
+            "rootHash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+          }
+        ],
+        "signerKid": "transparency-fixture-2026-01"
+      },
+      "signature": "Li9kKHCLBt9I2K2cr7zobXschrsE0yzYtqNI4aTK3a5-CUH5Gk5j0zI_b8TvSRC2UnRgajujRGLUJKlysusyCA"
+    }
+  },
+  "inclusionProof": {
+    "protocol": "nexus.transparency-inclusion-proof.v1",
+    "eventHash": "o3qONN-DcU4wHS99OgVGdHmAh1XBSRlbtM70q1tak4M",
+    "shardId": "a3",
+    "leafIndex": 1,
+    "treeSize": 3,
+    "auditPath": [
+      "mPYCd6O_Kdm9WuD4G1oXONK7xIliDu46QLJuclXjXrU",
+      "ozLKqyqpUJHUZ10TEIe_A_p8vj2tqRQ7M68t_4eM9XA"
+    ],
+    "checkpoint": {
+      "payload": {
+        "protocol": "nexus.transparency-checkpoint.v1",
+        "shardId": "a3",
+        "treeSize": 3,
+        "rootHash": "EfAfFDuTx_JWvNBjSqcc1Xcm37X9NN5KXmGdtU9fkxM",
+        "checkpointedAt": 1786400025,
+        "signerKid": "transparency-fixture-2026-01"
+      },
+      "signature": "JAMLz2ky8LYM37MFIv9KV6Tk85w2nBWVCYj5Es56w5fnpekC1yYb_xa7ES_TJTL2kC-vQTArqyU4LN8-n9LyDw"
+    }
+  },
+  "composition": {
+    "targetShard": {
+      "shardId": "a3",
+      "treeSize": 3,
+      "rootHash": "EfAfFDuTx_JWvNBjSqcc1Xcm37X9NN5KXmGdtU9fkxM"
+    },
+    "checkpointMatchesGlobalShard": true,
+    "inclusionCheckpointMatchesShardCheckpoint": true
+  },
+  "verification": {
+    "checkpoint": {
+      "now": 1786400025,
+      "maxAgeSeconds": 60,
+      "maxClockSkewSeconds": 0,
+      "signerKid": "transparency-fixture-2026-01",
+      "shardId": "a3",
+      "treeSize": 3,
+      "rootHash": "EfAfFDuTx_JWvNBjSqcc1Xcm37X9NN5KXmGdtU9fkxM"
+    },
+    "globalCheckpoint": {
+      "now": 1786400026,
+      "maxAgeSeconds": 60,
+      "maxClockSkewSeconds": 0,
+      "signerKid": "transparency-fixture-2026-01"
+    },
+    "inclusion": {
+      "now": 1786400025,
+      "maxAgeSeconds": 60,
+      "maxClockSkewSeconds": 0,
+      "signerKid": "transparency-fixture-2026-01",
+      "eventHash": "o3qONN-DcU4wHS99OgVGdHmAh1XBSRlbtM70q1tak4M",
+      "shardId": "a3",
+      "treeSize": 3,
+      "rootHash": "EfAfFDuTx_JWvNBjSqcc1Xcm37X9NN5KXmGdtU9fkxM"
+    }
+  }
+}

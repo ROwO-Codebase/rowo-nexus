@@ -1,0 +1,43 @@
+{
+  "schema": "nexus.test-vectors.v1",
+  "signingKeyId": "service-registry",
+  "keyset": {
+    "keys": [
+      {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "alg": "EdDSA",
+        "kid": "registry-fixture-2026-01",
+        "x": "_FHNjmIYoaONpH7QAjDwWAgW7RO6MwOsXeuRFUiQgCU",
+        "use": "sig"
+      }
+    ]
+  },
+  "verificationTime": 1786400035,
+  "payload": {
+    "protocol": "nexus.status-statement.v1",
+    "subject": "nx1_NZxiwvOxD3WCQ66ho5k9hF2vvDnhtZ7DsH9w4HnUWeo",
+    "state": "active",
+    "sequence": 0,
+    "registeredAt": 1786400005,
+    "iat": 1786400006,
+    "exp": 1786400066,
+    "signerKid": "registry-fixture-2026-01"
+  },
+  "canonicalPayloadJcs": "{\"exp\":1786400066,\"iat\":1786400006,\"protocol\":\"nexus.status-statement.v1\",\"registeredAt\":1786400005,\"sequence\":0,\"signerKid\":\"registry-fixture-2026-01\",\"state\":\"active\",\"subject\":\"nx1_NZxiwvOxD3WCQ66ho5k9hF2vvDnhtZ7DsH9w4HnUWeo\"}",
+  "signaturePreimageHex": "4e455855532d5349474e4154555245006e657875732e7374617475732d73746174656d656e742e7631007b22657870223a313738363430303036362c22696174223a313738363430303030362c2270726f746f636f6c223a226e657875732e7374617475732d73746174656d656e742e7631222c22726567697374657265644174223a313738363430303030352c2273657175656e6365223a302c227369676e65724b6964223a2272656769737472792d666978747572652d323032362d3031222c227374617465223a22616374697665222c227375626a656374223a226e78315f4e5a786977764f7844335743513636686f356b396846327676446e68745a37447348397734486e5557656f227d",
+  "signatureBase64Url": "jtA4rBVEvqNrItYwmXHvi5CuKX4mTHdoqnTIbanGaNKUYoPDCNsaqVbrTm-jhuAcdcTap29w8P77XE2s4iZuBw",
+  "statement": {
+    "payload": {
+      "protocol": "nexus.status-statement.v1",
+      "subject": "nx1_NZxiwvOxD3WCQ66ho5k9hF2vvDnhtZ7DsH9w4HnUWeo",
+      "state": "active",
+      "sequence": 0,
+      "registeredAt": 1786400005,
+      "iat": 1786400006,
+      "exp": 1786400066,
+      "signerKid": "registry-fixture-2026-01"
+    },
+    "signature": "jtA4rBVEvqNrItYwmXHvi5CuKX4mTHdoqnTIbanGaNKUYoPDCNsaqVbrTm-jhuAcdcTap29w8P77XE2s4iZuBw"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "nexus-registry-test",
+  "main": "src/index.ts",
+  // The current vitest-pool workerd binary supports through 2026-07-29.
+  // Production remains pinned to the required 2026-08-11 in wrangler.jsonc.
+  "compatibility_date": "2026-07-29",
+  "durable_objects": {
+    "bindings": [{ "name": "IDENTITY_STATE", "class_name": "IdentityState" }],
+  },
+  "exports": {
+    "IdentityState": {
+      "type": "durable-object",
+      "storage": "sqlite",
+    },
+  },
+}

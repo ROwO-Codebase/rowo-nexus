@@ -1,0 +1,43 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "nexus-reference-rp",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-08-11",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": true,
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "RP_STATE", "class_name": "ReferenceRpState" }],
+  },
+  "exports": {
+    "ReferenceRpState": {
+      "type": "durable-object",
+      "storage": "sqlite",
+    },
+  },
+  "ratelimits": [
+    {
+      "name": "RP_API_RATE_LIMITER",
+      "namespace_id": "1002",
+      "simple": {
+        "limit": 120,
+        "period": 60,
+      },
+    },
+  ],
+  "vars": {
+    // Replace both placeholders with the exact production HTTPS origins before deployment.
+    "RP_AUDIENCE": "https://notes.rowo.link",
+    "NEXUS_API_ORIGIN": "https://nexus.rowo.link",
+  },
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 0.01,
+    },
+  },
+}

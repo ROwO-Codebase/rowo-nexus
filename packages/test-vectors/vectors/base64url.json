@@ -1,0 +1,21 @@
+{
+  "schema": "nexus.test-vectors.v1",
+  "valid": [
+    { "name": "empty", "hex": "", "base64url": "" },
+    { "name": "single-zero-byte", "hex": "00", "base64url": "AA" },
+    { "name": "single-ff-byte", "hex": "ff", "base64url": "_w" },
+    { "name": "url-alphabet", "hex": "fbefff", "base64url": "--__" },
+    {
+      "name": "sequential-32-bytes",
+      "hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "base64url": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8"
+    }
+  ],
+  "invalid": [
+    { "name": "padding", "value": "Zg==" },
+    { "name": "standard-base64-alphabet", "value": "+/8" },
+    { "name": "impossible-length", "value": "A" },
+    { "name": "whitespace", "value": "Zg\n" },
+    { "name": "non-canonical-trailing-bits", "value": "AB" }
+  ]
+}

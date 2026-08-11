@@ -1,0 +1,39 @@
+{
+  "name": "@nexus/test-vectors",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "description": "Language-neutral deterministic cryptographic vectors for ROwO Nexus v1.",
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "vectors",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "generate": "tsx ../../scripts/generate-test-vectors.ts",
+    "test": "vitest run --config vitest.config.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "verify": "tsx ../../scripts/verify-test-vectors.ts"
+  },
+  "dependencies": {
+    "@nexus/crypto": "workspace:*",
+    "@nexus/protocol": "workspace:*",
+    "@nexus/verifier": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "prettier": "^3.9.6",
+    "tsx": "^4.23.11",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
+  }
+}

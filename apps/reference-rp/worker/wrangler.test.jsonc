@@ -1,0 +1,27 @@
+{
+  "$schema": "../../../node_modules/wrangler/config-schema.json",
+  "name": "nexus-reference-rp-test",
+  "main": "index.ts",
+  // The current pool's workerd build supports through 2026-07-29.
+  // Production remains pinned to 2026-08-11 in ../wrangler.jsonc.
+  "compatibility_date": "2026-07-29",
+  "assets": {
+    "directory": "../dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": true,
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "RP_STATE", "class_name": "ReferenceRpState" }],
+  },
+  "exports": {
+    "ReferenceRpState": {
+      "type": "durable-object",
+      "storage": "sqlite",
+    },
+  },
+  "vars": {
+    "RP_AUDIENCE": "https://notes.example.test",
+    "NEXUS_API_ORIGIN": "https://api.invalid.example",
+  },
+}

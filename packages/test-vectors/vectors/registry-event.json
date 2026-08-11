@@ -1,0 +1,29 @@
+{
+  "schema": "nexus.test-vectors.v1",
+  "eventWithoutEventId": {
+    "protocol": "nexus.registry-event.v1",
+    "eventType": "registered",
+    "subject": "nx1_NZxiwvOxD3WCQ66ho5k9hF2vvDnhtZ7DsH9w4HnUWeo",
+    "genesisHash": "NZxiwvOxD3WCQ66ho5k9hF2vvDnhtZ7DsH9w4HnUWeo",
+    "sequence": 0,
+    "state": "active",
+    "acceptedAt": 1786400005,
+    "actionHash": "vFUoK-rFEOGLtFnGd0h6L-4tXZjMDieV0UGJTx2luIY"
+  },
+  "canonicalEventJcs": "{\"acceptedAt\":1786400005,\"actionHash\":\"vFUoK-rFEOGLtFnGd0h6L-4tXZjMDieV0UGJTx2luIY\",\"eventType\":\"registered\",\"genesisHash\":\"NZxiwvOxD3WCQ66ho5k9hF2vvDnhtZ7DsH9w4HnUWeo\",\"protocol\":\"nexus.registry-event.v1\",\"sequence\":0,\"state\":\"active\",\"subject\":\"nx1_NZxiwvOxD3WCQ66ho5k9hF2vvDnhtZ7DsH9w4HnUWeo\"}",
+  "eventHashPreimageHex": "4e455855532d52454749535452592d4556454e54007631007b2261636365707465644174223a313738363430303030352c22616374696f6e48617368223a227646556f4b2d7246454f474c74466e47643068364c2d3474585a6a4d446965563055474a5478326c754959222c226576656e7454797065223a2272656769737465726564222c2267656e6573697348617368223a224e5a786977764f7844335743513636686f356b396846327676446e68745a37447348397734486e5557656f222c2270726f746f636f6c223a226e657875732e72656769737472792d6576656e742e7631222c2273657175656e6365223a302c227374617465223a22616374697665222c227375626a656374223a226e78315f4e5a786977764f7844335743513636686f356b396846327676446e68745a37447348397734486e5557656f227d",
+  "eventHashHex": "a37a8e34df83714e301d2f7d3a05467479808755c149195bb4cef4ab5b5a9383",
+  "eventHashBase64Url": "o3qONN-DcU4wHS99OgVGdHmAh1XBSRlbtM70q1tak4M",
+  "eventId": "nxe1_o3qONN-DcU4wHS99OgVGdHmAh1XBSRlbtM70q1tak4M",
+  "event": {
+    "protocol": "nexus.registry-event.v1",
+    "eventType": "registered",
+    "subject": "nx1_NZxiwvOxD3WCQ66ho5k9hF2vvDnhtZ7DsH9w4HnUWeo",
+    "genesisHash": "NZxiwvOxD3WCQ66ho5k9hF2vvDnhtZ7DsH9w4HnUWeo",
+    "sequence": 0,
+    "state": "active",
+    "acceptedAt": 1786400005,
+    "actionHash": "vFUoK-rFEOGLtFnGd0h6L-4tXZjMDieV0UGJTx2luIY",
+    "eventId": "nxe1_o3qONN-DcU4wHS99OgVGdHmAh1XBSRlbtM70q1tak4M"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "nexus-registry",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-11",
+  "durable_objects": {
+    "bindings": [{ "name": "IDENTITY_STATE", "class_name": "IdentityState" }],
+  },
+  "exports": {
+    "IdentityState": {
+      "type": "durable-object",
+      "storage": "sqlite",
+    },
+  },
+  "queues": {
+    "producers": [{ "binding": "REGISTRY_EVENTS", "queue": "nexus-registry-events" }],
+  },
+  "analytics_engine_datasets": [{ "binding": "METRICS", "dataset": "nexus_metrics" }],
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 0.01,
+    },
+  },
+}

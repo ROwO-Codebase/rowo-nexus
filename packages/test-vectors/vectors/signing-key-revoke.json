@@ -1,0 +1,41 @@
+{
+  "schema": "nexus.test-vectors.v1",
+  "signingKeyId": "identity-a",
+  "genesis": {
+    "protocol": "nexus.identity.v1",
+    "suite": "NX-25519-SHA256-JCS-v1",
+    "signingKey": { "alg": "Ed25519", "publicKey": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo" },
+    "agreementKey": { "alg": "X25519", "publicKey": "hSDwCYkwp1R0i33ctD73Wg2_Og0mOBr066SpjqqbTmo" },
+    "revocationCommitment": "_W__y81RfxyMr7yZ6dIpNYYBOkmq1iMTYB_mXUfAjyU"
+  },
+  "verification": {
+    "subject": "nx1_NZxiwvOxD3WCQ66ho5k9hF2vvDnhtZ7DsH9w4HnUWeo",
+    "expectedSequence": 0,
+    "nonce": "ICEiIyQlJicoKSorLC0uLw",
+    "now": 1786400020,
+    "maxClockSkewSeconds": 0
+  },
+  "payload": {
+    "protocol": "nexus.revoke.v1",
+    "subject": "nx1_NZxiwvOxD3WCQ66ho5k9hF2vvDnhtZ7DsH9w4HnUWeo",
+    "expectedSequence": 0,
+    "nonce": "ICEiIyQlJicoKSorLC0uLw",
+    "iat": 1786400020,
+    "reasonCode": "dispose"
+  },
+  "canonicalPayloadJcs": "{\"expectedSequence\":0,\"iat\":1786400020,\"nonce\":\"ICEiIyQlJicoKSorLC0uLw\",\"protocol\":\"nexus.revoke.v1\",\"reasonCode\":\"dispose\",\"subject\":\"nx1_NZxiwvOxD3WCQ66ho5k9hF2vvDnhtZ7DsH9w4HnUWeo\"}",
+  "signaturePreimageHex": "4e455855532d5349474e4154555245006e657875732e7265766f6b652e7631007b22657870656374656453657175656e6365223a302c22696174223a313738363430303032302c226e6f6e6365223a22494345694979516c4a69636f4b536f724c4330754c77222c2270726f746f636f6c223a226e657875732e7265766f6b652e7631222c22726561736f6e436f6465223a22646973706f7365222c227375626a656374223a226e78315f4e5a786977764f7844335743513636686f356b396846327676446e68745a37447348397734486e5557656f227d",
+  "signatureBase64Url": "KXDvQ14zxQ6e_qXfitytTJB_QI--FOnYwfD8SOLT60uEz2XnVOjSHYVm1KDWCqCKOK7rYHcvmDcILyNVpxOsDA",
+  "request": {
+    "mode": "signature",
+    "payload": {
+      "protocol": "nexus.revoke.v1",
+      "subject": "nx1_NZxiwvOxD3WCQ66ho5k9hF2vvDnhtZ7DsH9w4HnUWeo",
+      "expectedSequence": 0,
+      "nonce": "ICEiIyQlJicoKSorLC0uLw",
+      "iat": 1786400020,
+      "reasonCode": "dispose"
+    },
+    "signature": "KXDvQ14zxQ6e_qXfitytTJB_QI--FOnYwfD8SOLT60uEz2XnVOjSHYVm1KDWCqCKOK7rYHcvmDcILyNVpxOsDA"
+  }
+}

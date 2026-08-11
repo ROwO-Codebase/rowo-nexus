@@ -1,0 +1,39 @@
+{
+  "schema": "nexus.test-vectors.v1",
+  "cases": [
+    {
+      "name": "rfc-8785-number-serialization",
+      "value": [333333333.3333333, 1e30, 4.5, 0.002, 1e-27],
+      "canonicalJcs": "[333333333.3333333,1e+30,4.5,0.002,1e-27]",
+      "canonicalUtf8Hex": "5b3333333333333333332e333333333333332c31652b33302c342e352c302e3030322c31652d32375d"
+    },
+    {
+      "name": "utf-16-property-order",
+      "value": {
+        "1": "One",
+        "€": "Euro Sign",
+        "\r": "Carriage Return",
+        "דּ": "Hebrew Letter Dalet With Dagesh",
+        "😀": "Emoji: Grinning Face",
+        "": "Control",
+        "ö": "Latin Small Letter O With Diaeresis"
+      },
+      "canonicalJcs": "{\"\\r\":\"Carriage Return\",\"1\":\"One\",\"\":\"Control\",\"ö\":\"Latin Small Letter O With Diaeresis\",\"€\":\"Euro Sign\",\"😀\":\"Emoji: Grinning Face\",\"דּ\":\"Hebrew Letter Dalet With Dagesh\"}",
+      "canonicalUtf8Hex": "7b225c72223a2243617272696167652052657475726e222c2231223a224f6e65222c22c280223a22436f6e74726f6c222c22c3b6223a224c6174696e20536d616c6c204c6574746572204f205769746820446961657265736973222c22e282ac223a224575726f205369676e222c22f09f9880223a22456d6f6a693a204772696e6e696e672046616365222c22efacb3223a22486562726577204c65747465722044616c6574205769746820446167657368227d"
+    },
+    {
+      "name": "escaping-and-nesting",
+      "value": {
+        "z": [true, null, "line\nfeed"],
+        "a": { "quote": "\"", "slash": "/", "control": "\b\t" }
+      },
+      "canonicalJcs": "{\"a\":{\"control\":\"\\b\\t\",\"quote\":\"\\\"\",\"slash\":\"/\"},\"z\":[true,null,\"line\\nfeed\"]}",
+      "canonicalUtf8Hex": "7b2261223a7b22636f6e74726f6c223a225c625c74222c2271756f7465223a225c22222c22736c617368223a222f227d2c227a223a5b747275652c6e756c6c2c226c696e655c6e66656564225d7d"
+    }
+  ],
+  "rejectedJsonLiterals": [
+    { "name": "lone-high-surrogate", "json": "\"\\ud800\"" },
+    { "name": "lone-low-surrogate", "json": "\"\\udc00\"" },
+    { "name": "lone-surrogate-key", "json": "{\"\\ud800\":true}" }
+  ]
+}

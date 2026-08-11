@@ -1,0 +1,8 @@
+{
+  "schema": "nexus.test-vectors.v1",
+  "warning": "NON-PRODUCTION TEST FIXTURE: public RFC 8032 key material; never use for real identities or services.",
+  "secretHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+  "commitmentPreimageHex": "4e455855532d5245564f434154494f4e2d434f4d4d49544d454e5400763100000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+  "commitmentHex": "fd6fffcbcd517f1c8cafbc99e9d2293586013a49aad62313601fe65d47c08f25",
+  "commitmentBase64Url": "_W__y81RfxyMr7yZ6dIpNYYBOkmq1iMTYB_mXUfAjyU"
+}

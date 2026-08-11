@@ -1,0 +1,16 @@
+node_modules/
+.pnpm-store/
+dist/
+coverage/
+.wrangler/
+worker-dist/
+.dev.vars
+.env
+.env.*
+!.env.example
+playwright-report/
+test-results/
+*.tsbuildinfo
+*.log
+.DS_Store
+Thumbs.db

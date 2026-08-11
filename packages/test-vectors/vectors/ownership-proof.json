@@ -1,0 +1,59 @@
+{
+  "schema": "nexus.test-vectors.v1",
+  "signingKeyId": "identity-a",
+  "signingPublicKeyBase64Url": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+  "payload": {
+    "protocol": "nexus.ownership-proof.v1",
+    "subject": "nx1_NZxiwvOxD3WCQ66ho5k9hF2vvDnhtZ7DsH9w4HnUWeo",
+    "genesis": {
+      "protocol": "nexus.identity.v1",
+      "suite": "NX-25519-SHA256-JCS-v1",
+      "signingKey": {
+        "alg": "Ed25519",
+        "publicKey": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"
+      },
+      "agreementKey": {
+        "alg": "X25519",
+        "publicKey": "hSDwCYkwp1R0i33ctD73Wg2_Og0mOBr066SpjqqbTmo"
+      },
+      "revocationCommitment": "_W__y81RfxyMr7yZ6dIpNYYBOkmq1iMTYB_mXUfAjyU"
+    },
+    "aud": "https://rp.example",
+    "act": "resource.create",
+    "resource": "urn:example:resource:alpha",
+    "nonce": "EBESExQVFhcYGRobHB0eHw",
+    "iat": 1786400000,
+    "exp": 1786400060,
+    "contextHash": "LmbGKjE5jznUFqJQgb_yGMIt8YXBv4u-tpSNvUjPqmw"
+  },
+  "canonicalPayloadJcs": "{\"act\":\"resource.create\",\"aud\":\"https://rp.example\",\"contextHash\":\"LmbGKjE5jznUFqJQgb_yGMIt8YXBv4u-tpSNvUjPqmw\",\"exp\":1786400060,\"genesis\":{\"agreementKey\":{\"alg\":\"X25519\",\"publicKey\":\"hSDwCYkwp1R0i33ctD73Wg2_Og0mOBr066SpjqqbTmo\"},\"protocol\":\"nexus.identity.v1\",\"revocationCommitment\":\"_W__y81RfxyMr7yZ6dIpNYYBOkmq1iMTYB_mXUfAjyU\",\"signingKey\":{\"alg\":\"Ed25519\",\"publicKey\":\"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo\"},\"suite\":\"NX-25519-SHA256-JCS-v1\"},\"iat\":1786400000,\"nonce\":\"EBESExQVFhcYGRobHB0eHw\",\"protocol\":\"nexus.ownership-proof.v1\",\"resource\":\"urn:example:resource:alpha\",\"subject\":\"nx1_NZxiwvOxD3WCQ66ho5k9hF2vvDnhtZ7DsH9w4HnUWeo\"}",
+  "signaturePreimageHex": "4e455855532d5349474e4154555245006e657875732e6f776e6572736869702d70726f6f662e7631007b22616374223a227265736f757263652e637265617465222c22617564223a2268747470733a2f2f72702e6578616d706c65222c22636f6e7465787448617368223a224c6d62474b6a45356a7a6e5546714a5167625f79474d4974385958427634752d7470534e76556a50716d77222c22657870223a313738363430303036302c2267656e65736973223a7b2261677265656d656e744b6579223a7b22616c67223a22583235353139222c227075626c69634b6579223a226853447743596b777031523069333363744437335767325f4f67306d4f427230363653706a717162546d6f227d2c2270726f746f636f6c223a226e657875732e6964656e746974792e7631222c227265766f636174696f6e436f6d6d69746d656e74223a225f575f5f793831526678794d7237795a366449704e5959424f6b6d7131694d5459425f6d585566416a7955222c227369676e696e674b6579223a7b22616c67223a2245643235353139222c227075626c69634b6579223a223131715941594b7843726656535f3754795751484f6737686376506170694d6c727749616150634855526f227d2c227375697465223a224e582d32353531392d5348413235362d4a43532d7631227d2c22696174223a313738363430303030302c226e6f6e6365223a2245424553457851564668635947526f62484230654877222c2270726f746f636f6c223a226e657875732e6f776e6572736869702d70726f6f662e7631222c227265736f75726365223a2275726e3a6578616d706c653a7265736f757263653a616c706861222c227375626a656374223a226e78315f4e5a786977764f7844335743513636686f356b396846327676446e68745a37447348397734486e5557656f227d",
+  "signatureBase64Url": "K-MV55jlYr9ldLQyBKXRF5i1S0BsFVKzQUgodvuIRNVeRdTp2OkETkmXx-yYPYTdQEk8TOGecqCdbph_ZFBEBw",
+  "proof": {
+    "payload": {
+      "protocol": "nexus.ownership-proof.v1",
+      "subject": "nx1_NZxiwvOxD3WCQ66ho5k9hF2vvDnhtZ7DsH9w4HnUWeo",
+      "genesis": {
+        "protocol": "nexus.identity.v1",
+        "suite": "NX-25519-SHA256-JCS-v1",
+        "signingKey": {
+          "alg": "Ed25519",
+          "publicKey": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"
+        },
+        "agreementKey": {
+          "alg": "X25519",
+          "publicKey": "hSDwCYkwp1R0i33ctD73Wg2_Og0mOBr066SpjqqbTmo"
+        },
+        "revocationCommitment": "_W__y81RfxyMr7yZ6dIpNYYBOkmq1iMTYB_mXUfAjyU"
+      },
+      "aud": "https://rp.example",
+      "act": "resource.create",
+      "resource": "urn:example:resource:alpha",
+      "nonce": "EBESExQVFhcYGRobHB0eHw",
+      "iat": 1786400000,
+      "exp": 1786400060,
+      "contextHash": "LmbGKjE5jznUFqJQgb_yGMIt8YXBv4u-tpSNvUjPqmw"
+    },
+    "signature": "K-MV55jlYr9ldLQyBKXRF5i1S0BsFVKzQUgodvuIRNVeRdTp2OkETkmXx-yYPYTdQEk8TOGecqCdbph_ZFBEBw"
+  }
+}

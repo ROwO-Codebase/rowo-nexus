@@ -1,0 +1,18 @@
+packages:
+  - 'packages/*'
+  - 'apps/*'
+  - 'workers/*'
+
+allowBuilds:
+  esbuild: true
+  workerd: true
+
+minimumReleaseAgeExclude:
+  - '@cloudflare/workers-types@5.20260811.1'
+  - '@cloudflare/vitest-pool-workers@0.21.0'
+  - miniflare@5.20260804.0-alpha
+  - wrangler@4.120.1
+
+onlyBuiltDependencies:
+  - esbuild
+  - workerd

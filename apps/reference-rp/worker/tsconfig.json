@@ -1,0 +1,14 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "..",
+    "types": [
+      "@cloudflare/workers-types",
+      "@cloudflare/vitest-pool-workers/types",
+      "vitest/globals"
+    ],
+    "declaration": false,
+    "declarationMap": false
+  },
+  "include": ["./**/*.ts", "../src/shared/**/*.ts"]
+}

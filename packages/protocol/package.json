@@ -1,0 +1,35 @@
+{
+  "name": "@nexus/protocol",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Canonical Nexus v1 wire types, schemas, encodings, and cryptographic preimages.",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "canonicalize": "3.0.0",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "fast-check": "^4.9.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

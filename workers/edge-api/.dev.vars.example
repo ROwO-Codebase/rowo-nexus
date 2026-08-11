@@ -1,0 +1,2 @@
+# Local development only. Never set this flag in preview, staging, or production.
+ALLOW_LOCALHOST_HTTP=true

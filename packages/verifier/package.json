@@ -1,0 +1,34 @@
+{
+  "name": "@nexus/verifier",
+  "version": "0.1.0",
+  "type": "module",
+  "sideEffects": false,
+  "description": "Runtime-neutral verification for ROwO Nexus protocol objects.",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --root ../.. packages/verifier/src/verifier.test.ts packages/verifier/src/transparency.test.ts packages/verifier/src/transparency-auth.test.ts"
+  },
+  "dependencies": {
+    "@nexus/crypto": "workspace:*",
+    "@nexus/protocol": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}
