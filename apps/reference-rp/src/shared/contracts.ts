@@ -11,7 +11,8 @@ export type SessionAction =
   | 'reply.create'
   | 'reply.delete'
   | 'note.like'
-  | 'note.unlike';
+  | 'note.unlike'
+  | 'profile.set-name';
 export type NotesAction = ProofAction | SessionAction;
 
 export interface NoteDraft {
@@ -24,6 +25,7 @@ export interface ReplyView {
   id: string;
   noteId: string;
   authorSubject: NexusSubject;
+  authorFriendlyName: string | null;
   body: string;
   createdAt: number;
 }
@@ -32,6 +34,7 @@ export interface NoteView {
   id: string;
   resource: string;
   authorSubject: NexusSubject;
+  authorFriendlyName: string | null;
   title: string;
   body: string;
   visibility: NoteVisibility;
@@ -67,7 +70,8 @@ export type SessionOperationInput =
   | { action: 'reply.create'; noteId: string; body: string }
   | { action: 'reply.delete'; noteId: string; replyId: string }
   | { action: 'note.like'; noteId: string }
-  | { action: 'note.unlike'; noteId: string };
+  | { action: 'note.unlike'; noteId: string }
+  | { action: 'profile.set-name'; friendlyName: string };
 
 export interface ApplicationReceipt {
   receiptId: string;
@@ -82,6 +86,7 @@ export interface ApplicationReceipt {
 
 export interface SessionStatus {
   subject: NexusSubject;
+  friendlyName: string | null;
   state: 'active' | 'revoked';
   sequence: number;
   expiresAt: number;
@@ -96,6 +101,7 @@ export interface SessionStartResult {
 export interface SessionOperationResult {
   note: NoteView | null;
   receipt: ApplicationReceipt;
+  session?: SessionStatus;
 }
 
 export interface ApiErrorBody {

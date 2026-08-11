@@ -32,6 +32,7 @@ import {
 import { WalletCoreError } from './errors.js';
 import { requireTrustedWalletEventBoundary } from './trusted-wallet-event.js';
 import type {
+  AuthorizationHistoryEntry,
   Clock,
   ContinuityLinkOptions,
   CreatedLocalIdentity,
@@ -58,6 +59,7 @@ const OWNERSHIP_PROOF_PROTOCOL = 'nexus.ownership-proof.v1' as const;
 const REVOKE_PROTOCOL = 'nexus.revoke.v1' as const;
 const REVOKE_SECRET_PROTOCOL = 'nexus.revoke-secret.v1' as const;
 const CONTINUITY_LINK_PROTOCOL = 'nexus.continuity-link.v1' as const;
+const MAX_AUTHORIZATION_HISTORY_ENTRIES = 200;
 
 export interface WalletCoreOptions {
   keyVault: KeyVault;
@@ -116,6 +118,7 @@ function summarize(record: LocalIdentityRecordV1): LocalIdentitySummary {
     subject: record.subject,
     ...(record.label === undefined ? {} : { label: record.label }),
     localScopes: [...record.localScopes],
+    authorizationHistory: structuredClone(record.authorizationHistory ?? []),
     localState: record.localState,
     registered: record.registrationReceipt !== undefined,
     hasAgreementKey: record.genesis.agreementKey !== undefined,
@@ -229,6 +232,7 @@ export class WalletCore implements WalletCoreApi {
         ...(agreementPrivateKeyRef === undefined ? {} : { agreementPrivateKeyRef }),
         revocationSecretRef,
         localScopes: [],
+        authorizationHistory: [],
         ...(options.label === undefined ? {} : { label: options.label }),
         localState: 'active',
       };
@@ -322,6 +326,59 @@ export class WalletCore implements WalletCoreApi {
       createProtocolSignaturePreimage(payload),
     );
     return { payload, signature: base64Url64Schema.parse(encodeBase64Url(signature)) };
+  }
+
+  public async proveAndRecordAuthorization(
+    localId: string,
+    boundary: TrustedWalletEventBoundary,
+    request: ProofRequest,
+    rememberScope: boolean,
+  ): Promise<OwnershipProofV1> {
+    const proof = await this.prove(localId, boundary, request);
+    await this.#recordProofAuthorization(localId, boundary, request, rememberScope);
+    return proof;
+  }
+
+  async #recordProofAuthorization(
+    localId: string,
+    boundary: TrustedWalletEventBoundary,
+    request: ProofRequest,
+    rememberScope: boolean,
+  ): Promise<void> {
+    const audience = requireTrustedWalletEventBoundary(boundary).audience;
+    const record = await this.#getActiveRegisteredRecord(localId);
+    const parsedRequest = parseWalletInput(
+      () => proofRequestSchema.parse(request),
+      'The ownership proof request is invalid.',
+    );
+    const approvedAt = this.#clock.now();
+    validateEpochSeconds(approvedAt, 'clock.now()');
+
+    const introducedScope = rememberScope && !record.localScopes.includes(audience);
+    const entry: AuthorizationHistoryEntry = {
+      authorizationId: newLocalId(this.#crypto),
+      approvedAt,
+      audience,
+      action: parsedRequest.action,
+      resource: parsedRequest.resource,
+      introducedScope,
+      contextBound: parsedRequest.contextHash !== undefined,
+    };
+    const authorizationHistory = [entry, ...(record.authorizationHistory ?? [])].slice(
+      0,
+      MAX_AUTHORIZATION_HISTORY_ENTRIES,
+    );
+
+    await this.#identityStore.put({
+      ...record,
+      localScopes: introducedScope ? [...record.localScopes, audience] : record.localScopes,
+      authorizationHistory,
+    });
+  }
+
+  public async clearAuthorizationHistory(localId: string): Promise<void> {
+    const record = await this.#getRecord(localId);
+    await this.#identityStore.put({ ...record, authorizationHistory: [] });
   }
 
   public async revoke(

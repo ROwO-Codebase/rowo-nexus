@@ -1,8 +1,11 @@
+import { useState } from 'react';
 import {
   AlertTriangle,
   ArrowRightLeft,
+  Clock3,
   Fingerprint,
   Globe2,
+  History,
   KeySquare,
   Link2,
   Loader2,
@@ -26,6 +29,8 @@ interface IdentityDetailProps {
   onContinuity: () => void;
   retryingRegistration: boolean;
   onRetryRegistration: () => void;
+  clearingHistory: boolean;
+  onClearHistory: () => Promise<void>;
 }
 
 export function IdentityDetail({
@@ -36,9 +41,21 @@ export function IdentityDetail({
   onContinuity,
   retryingRegistration,
   onRetryRegistration,
+  clearingHistory,
+  onClearHistory,
 }: IdentityDetailProps) {
   const active = identity.localState === 'active';
   const registeredActions = canUseRegisteredIdentityActions(identity);
+  const [confirmClearHistory, setConfirmClearHistory] = useState(false);
+
+  const clearHistory = async () => {
+    if (!confirmClearHistory) {
+      setConfirmClearHistory(true);
+      return;
+    }
+    await onClearHistory();
+    setConfirmClearHistory(false);
+  };
 
   return (
     <motion.section
@@ -161,6 +178,97 @@ export function IdentityDetail({
           )}
           <p className="mt-2 text-xs leading-relaxed text-slate-400">
             Scope mappings stay in this wallet and are never stored in the Nexus registry.
+          </p>
+        </div>
+
+        <div className="mt-6 border-t border-slate-100 pt-6">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <History className="h-4 w-4 text-indigo-600" aria-hidden="true" />
+              <h3 className="text-sm font-semibold text-slate-900">Authorization history</h3>
+              {identity.authorizationHistory.length > 0 && (
+                <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">
+                  {String(identity.authorizationHistory.length)}
+                </span>
+              )}
+            </div>
+            {identity.authorizationHistory.length > 0 && (
+              <button
+                type="button"
+                onClick={() => void clearHistory()}
+                disabled={clearingHistory}
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                  confirmClearHistory
+                    ? 'bg-rose-600 text-white hover:bg-rose-700'
+                    : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+                }`}
+              >
+                {clearingHistory
+                  ? 'Clearing…'
+                  : confirmClearHistory
+                    ? 'Confirm clear'
+                    : 'Clear history'}
+              </button>
+            )}
+          </div>
+
+          {identity.authorizationHistory.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">
+              No proof authorizations have been recorded for this identity in this browser.
+            </div>
+          ) : (
+            <ol className="max-h-96 space-y-2 overflow-y-auto pr-1">
+              {identity.authorizationHistory.map((entry) => {
+                const approvedAt = new Date(entry.approvedAt * 1_000);
+                return (
+                  <li
+                    key={entry.authorizationId}
+                    className="rounded-xl border border-slate-200 p-3.5"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <code
+                        className="min-w-0 truncate text-xs font-semibold text-indigo-700"
+                        title={entry.audience}
+                      >
+                        {entry.audience}
+                      </code>
+                      <time
+                        dateTime={approvedAt.toISOString()}
+                        className="inline-flex shrink-0 items-center gap-1 text-xs text-slate-400"
+                      >
+                        <Clock3 className="h-3 w-3" aria-hidden="true" />
+                        {approvedAt.toLocaleString()}
+                      </time>
+                    </div>
+                    <div className="mt-2 grid gap-1.5 text-xs sm:grid-cols-[auto_1fr]">
+                      <span className="font-medium text-slate-500">Action</span>
+                      <code className="break-all text-slate-800">{entry.action}</code>
+                      <span className="font-medium text-slate-500">Resource</span>
+                      <code className="break-all text-slate-800">{entry.resource}</code>
+                    </div>
+                    {(entry.introducedScope || entry.contextBound) && (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {entry.introducedScope && (
+                          <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800">
+                            New app scope
+                          </span>
+                        )}
+                        {entry.contextBound && (
+                          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-800">
+                            Context-bound
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+          <p className="mt-2 text-xs leading-relaxed text-slate-400">
+            Stored only in this browser, up to 200 entries per identity. It contains no proofs,
+            signatures, nonces, or key material. Actions covered by an app's own session are not
+            visible to the wallet.
           </p>
         </div>
 

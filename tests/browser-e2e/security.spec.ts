@@ -40,6 +40,7 @@ interface NoteView {
   visibility: 'public' | 'private';
   version: number;
   authorSubject: string;
+  authorFriendlyName: string | null;
   likeCount: number;
   replies: Array<{ id: string; body: string; authorSubject: string }>;
 }
@@ -94,6 +95,9 @@ test.describe.serial('Nexus browser security boundary', () => {
     await page.goto(RP_A_ORIGIN);
     await expect(page.getByRole('heading', { name: 'Notes without accounts' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Log in', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Log in with Nexus' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Log in to write' })).toHaveCount(0);
+    await expect(page.getByText('Log in to write.', { exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Edit' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Delete' })).toHaveCount(0);
 
@@ -107,6 +111,9 @@ test.describe.serial('Nexus browser security boundary', () => {
     await approveWallet(popup);
     await expect(page.getByText('Session active', { exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Log out', exact: true })).toBeVisible();
+    await page.getByLabel('Friendly name').fill('friendly_name');
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByText('friendly_name', { exact: true }).first()).toBeVisible();
 
     const loginRequest = lastRequest('/api/operations');
     expect(loginRequest).toBeDefined();
@@ -142,6 +149,22 @@ test.describe.serial('Nexus browser security boundary', () => {
 
     ownedNote = (await listNotes(RP_A_ORIGIN)).find((note) => note.title === title) as NoteView;
     expect(ownedNote.authorSubject).toBe(proofForA.payload.subject);
+    expect(ownedNote.authorFriendlyName).toBe('friendly_name');
+
+    const historyPage = await context.newPage();
+    await historyPage.goto(WALLET_ORIGIN);
+    await expect(historyPage.getByText('1 authorization', { exact: true })).toBeVisible();
+    await historyPage.getByRole('button', { name: 'View details' }).click();
+    await expect(historyPage.getByRole('heading', { name: 'Authorization history' })).toBeVisible();
+    const authorizationHistory = historyPage.locator('ol');
+    await expect(authorizationHistory.getByText(RP_A_ORIGIN, { exact: true })).toBeVisible();
+    await expect(historyPage.getByText('session.start', { exact: true })).toBeVisible();
+    await expect(
+      historyPage.getByText('urn:rowo:nexus-notes:session', { exact: true }),
+    ).toBeVisible();
+    await expect(historyPage.getByText('New app scope', { exact: true })).toBeVisible();
+    await expect(historyPage.getByText(proofForA.payload.nonce, { exact: true })).toHaveCount(0);
+    await historyPage.close();
     await page.close();
   });
 
@@ -179,6 +202,16 @@ test.describe.serial('Nexus browser security boundary', () => {
     const anonymousPage = await anonymous.newPage();
     await anonymousPage.goto(RP_A_ORIGIN);
     await expect(anonymousPage.getByText(privateTitle, { exact: true })).toHaveCount(0);
+    await anonymousPage.getByText(ownedNote.title, { exact: true }).click();
+    await expect(anonymousPage.getByText('friendly_name', { exact: true })).toBeVisible();
+    await expect(anonymousPage.getByText('Log in to reply.', { exact: true })).toBeVisible();
+    await expect(anonymousPage.getByRole('button', { name: 'Log in to reply' })).toHaveCount(0);
+    await expect(
+      anonymousPage.getByText(
+        'Log in with Nexus to reveal controls available to your current subject.',
+        { exact: true },
+      ),
+    ).toHaveCount(0);
     await anonymous.close();
     await page.close();
   });

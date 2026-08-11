@@ -11,6 +11,7 @@ function identity(
     localId,
     subject: `nx1_${localId}`,
     localScopes: [],
+    authorizationHistory: [],
     localState: 'active',
     registered: true,
     hasAgreementKey: false,

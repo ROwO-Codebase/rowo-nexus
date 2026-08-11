@@ -45,6 +45,7 @@ const SESSION_POLICY = Object.freeze({
     'reply.delete',
     'note.like',
     'note.unlike',
+    'profile.set-name',
   ],
   resourcePolicy: 'public-notes-and-private-notes-owned-by-session-subject',
   ttlSeconds: SESSION_TTL_SECONDS,
@@ -91,6 +92,13 @@ interface ReplyRow extends Record<string, SqlStorageValue> {
   author_subject: string;
   body: string;
   created_at: number;
+}
+
+interface ProfileRow extends Record<string, SqlStorageValue> {
+  subject: string;
+  friendly_name: string;
+  name_key: string;
+  updated_at: number;
 }
 
 interface StartedSession {
@@ -349,6 +357,7 @@ export class ReferenceRpState extends DurableObject<ReferenceRpEnv> {
 
       const session: SessionStatus = {
         subject: prepared.subject,
+        friendlyName: this.#friendlyName(prepared.subject),
         state: 'active',
         sequence: prepared.sequence,
         expiresAt: now + SESSION_TTL_SECONDS,
@@ -395,6 +404,7 @@ export class ReferenceRpState extends DurableObject<ReferenceRpEnv> {
       proofHash: row.proof_hash,
       status: {
         subject,
+        friendlyName: this.#friendlyName(subject),
         state: 'active',
         sequence: lifecycle.sequence,
         expiresAt: row.expires_at,
@@ -446,7 +456,33 @@ export class ReferenceRpState extends DurableObject<ReferenceRpEnv> {
       let resource: string;
       let resultingVersion: number | null;
 
-      if (operation.action === 'note.create') {
+      if (operation.action === 'profile.set-name') {
+        const nameKey = friendlyNameKey(operation.friendlyName);
+        const claimed = this.ctx.storage.sql
+          .exec<ProfileRow>(
+            'SELECT subject, friendly_name, name_key, updated_at FROM profiles WHERE name_key = ?',
+            nameKey,
+          )
+          .toArray()[0];
+        if (claimed !== undefined && claimed.subject !== subject) {
+          throw new RpWorkerError('NAME_TAKEN', 'That friendly name is already in use.', 409);
+        }
+        this.ctx.storage.sql.exec(
+          `INSERT INTO profiles (subject, friendly_name, name_key, updated_at)
+           VALUES (?, ?, ?, ?)
+           ON CONFLICT(subject) DO UPDATE SET
+             friendly_name = excluded.friendly_name,
+             name_key = excluded.name_key,
+             updated_at = excluded.updated_at`,
+          subject,
+          operation.friendlyName,
+          nameKey,
+          now,
+        );
+        resource = `profile:${subject}`;
+        note = null;
+        resultingVersion = null;
+      } else if (operation.action === 'note.create') {
         const id = `nt_${secureToken(9)}`;
         resource = `note:${id}`;
         this.ctx.storage.sql.exec(
@@ -571,7 +607,19 @@ export class ReferenceRpState extends DurableObject<ReferenceRpEnv> {
         resultingVersion,
       };
       this.#insertReceipt(receipt);
-      return { note, receipt };
+      return {
+        note,
+        receipt,
+        ...(operation.action === 'profile.set-name'
+          ? {
+              session: {
+                ...session.status,
+                friendlyName: operation.friendlyName,
+                checkedAt: now,
+              },
+            }
+          : {}),
+      };
     });
   }
 
@@ -674,7 +722,7 @@ export class ReferenceRpState extends DurableObject<ReferenceRpEnv> {
         note.id,
       )
       .toArray()
-      .map(toReplyView);
+      .map((reply) => this.#toReplyView(reply));
     const likeCount = this.ctx.storage.sql
       .exec<{ count: number }>(
         'SELECT COUNT(*) AS count FROM note_likes WHERE note_id = ?',
@@ -694,6 +742,7 @@ export class ReferenceRpState extends DurableObject<ReferenceRpEnv> {
       id: note.id,
       resource: note.resource,
       authorSubject: note.author_subject as NexusSubject,
+      authorFriendlyName: this.#friendlyName(note.author_subject as NexusSubject),
       title: note.title,
       body: note.body,
       visibility: parseStoredVisibility(note.visibility),
@@ -706,6 +755,29 @@ export class ReferenceRpState extends DurableObject<ReferenceRpEnv> {
       likedByViewer,
       replies,
     };
+  }
+
+  #toReplyView(reply: ReplyRow): ReplyView {
+    const subject = reply.author_subject as NexusSubject;
+    return {
+      id: reply.id,
+      noteId: reply.note_id,
+      authorSubject: subject,
+      authorFriendlyName: this.#friendlyName(subject),
+      body: reply.body,
+      createdAt: reply.created_at,
+    };
+  }
+
+  #friendlyName(subject: NexusSubject): string | null {
+    return (
+      this.ctx.storage.sql
+        .exec<ProfileRow>(
+          'SELECT subject, friendly_name, name_key, updated_at FROM profiles WHERE subject = ?',
+          subject,
+        )
+        .toArray()[0]?.friendly_name ?? null
+    );
   }
 
   #readChallenge(challengeId: string): ChallengeRow {
@@ -743,7 +815,7 @@ export class ReferenceRpState extends DurableObject<ReferenceRpEnv> {
         version INTEGER NOT NULL,
         seeded INTEGER NOT NULL CHECK (seeded IN (0, 1))
       );
-      INSERT OR IGNORE INTO schema_meta (singleton, version, seeded) VALUES (1, 2, 0);
+      INSERT OR IGNORE INTO schema_meta (singleton, version, seeded) VALUES (1, 3, 0);
       CREATE TABLE IF NOT EXISTS challenges (
         challenge_id TEXT PRIMARY KEY,
         nonce_hash TEXT NOT NULL UNIQUE,
@@ -811,6 +883,12 @@ export class ReferenceRpState extends DurableObject<ReferenceRpEnv> {
         PRIMARY KEY (note_id, subject)
       );
       CREATE INDEX IF NOT EXISTS note_likes_note ON note_likes (note_id);
+      CREATE TABLE IF NOT EXISTS profiles (
+        subject TEXT PRIMARY KEY,
+        friendly_name TEXT NOT NULL,
+        name_key TEXT NOT NULL UNIQUE,
+        updated_at INTEGER NOT NULL
+      );
     `);
     let version = this.ctx.storage.sql
       .exec<{ version: number }>('SELECT version FROM schema_meta WHERE singleton = 1')
@@ -829,7 +907,11 @@ export class ReferenceRpState extends DurableObject<ReferenceRpEnv> {
       `);
       version = 2;
     }
-    if (version !== 2) throw new Error('Reference RP schema version is unsupported.');
+    if (version === 2) {
+      this.ctx.storage.sql.exec('UPDATE schema_meta SET version = 3 WHERE singleton = 1');
+      version = 3;
+    }
+    if (version !== 3) throw new Error('Reference RP schema version is unsupported.');
   }
 
   #seedNotes(): void {
@@ -909,14 +991,8 @@ function parseStoredAuthorization(value: string): AuthorizationMethod {
   return value;
 }
 
-function toReplyView(reply: ReplyRow): ReplyView {
-  return {
-    id: reply.id,
-    noteId: reply.note_id,
-    authorSubject: reply.author_subject as NexusSubject,
-    body: reply.body,
-    createdAt: reply.created_at,
-  };
+function friendlyNameKey(name: string): string {
+  return name.toLowerCase();
 }
 
 function readSessionToken(header: string | null): string {

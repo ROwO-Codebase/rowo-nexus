@@ -79,6 +79,7 @@ describe('deployed reference RP Worker', () => {
         DELETE FROM note_likes;
         DELETE FROM replies;
         DELETE FROM notes;
+        DELETE FROM profiles;
         DELETE FROM challenges;
         DELETE FROM sessions;
         DELETE FROM receipts;
@@ -252,6 +253,45 @@ describe('deployed reference RP Worker', () => {
     ]);
   });
 
+  it('updates one unique friendly name across public notes and replies', async () => {
+    const owner = await login(await createRegisteredIdentity());
+    const visitor = await login(await createRegisteredIdentity());
+    const note = await createNote(owner.cookie, 'public');
+    await expectSessionSuccess(
+      await sessionOperation(owner.cookie, {
+        action: 'reply.create',
+        noteId: note.id,
+        body: 'An owner reply.',
+      }),
+    );
+
+    const named = await expectSessionSuccess(
+      await sessionOperation(owner.cookie, {
+        action: 'profile.set-name',
+        friendlyName: 'friendly_name',
+      }),
+    );
+    expect(named.session?.friendlyName).toBe('friendly_name');
+    const publicView = await fetchNote(note.id);
+    expect(publicView.authorFriendlyName).toBe('friendly_name');
+    expect(publicView.replies[0]?.authorFriendlyName).toBe('friendly_name');
+
+    const collision = await sessionOperation(visitor.cookie, {
+      action: 'profile.set-name',
+      friendlyName: 'FRIENDLY_NAME',
+    });
+    expect(collision.status).toBe(409);
+    await expect(collision.json()).resolves.toMatchObject({ error: { code: 'NAME_TAKEN' } });
+
+    await expectSessionSuccess(
+      await sessionOperation(owner.cookie, {
+        action: 'profile.set-name',
+        friendlyName: 'renamed_writer',
+      }),
+    );
+    expect((await fetchNote(note.id)).authorFriendlyName).toBe('renamed_writer');
+  });
+
   it('supports replies and enforces reply-author or note-author removal', async () => {
     const owner = await login(await createRegisteredIdentity());
     const visitor = await login(await createRegisteredIdentity());
@@ -376,8 +416,13 @@ describe('deployed reference RP Worker', () => {
           "SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'table' AND name = 'note_likes'",
         )
         .one().count,
+      profileTable: state.storage.sql
+        .exec<{ count: number }>(
+          "SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'table' AND name = 'profiles'",
+        )
+        .one().count,
     }));
-    expect(schema).toEqual({ version: 2, replyTable: 1, likesTable: 1 });
+    expect(schema).toEqual({ version: 3, replyTable: 1, likesTable: 1, profileTable: 1 });
   });
 });
 

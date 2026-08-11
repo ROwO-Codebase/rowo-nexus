@@ -162,6 +162,17 @@ describe('WebCrypto IndexedDB vault', () => {
       signingPrivateKeyRef,
       revocationSecretRef,
       localScopes: ['https://rp-a.test'],
+      authorizationHistory: [
+        {
+          authorizationId: 'b7273ce1-f2aa-439c-9538-c56c2ba279b1',
+          approvedAt: NOW,
+          audience: 'https://rp-a.test',
+          action: 'post.create',
+          resource: 'post:01JABC',
+          introducedScope: true,
+          contextBound: false,
+        },
+      ],
       localState: 'active' as const,
     };
     await store.put(record);
@@ -330,6 +341,72 @@ describe('scope, proof, rotation, and explicit continuity', () => {
     await expect(wallet.prove(identity.localId, forged, request)).rejects.toMatchObject({
       code: 'UNTRUSTED_WALLET_EVENT',
     });
+  });
+
+  it('stores a bounded, metadata-only authorization history and clears it independently', async () => {
+    const { wallet } = createHarness();
+    const identity = await wallet.createIdentity();
+    const rpA = boundary('https://rp-a.test');
+    const request = proofRequestSchema.parse({
+      action: 'post.edit',
+      resource: 'post:01JABC',
+      nonce: 'AQEBAQEBAQEBAQEBAQEBAQ',
+      expiresAt: NOW + 60,
+      contextHash: encodeBase64Url(new Uint8Array(32).fill(0x04)),
+    });
+
+    const proof = await wallet.proveAndRecordAuthorization(identity.localId, rpA, request, true);
+    expect(proof.payload).toMatchObject({
+      aud: 'https://rp-a.test',
+      act: 'post.edit',
+      resource: 'post:01JABC',
+    });
+    let summary = (await wallet.listIdentitySummaries())[0];
+    const first = summary?.authorizationHistory[0];
+    expect(first).toBeDefined();
+    if (first === undefined) throw new Error('Expected a recorded authorization.');
+    expect(first).toMatchObject({
+      approvedAt: NOW,
+      audience: 'https://rp-a.test',
+      action: 'post.edit',
+      resource: 'post:01JABC',
+      introducedScope: true,
+      contextBound: true,
+    });
+    expect(Object.keys(first).sort()).toEqual([
+      'action',
+      'approvedAt',
+      'audience',
+      'authorizationId',
+      'contextBound',
+      'introducedScope',
+      'resource',
+    ]);
+    expect(JSON.stringify(first)).not.toContain(request.nonce);
+    expect(JSON.stringify(first)).not.toContain(request.contextHash);
+
+    await wallet.proveAndRecordAuthorization(identity.localId, rpA, request, true);
+    summary = (await wallet.listIdentitySummaries())[0];
+    expect(summary?.localScopes).toEqual(['https://rp-a.test']);
+    expect(summary?.authorizationHistory).toHaveLength(2);
+    expect(summary?.authorizationHistory[0]?.introducedScope).toBe(false);
+    expect(summary?.authorizationHistory[1]?.introducedScope).toBe(true);
+
+    for (let index = 0; index < 200; index += 1) {
+      await wallet.proveAndRecordAuthorization(identity.localId, rpA, request, false);
+    }
+    summary = (await wallet.listIdentitySummaries())[0];
+    expect(summary?.authorizationHistory).toHaveLength(200);
+
+    await wallet.clearAuthorizationHistory(identity.localId);
+    summary = (await wallet.listIdentitySummaries())[0];
+    expect(summary?.authorizationHistory).toEqual([]);
+    expect(summary?.localScopes).toEqual(['https://rp-a.test']);
+
+    const forged = { audience: 'https://rp-b.test' } as TrustedWalletEventBoundary;
+    await expect(
+      wallet.proveAndRecordAuthorization(identity.localId, forged, request, true),
+    ).rejects.toMatchObject({ code: 'UNTRUSTED_WALLET_EVENT' });
   });
 
   it('rotates through independent create and local scoping without a registry link', async () => {

@@ -38,3 +38,16 @@ unavailable until a verified registration receipt is retained.
 
 The wallet intentionally offers no local-delete shortcut for this state. Without a confirmed
 revocation, a lost success response cannot be distinguished safely from a failed registration.
+
+## Local authorization history
+
+After a proof is successfully created for an approved wallet request, the wallet stores a bounded
+history on the selected local identity. Each entry contains only the approval time, exact app
+origin, action, resource, whether the approval introduced a new local app scope, and whether the
+request was context-bound. It never stores the proof, signature, nonce, context hash, or private key
+material.
+
+The newest 200 entries per identity are retained in the wallet's IndexedDB identity record. Existing
+wallet records without this field open with an empty history. Users can view and clear history from
+**View details** without removing remembered app scopes. The history is local activity metadata—not
+cryptographic evidence—and it cannot observe operations an app performs under its own RP session.

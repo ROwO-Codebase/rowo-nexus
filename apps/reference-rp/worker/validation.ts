@@ -76,7 +76,21 @@ export function parseSessionOperation(value: unknown): SessionOperationInput {
     const record = requireRecord(value, ['action', 'noteId']);
     return { action: value['action'], noteId: parseNoteId(record['noteId']) };
   }
+  if (value['action'] === 'profile.set-name') {
+    const record = requireRecord(value, ['action', 'friendlyName']);
+    return { action: 'profile.set-name', friendlyName: parseFriendlyName(record['friendlyName']) };
+  }
   throw badRequest('The requested note session action is unsupported.');
+}
+
+function parseFriendlyName(value: unknown): string {
+  const name = typeof value === 'string' ? value.trim() : '';
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{2,23}$/u.test(name) || name.toLowerCase().startsWith('nx1_')) {
+    throw badRequest(
+      'Friendly name must be 3–24 letters, numbers, underscores, or hyphens and cannot start with nx1_.',
+    );
+  }
+  return name;
 }
 
 export function parseNoteId(value: unknown): string {
