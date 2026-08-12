@@ -652,6 +652,39 @@ describe('v2 root-authorized devices', () => {
     ).toHaveLength(1);
   });
 
+  it('removes an expired device identity and its local signing key without changing the root', async () => {
+    const keyVault = new InMemoryKeyVault();
+    const identityStore = new InMemoryIdentityStore();
+    const createWallet = (now: number) =>
+      new WalletCore({
+        keyVault,
+        identityStore,
+        registryClient: new InMemoryRegistryClient({ clock: { now: () => now } }),
+        verifyRegistryReceipt: acceptUnsignedInMemoryRegistryReceipt,
+        clock: { now: () => now },
+      });
+    const wallet = createWallet(NOW);
+    const root = await wallet.createIdentity();
+    const issued = await wallet.issueDeviceTransfer(root.localId, {
+      validFrom: NOW,
+      activationDeadline: NOW + 30,
+      expiresAt: NOW + 60,
+    });
+    const imported = await wallet.importDeviceTransfer(issued.bundle, issued.transferKey);
+    const deviceRecord = await identityStore.get(imported.localId);
+    const signingRef = deviceRecord?.deviceV2?.signingPrivateKeyRef;
+    if (signingRef === undefined) throw new Error('Expected an imported device signing key.');
+
+    await expect(wallet.removeLocalIdentity(imported.localId)).rejects.toMatchObject({
+      code: 'INVALID_REQUEST',
+    });
+    await createWallet(NOW + 60).removeLocalIdentity(imported.localId);
+
+    expect(await identityStore.get(imported.localId)).toBeUndefined();
+    expect(await identityStore.get(root.localId)).toBeDefined();
+    expect(await keyVault.hasKey(signingRef)).toBe(false);
+  });
+
   it('atomically reserves one device ID across two IndexedDB store instances', async () => {
     const source = createHarness();
     const root = await source.wallet.createIdentity();

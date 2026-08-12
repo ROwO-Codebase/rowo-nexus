@@ -197,6 +197,79 @@ export function DisposeIdentityModal({ identity, onClose, onDispose }: DisposeId
   );
 }
 
+interface RemoveLocalIdentityModalProps {
+  identity: LocalIdentitySummary;
+  onClose: () => void;
+  onRemove: () => Promise<void>;
+}
+
+export function RemoveLocalIdentityModal({
+  identity,
+  onClose,
+  onRemove,
+}: RemoveLocalIdentityModalProps) {
+  const [confirmed, setConfirmed] = useState(false);
+  const [state, setState] = useState<AsyncFormState>(idle);
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!confirmed) return;
+    setState({ busy: true });
+    try {
+      await onRemove();
+    } catch (error) {
+      setState({ busy: false, error: errorMessage(error) });
+    }
+  };
+
+  return (
+    <ModalShell
+      title="Remove from this wallet"
+      description="Delete this revoked or expired identity's local wallet entry."
+      icon={<Trash2 className="h-5 w-5" aria-hidden="true" />}
+      onClose={onClose}
+      closeDisabled={state.busy}
+    >
+      <form onSubmit={(event) => void submit(event)} className="space-y-5">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-relaxed text-amber-950">
+          <div className="mb-2 flex items-center gap-2 font-semibold">
+            <ShieldAlert className="h-4 w-4" aria-hidden="true" /> Local deletion only
+          </div>
+          This removes <strong>{identity.label ?? 'this identity'}</strong>, its nickname, history,
+          metadata, and any remaining private material from this wallet. It does not delete public
+          registry records or copies held by another wallet.
+        </div>
+        <label className="flex items-start gap-3 rounded-xl border border-rose-200 p-4">
+          <input
+            type="checkbox"
+            checked={confirmed}
+            onChange={(event) => setConfirmed(event.target.checked)}
+            disabled={state.busy}
+            className="mt-1 accent-rose-600"
+          />
+          <span className="text-sm font-medium leading-relaxed text-slate-800">
+            Remove this identity and its remaining local data from this wallet.
+          </span>
+        </label>
+        {state.error !== undefined && <ErrorNotice message={state.error} />}
+        <div className="flex gap-2">
+          <button type="button" onClick={onClose} disabled={state.busy} className={secondaryButton}>
+            Keep identity
+          </button>
+          <button
+            type="submit"
+            disabled={state.busy || !confirmed}
+            className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-rose-300"
+          >
+            {state.busy && <Loader2 className="h-4 w-4 animate-spin" />}
+            {state.busy ? 'Removing…' : 'Remove from wallet'}
+          </button>
+        </div>
+      </form>
+    </ModalShell>
+  );
+}
+
 interface RotateIdentityModalProps {
   identity: LocalIdentitySummary;
   onClose: () => void;

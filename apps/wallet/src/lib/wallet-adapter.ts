@@ -305,6 +305,10 @@ export const walletAdapter = {
     });
   },
 
+  removeLocalIdentity(localId: string): Promise<void> {
+    return walletCore.removeLocalIdentity(localId);
+  },
+
   async rotate(oldLocalId: string, input: RotateIdentityInput): Promise<CreatedLocalIdentity> {
     // Independent create + optional disposal deliberately emits no old/new link.
     const created = await walletCore.createIdentity({

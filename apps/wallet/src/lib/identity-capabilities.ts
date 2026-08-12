@@ -13,3 +13,18 @@ export function canUseRegisteredIdentityActions(identity: LocalIdentitySummary):
   // devices get their own self-revocation flow and must never be offered root operations.
   return identity.device === undefined && identity.localState === 'active' && identity.registered;
 }
+
+export function canRemoveLocalIdentity(
+  identity: LocalIdentitySummary,
+  now = Math.floor(Date.now() / 1_000),
+): boolean {
+  if (identity.localState === 'revoked') return true;
+  const device = identity.device;
+  return (
+    device !== undefined &&
+    (device.localState === 'revoked' ||
+      device.registryState === 'revoked' ||
+      device.registryState === 'expired' ||
+      now >= device.expiresAt)
+  );
+}
