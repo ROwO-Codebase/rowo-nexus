@@ -362,6 +362,14 @@ reports at least the subject, genesis hash, identity state and sequence, device-
 device and authorization IDs, effective device state, authorization expiry, statement validity, and
 service signing `kid`.
 
+The wallet permits the holder to poll this exact status tuple manually for an installed device or
+for a device in the root wallet's local authorization catalog. It MUST validate the response schema,
+service signature, freshness, and exact subject, genesis, device, and authorization binding before
+recording the observation. An observed revoked, expired, or unknown state disables device proofs
+locally. Polling alone MUST NOT delete a device key or mark receipt-gated local revocation complete;
+key deletion still requires a verified terminal registry receipt. The reference wallet records the
+last checked time and does not require a background service or push channel.
+
 Recommended additive endpoints are:
 
 ```text

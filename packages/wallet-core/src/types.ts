@@ -1,10 +1,14 @@
 import type {
+  Base64Url32,
   ContinuityLinkV1,
   DeviceActivationRequestV2,
   DeviceAuthorizationV2,
   DeviceRegistryReceiptV2,
+  DeviceRegistryStatusV2,
   DeviceRootRevokeRequestV2,
   DeviceSelfRevokeRequestV2,
+  DeviceStatusRequestV2,
+  DeviceStatusStateV2,
   DeviceRevocationReasonCode,
   IdentityGenesisV1,
   NexusDeviceAuthorizationIdV2,
@@ -81,6 +85,10 @@ export interface LocalDeviceRecordV2 {
   importStartedAt?: number;
   activationReceipt?: DeviceRegistryReceiptV2;
   revocationReceipt?: DeviceRegistryReceiptV2;
+  /** Latest manually verified registry observation; absence means this wallet has not polled. */
+  registryState?: DeviceStatusStateV2;
+  statusCheckedAt?: number;
+  registryRevokedAt?: number;
 }
 
 export interface LocalIssuedDeviceRecordV2 {
@@ -91,6 +99,10 @@ export interface LocalIssuedDeviceRecordV2 {
   label?: string;
   localState: 'issued' | 'revoked';
   revocationReceipt?: DeviceRegistryReceiptV2;
+  /** Latest manually verified registry observation; absence means this wallet has not polled. */
+  registryState?: DeviceStatusStateV2;
+  statusCheckedAt?: number;
+  registryRevokedAt?: number;
 }
 
 export interface AuthorizationHistoryEntry {
@@ -140,6 +152,7 @@ export interface RegistryClient {
   activateDevice?(request: DeviceActivationRequestV2): Promise<unknown>;
   revokeDeviceSelf?(request: DeviceSelfRevokeRequestV2): Promise<unknown>;
   revokeDeviceRoot?(request: DeviceRootRevokeRequestV2): Promise<unknown>;
+  getDeviceStatus?(request: DeviceStatusRequestV2): Promise<unknown>;
 }
 
 /**
@@ -150,6 +163,19 @@ export type RegistryReceiptVerifier = (receipt: unknown) => Promise<RegistryRece
 
 /** Verifies the service signature and strict wire shape of a v2 device receipt. */
 export type DeviceRegistryReceiptVerifier = (receipt: unknown) => Promise<DeviceRegistryReceiptV2>;
+
+export interface DeviceRegistryStatusExpectation {
+  subject: NexusSubject;
+  genesisHash: Base64Url32;
+  deviceId: NexusDeviceIdV2;
+  authorizationId: NexusDeviceAuthorizationIdV2;
+}
+
+/** Strict-parses and verifies a service-signed v2 device status response and its exact tuple. */
+export type DeviceRegistryStatusVerifier = (
+  status: unknown,
+  expected: DeviceRegistryStatusExpectation,
+) => Promise<DeviceRegistryStatusV2>;
 
 export interface Clock {
   now(): number;
@@ -190,6 +216,9 @@ export interface LocalIdentitySummary {
     localState: LocalDeviceRecordV2['localState'];
     activationDeadline: number;
     expiresAt: number;
+    registryState?: DeviceStatusStateV2;
+    statusCheckedAt?: number;
+    registryRevokedAt?: number;
   };
   issuedDevices: readonly {
     deviceId: NexusDeviceIdV2;
@@ -199,6 +228,9 @@ export interface LocalIdentitySummary {
     expiresAt: number;
     label?: string;
     localState: LocalIssuedDeviceRecordV2['localState'];
+    registryState?: DeviceStatusStateV2;
+    statusCheckedAt?: number;
+    registryRevokedAt?: number;
   }[];
 }
 
@@ -338,4 +370,5 @@ export interface WalletCoreApi {
     deviceId: NexusDeviceIdV2,
     options?: DeviceRevocationOptions,
   ): Promise<DeviceRegistryReceiptV2>;
+  refreshDeviceStatus(localId: string, deviceId?: NexusDeviceIdV2): Promise<DeviceRegistryStatusV2>;
 }

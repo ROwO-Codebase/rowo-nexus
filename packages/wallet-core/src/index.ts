@@ -24,6 +24,8 @@ export type {
   CreatedLocalIdentity,
   CreateIdentityOptions,
   DeviceRegistryReceiptVerifier,
+  DeviceRegistryStatusExpectation,
+  DeviceRegistryStatusVerifier,
   DeviceRequestOptions,
   DeviceRevocationOptions,
   DeviceTransferEnvelopeV2,

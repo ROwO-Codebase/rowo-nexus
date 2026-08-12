@@ -34,6 +34,8 @@ export function deviceManagementCapabilities(
     activateDevice:
       locallyActive &&
       identity.device.localState === 'pending-activation' &&
+      identity.device.registryState !== 'revoked' &&
+      identity.device.registryState !== 'expired' &&
       now < identity.device.activationDeadline &&
       now < identity.device.expiresAt,
     selfRevokeDevice: locallyActive && identity.device.localState !== 'revoked',

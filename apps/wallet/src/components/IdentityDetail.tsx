@@ -42,6 +42,10 @@ interface IdentityDetailProps {
   onActivateDevice: () => Promise<void>;
   onSelfRevokeDevice: () => void;
   onRootRevokeDevice: (device: LocalIdentitySummary['issuedDevices'][number]) => void;
+  onRefreshDevice: (
+    deviceId?: LocalIdentitySummary['issuedDevices'][number]['deviceId'],
+  ) => Promise<void>;
+  refreshingDeviceId?: string;
   deviceActionBusy: boolean;
 }
 
@@ -60,6 +64,8 @@ export function IdentityDetail({
   onActivateDevice,
   onSelfRevokeDevice,
   onRootRevokeDevice,
+  onRefreshDevice,
+  refreshingDeviceId,
   deviceActionBusy,
 }: IdentityDetailProps) {
   const active = identity.localState === 'active';
@@ -71,6 +77,7 @@ export function IdentityDetail({
   const [renameError, setRenameError] = useState<string>();
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1_000));
   const deviceCapabilities = deviceManagementCapabilities(identity, now);
+  const installedRegistryState = identity.device?.registryState;
 
   useEffect(() => {
     if (identity.device?.localState !== 'pending-activation') return;
@@ -298,11 +305,17 @@ export function IdentityDetail({
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-slate-900">
-                      {identity.device.localState === 'pending-activation'
-                        ? 'Pending activation'
-                        : identity.device.localState === 'active'
-                          ? 'Active delegated key'
-                          : 'Revoked delegated key'}
+                      {installedRegistryState === 'revoked'
+                        ? 'Revoked delegated key'
+                        : installedRegistryState === 'expired'
+                          ? 'Expired delegated key'
+                          : installedRegistryState === 'unknown'
+                            ? 'Not active at registry'
+                            : identity.device.localState === 'pending-activation'
+                              ? 'Pending activation'
+                              : identity.device.localState === 'active'
+                                ? 'Active delegated key'
+                                : 'Revoked delegated key'}
                     </p>
                     <code
                       className="mt-1 block truncate text-xs text-slate-400"
@@ -315,7 +328,28 @@ export function IdentityDetail({
                       {new Date(identity.device.expiresAt * 1_000).toLocaleString()}. This key
                       cannot add or remove other devices.
                     </p>
+                    {identity.device.statusCheckedAt !== undefined && (
+                      <p className="mt-1 text-xs text-slate-400">
+                        Registry checked{' '}
+                        {new Date(identity.device.statusCheckedAt * 1_000).toLocaleString()}
+                      </p>
+                    )}
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => void onRefreshDevice()}
+                    disabled={refreshingDeviceId !== undefined || deviceActionBusy}
+                    className={smallSecondaryButton}
+                  >
+                    {refreshingDeviceId === identity.device.deviceId ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-3.5 w-3.5" />
+                    )}
+                    {refreshingDeviceId === identity.device.deviceId
+                      ? 'Checking…'
+                      : 'Refresh status'}
+                  </button>
                   {deviceCapabilities.activateDevice && (
                     <button
                       type="button"
@@ -373,12 +407,22 @@ export function IdentityDetail({
                           </p>
                           <span
                             className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                              device.localState === 'revoked'
+                              device.localState === 'revoked' || device.registryState === 'revoked'
                                 ? 'bg-rose-100 text-rose-800'
-                                : 'bg-emerald-100 text-emerald-800'
+                                : device.registryState === 'active'
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : 'bg-amber-100 text-amber-800'
                             }`}
                           >
-                            {device.localState === 'revoked' ? 'Revoked' : 'Issued'}
+                            {device.localState === 'revoked' || device.registryState === 'revoked'
+                              ? 'Revoked'
+                              : device.registryState === 'active'
+                                ? 'Active'
+                                : device.registryState === 'expired'
+                                  ? 'Expired'
+                                  : device.registryState === 'unknown'
+                                    ? 'Not activated'
+                                    : 'Not checked'}
                           </span>
                         </div>
                         <code
@@ -390,17 +434,40 @@ export function IdentityDetail({
                         <p className="mt-1 text-xs text-slate-500">
                           Expires {new Date(device.expiresAt * 1_000).toLocaleString()}
                         </p>
+                        {device.statusCheckedAt !== undefined && (
+                          <p className="mt-1 text-xs text-slate-400">
+                            Registry checked{' '}
+                            {new Date(device.statusCheckedAt * 1_000).toLocaleString()}
+                          </p>
+                        )}
                       </div>
-                      {device.localState !== 'revoked' && deviceCapabilities.rootRevokeDevice && (
+                      <div className="flex flex-wrap gap-2">
                         <button
                           type="button"
-                          onClick={() => onRootRevokeDevice(device)}
-                          disabled={deviceActionBusy}
-                          className={smallDangerButton}
+                          onClick={() => void onRefreshDevice(device.deviceId)}
+                          disabled={refreshingDeviceId !== undefined || deviceActionBusy}
+                          className={smallSecondaryButton}
                         >
-                          <ShieldOff className="h-3.5 w-3.5" /> Remove
+                          {refreshingDeviceId === device.deviceId ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-3.5 w-3.5" />
+                          )}
+                          {refreshingDeviceId === device.deviceId ? 'Checking…' : 'Refresh'}
                         </button>
-                      )}
+                        {device.localState !== 'revoked' &&
+                          device.registryState !== 'revoked' &&
+                          deviceCapabilities.rootRevokeDevice && (
+                            <button
+                              type="button"
+                              onClick={() => onRootRevokeDevice(device)}
+                              disabled={deviceActionBusy || refreshingDeviceId !== undefined}
+                              className={smallDangerButton}
+                            >
+                              <ShieldOff className="h-3.5 w-3.5" /> Remove
+                            </button>
+                          )}
+                      </div>
                     </div>
                   </li>
                 ))}
@@ -564,3 +631,5 @@ const smallPrimaryButton =
   'inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-300';
 const smallDangerButton =
   'inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-rose-200 bg-white px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50';
+const smallSecondaryButton =
+  'inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50';

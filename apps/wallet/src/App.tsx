@@ -79,6 +79,7 @@ function App() {
   const [retryingRegistrationId, setRetryingRegistrationId] = useState<string>();
   const [clearingHistoryId, setClearingHistoryId] = useState<string>();
   const [deviceActionId, setDeviceActionId] = useState<string>();
+  const [refreshingDeviceId, setRefreshingDeviceId] = useState<string>();
   const pendingRef = useRef<PendingProofRequest | undefined>(undefined);
 
   const refresh = useCallback(async () => {
@@ -279,6 +280,31 @@ function App() {
       setNotice({ kind: 'success', message: 'The root identity removed that device.' });
     } finally {
       setDeviceActionId(undefined);
+    }
+  };
+
+  const refreshDeviceStatus = async (
+    identity: LocalIdentitySummary,
+    deviceId?: LocalIdentitySummary['issuedDevices'][number]['deviceId'],
+  ) => {
+    const targetDeviceId = deviceId ?? identity.device?.deviceId;
+    if (targetDeviceId === undefined || refreshingDeviceId !== undefined) return;
+    setRefreshingDeviceId(targetDeviceId);
+    try {
+      const status = await walletAdapter.refreshDeviceStatus(identity.localId, deviceId);
+      await refresh();
+      setNotice({
+        kind: status.deviceState === 'active' ? 'success' : 'error',
+        message: `Registry device status: ${status.deviceState}.`,
+      });
+    } catch (error) {
+      setNotice({
+        kind: 'error',
+        message:
+          error instanceof Error ? error.message : 'The device status could not be refreshed.',
+      });
+    } finally {
+      setRefreshingDeviceId(undefined);
     }
   };
 
@@ -506,6 +532,8 @@ function App() {
               onRootRevokeDevice={(device) =>
                 setFlow({ type: 'root-revoke-device', identity: selectedIdentity, device })
               }
+              onRefreshDevice={(deviceId) => refreshDeviceStatus(selectedIdentity, deviceId)}
+              {...(refreshingDeviceId === undefined ? {} : { refreshingDeviceId })}
               deviceActionBusy={deviceActionId !== undefined}
             />
           </div>

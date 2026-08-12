@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   createProtocolSignaturePreimage,
+  deriveGenesisHash,
   getDefaultCryptoProvider,
   WebCryptoProvider,
 } from '@nexus/crypto';
@@ -12,14 +13,17 @@ import {
   decodeBase64Url,
   decodeBase64UrlExact,
   deviceRegistryReceiptV2Schema,
+  deviceRegistryStatusV2Schema,
   encodeBase64Url,
   formatDeviceIdV2,
   proofRequestSchema,
   type DeviceActivationRequestV2,
   type DeviceAuthorizationPayloadV2,
   type DeviceRegistryReceiptV2,
+  type DeviceRegistryStatusV2,
   type DeviceRootRevokeRequestV2,
   type DeviceSelfRevokeRequestV2,
+  type DeviceStatusRequestV2,
   type NexusDeviceAuthorizationIdV2,
   type NexusDeviceIdV2,
   type NexusSubject,
@@ -147,6 +151,58 @@ class DeviceRegistryClient implements RegistryClient {
     );
     return Promise.resolve(this.#terminalReceipt);
   }
+}
+
+class PollingDeviceRegistryClient extends DeviceRegistryClient {
+  public status: DeviceRegistryStatusV2 | undefined;
+
+  public getDeviceStatus(request: DeviceStatusRequestV2): Promise<unknown> {
+    if (this.status === undefined) return Promise.reject(new Error('missing test status'));
+    expect(request).toMatchObject({
+      subject: this.status.subject,
+      deviceId: this.status.deviceId,
+      authorizationId: this.status.authorizationId,
+    });
+    return Promise.resolve(this.status);
+  }
+}
+
+function revokedDeviceStatus(
+  request: DeviceStatusRequestV2,
+  genesisHash: string,
+): DeviceRegistryStatusV2 {
+  const payload = {
+    protocol: 'nexus.device-status-statement.v2' as const,
+    ...request,
+    genesisHash,
+    identityState: 'active' as const,
+    identitySequence: 0,
+    deviceLedgerSequence: 2,
+    deviceState: 'revoked' as const,
+    activatedAt: NOW - 100,
+    revokedAt: NOW - 10,
+    authorizationExpiresAt: NOW + 10_000,
+    iat: NOW,
+    exp: NOW + 60,
+    signerKid: 'test-device-registry',
+  };
+  return deviceRegistryStatusV2Schema.parse({
+    subject: request.subject,
+    genesisHash,
+    identityState: payload.identityState,
+    identitySequence: payload.identitySequence,
+    deviceLedgerSequence: payload.deviceLedgerSequence,
+    deviceId: request.deviceId,
+    authorizationId: request.authorizationId,
+    deviceState: payload.deviceState,
+    activatedAt: payload.activatedAt,
+    revokedAt: payload.revokedAt,
+    authorizationExpiresAt: payload.authorizationExpiresAt,
+    statusStatement: {
+      payload,
+      signature: encodeBase64Url(new Uint8Array(64).fill(8)),
+    },
+  });
 }
 
 class FlakyDeleteKeyVault extends InMemoryKeyVault {
@@ -495,6 +551,80 @@ describe('v2 root-authorized devices', () => {
         (summary) => summary.localId === imported.localId,
       )?.proofReady,
     ).toBe(false);
+  });
+
+  it('manually polls an exact signed status and disables a remotely revoked device locally', async () => {
+    const keyVault = new InMemoryKeyVault();
+    const identityStore = new InMemoryIdentityStore();
+    const registryClient = new PollingDeviceRegistryClient();
+    const verifiedExpectations: unknown[] = [];
+    const wallet = new WalletCore({
+      keyVault,
+      identityStore,
+      registryClient,
+      verifyRegistryReceipt: acceptUnsignedInMemoryRegistryReceipt,
+      verifyDeviceRegistryStatus: (status, expected) => {
+        verifiedExpectations.push(expected);
+        return Promise.resolve(deviceRegistryStatusV2Schema.parse(status));
+      },
+      clock: { now: () => NOW },
+    });
+    const root = await wallet.createIdentity();
+    const issued = await wallet.issueDeviceTransfer(root.localId, { label: 'Remote phone' });
+    const imported = await wallet.importDeviceTransfer(issued.bundle, issued.transferKey);
+    const importedRecord = await identityStore.get(imported.localId);
+    if (importedRecord?.deviceV2 === undefined) throw new Error('Expected imported device record.');
+    await identityStore.put({
+      ...importedRecord,
+      deviceV2: { ...importedRecord.deviceV2, localState: 'active' },
+    });
+    const request = {
+      subject: root.subject,
+      deviceId: imported.deviceId,
+      authorizationId: imported.authorizationId,
+    };
+    registryClient.status = revokedDeviceStatus(
+      request,
+      encodeBase64Url(await deriveGenesisHash(root.genesis, getDefaultCryptoProvider())),
+    );
+
+    await expect(wallet.refreshDeviceStatus(imported.localId)).resolves.toMatchObject({
+      deviceState: 'revoked',
+    });
+    await expect(
+      wallet.refreshDeviceStatus(root.localId, imported.deviceId),
+    ).resolves.toMatchObject({ deviceState: 'revoked' });
+
+    const summaries = await wallet.listIdentitySummaries();
+    expect(summaries.find((summary) => summary.localId === imported.localId)).toMatchObject({
+      proofReady: false,
+      device: {
+        localState: 'active',
+        registryState: 'revoked',
+        statusCheckedAt: NOW,
+        registryRevokedAt: NOW - 10,
+      },
+    });
+    expect(
+      summaries.find((summary) => summary.localId === root.localId)?.issuedDevices[0],
+    ).toMatchObject({
+      localState: 'issued',
+      registryState: 'revoked',
+      statusCheckedAt: NOW,
+    });
+    expect(verifiedExpectations).toHaveLength(2);
+    await expect(
+      wallet.proveDevice(
+        imported.localId,
+        boundary('https://rp-a.test'),
+        proofRequestSchema.parse({
+          action: 'post.edit',
+          resource: 'post:01JABC',
+          nonce: 'AQEBAQEBAQEBAQEBAQEBAQ',
+          expiresAt: NOW + 60,
+        }),
+      ),
+    ).rejects.toMatchObject({ code: 'IDENTITY_REVOKED' });
   });
 
   it('atomically permits only one concurrent installation of the same device key', async () => {

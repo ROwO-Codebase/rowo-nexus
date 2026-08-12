@@ -1,12 +1,15 @@
 import {
   registryReceiptV1Schema,
   registryStatusV1Schema,
+  deviceRegistryStatusV2Schema,
   serviceKeySetSchema,
   type ContinuityLinkV1,
   type DeviceActivationRequestV2,
   type DeviceRegistryReceiptV2,
+  type DeviceRegistryStatusV2,
   type DeviceRootRevokeRequestV2,
   type DeviceSelfRevokeRequestV2,
+  type DeviceStatusRequestV2,
   type OwnershipProofV1,
   type OwnershipProofV2,
   type ProofRequest,
@@ -15,7 +18,11 @@ import {
   type RevokeBySignatureRequestV1,
   type ServiceKeySet,
 } from '@nexus/protocol';
-import { verifyDeviceRegistryReceipt, verifyRegistryReceipt } from '@nexus/verifier';
+import {
+  verifyDeviceRegistryReceipt,
+  verifyDeviceStatusStatement,
+  verifyRegistryReceipt,
+} from '@nexus/verifier';
 import {
   IndexedDbIdentityStore,
   WalletCore,
@@ -163,6 +170,10 @@ class HttpRegistryClient implements RegistryClient {
     return this.#deviceMutation('/v2/device/revoke-root', request);
   }
 
+  public async getDeviceStatus(request: DeviceStatusRequestV2): Promise<DeviceRegistryStatusV2> {
+    return deviceRegistryStatusV2Schema.parse(await postRegistry('/v2/device/status', request));
+  }
+
   async #deviceMutation(path: string, request: unknown): Promise<DeviceRegistryReceiptV2> {
     const value = await postRegistry(path, request);
     if (!isRecord(value)) throw new Error('The device registry response is malformed.');
@@ -179,6 +190,16 @@ const walletCore = new WalletCore({
     verifyRegistryReceipt(receipt, await loadServiceKeyset()),
   verifyDeviceRegistryReceipt: async (receipt) =>
     verifyDeviceRegistryReceipt(receipt, await loadServiceKeyset()),
+  verifyDeviceRegistryStatus: async (status, expected) => {
+    const parsed = deviceRegistryStatusV2Schema.parse(status);
+    await verifyDeviceStatusStatement(
+      parsed.statusStatement,
+      await loadServiceKeyset(),
+      Math.floor(Date.now() / 1_000),
+      expected,
+    );
+    return parsed;
+  },
 });
 
 export interface CreateIdentityInput {
@@ -266,6 +287,13 @@ export const walletAdapter = {
     deviceId: LocalIdentitySummary['issuedDevices'][number]['deviceId'],
   ): Promise<DeviceRegistryReceiptV2> {
     return walletCore.revokeDeviceRoot(rootLocalId, deviceId, { reasonCode: 'replaced' });
+  },
+
+  refreshDeviceStatus(
+    localId: string,
+    deviceId?: LocalIdentitySummary['issuedDevices'][number]['deviceId'],
+  ): Promise<DeviceRegistryStatusV2> {
+    return walletCore.refreshDeviceStatus(localId, deviceId);
   },
 
   dispose(localId: string): Promise<RegistryReceiptV1> {

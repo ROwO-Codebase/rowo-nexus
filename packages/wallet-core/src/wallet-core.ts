@@ -17,6 +17,7 @@ import {
   deviceAuthorizationPayloadV2Schema,
   deviceAuthorizationV2Schema,
   deviceRegistryReceiptV2Schema,
+  deviceRegistryStatusV2Schema,
   deviceRootRevokePayloadV2Schema,
   deviceSelfRevokePayloadV2Schema,
   continuityLinkPayloadV1Schema,
@@ -37,6 +38,7 @@ import {
   type DeviceAuthorizationPayloadV2,
   type DeviceAuthorizationV2,
   type DeviceRegistryReceiptV2,
+  type DeviceRegistryStatusV2,
   type DeviceRootRevokePayloadV2,
   type DeviceRootRevokeRequestV2,
   type DeviceSelfRevokePayloadV2,
@@ -64,6 +66,7 @@ import type {
   CreateIdentityOptions,
   DisposeIdentityOptions,
   DeviceRegistryReceiptVerifier,
+  DeviceRegistryStatusVerifier,
   DeviceRequestOptions,
   DeviceRevocationOptions,
   DeviceTransferEnvelopeV2,
@@ -112,6 +115,7 @@ export interface WalletCoreOptions {
   crypto?: CryptoProvider;
   clock?: Clock;
   verifyDeviceRegistryReceipt?: DeviceRegistryReceiptVerifier;
+  verifyDeviceRegistryStatus?: DeviceRegistryStatusVerifier;
 }
 
 const systemClock: Clock = {
@@ -170,6 +174,8 @@ function summarize(record: LocalIdentityRecordV1, now: number): LocalIdentitySum
       (record.deviceV2 === undefined
         ? record.registrationReceipt !== undefined
         : record.deviceV2.localState === 'active' &&
+          (record.deviceV2.registryState === undefined ||
+            record.deviceV2.registryState === 'active') &&
           now >= record.deviceV2.authorization.payload.validFrom &&
           now < record.deviceV2.authorization.payload.expiresAt),
     hasAgreementKey: record.agreementPrivateKeyRef !== undefined,
@@ -182,6 +188,15 @@ function summarize(record: LocalIdentityRecordV1, now: number): LocalIdentitySum
             localState: record.deviceV2.localState,
             activationDeadline: record.deviceV2.authorization.payload.activationDeadline,
             expiresAt: record.deviceV2.authorization.payload.expiresAt,
+            ...(record.deviceV2.registryState === undefined
+              ? {}
+              : { registryState: record.deviceV2.registryState }),
+            ...(record.deviceV2.statusCheckedAt === undefined
+              ? {}
+              : { statusCheckedAt: record.deviceV2.statusCheckedAt }),
+            ...(record.deviceV2.registryRevokedAt === undefined
+              ? {}
+              : { registryRevokedAt: record.deviceV2.registryRevokedAt }),
           },
         }),
     issuedDevices: (record.issuedDevicesV2 ?? []).map((device) => ({
@@ -192,6 +207,11 @@ function summarize(record: LocalIdentityRecordV1, now: number): LocalIdentitySum
       expiresAt: device.authorization.payload.expiresAt,
       ...(device.label === undefined ? {} : { label: device.label }),
       localState: device.localState,
+      ...(device.registryState === undefined ? {} : { registryState: device.registryState }),
+      ...(device.statusCheckedAt === undefined ? {} : { statusCheckedAt: device.statusCheckedAt }),
+      ...(device.registryRevokedAt === undefined
+        ? {}
+        : { registryRevokedAt: device.registryRevokedAt }),
     })),
   };
 }
@@ -235,6 +255,7 @@ export class WalletCore implements WalletCoreApi {
   readonly #crypto: CryptoProvider;
   readonly #clock: Clock;
   readonly #verifyDeviceRegistryReceipt: DeviceRegistryReceiptVerifier | undefined;
+  readonly #verifyDeviceRegistryStatus: DeviceRegistryStatusVerifier | undefined;
 
   public constructor(options: WalletCoreOptions) {
     this.#keyVault = options.keyVault;
@@ -244,6 +265,7 @@ export class WalletCore implements WalletCoreApi {
     this.#crypto = options.crypto ?? getDefaultCryptoProvider();
     this.#clock = options.clock ?? systemClock;
     this.#verifyDeviceRegistryReceipt = options.verifyDeviceRegistryReceipt;
+    this.#verifyDeviceRegistryStatus = options.verifyDeviceRegistryStatus;
   }
 
   public async createIdentity(options: CreateIdentityOptions = {}): Promise<CreatedLocalIdentity> {
@@ -954,6 +976,19 @@ export class WalletCore implements WalletCoreApi {
     const audience = requireTrustedWalletEventBoundary(boundary).audience;
     const record = await this.#getDeviceRecord(deviceLocalId, true);
     const device = record.deviceV2;
+    if (device.registryState === 'revoked') {
+      throw new WalletCoreError('IDENTITY_REVOKED', 'The registry reports this device as revoked.');
+    }
+    if (
+      device.registryState !== undefined &&
+      device.registryState !== 'active' &&
+      device.localState === 'active'
+    ) {
+      throw new WalletCoreError(
+        'IDENTITY_NOT_REGISTERED',
+        `The registry reports this device as ${device.registryState}.`,
+      );
+    }
     if (device.localState !== 'active') {
       throw new WalletCoreError(
         'IDENTITY_NOT_REGISTERED',
@@ -1198,6 +1233,121 @@ export class WalletCore implements WalletCoreApi {
       }
     }
     return structuredClone(receipt);
+  }
+
+  public async refreshDeviceStatus(
+    localId: string,
+    deviceIdInput?: Parameters<WalletCoreApi['refreshDeviceStatus']>[1],
+  ): Promise<DeviceRegistryStatusV2> {
+    if (
+      this.#registryClient.getDeviceStatus === undefined ||
+      this.#verifyDeviceRegistryStatus === undefined
+    ) {
+      throw new WalletCoreError(
+        'INVALID_REQUEST',
+        'The registry client does not support verified v2 device status polling.',
+      );
+    }
+    const record = await this.#getRecord(localId);
+    const target =
+      record.deviceV2 !== undefined
+        ? record.deviceV2
+        : (() => {
+            if (deviceIdInput === undefined) {
+              throw new WalletCoreError(
+                'INVALID_REQUEST',
+                'A root identity must select an issued device to refresh.',
+              );
+            }
+            const deviceId = nexusDeviceIdV2Schema.parse(deviceIdInput);
+            const issued = (record.issuedDevicesV2 ?? []).find(
+              (device) => device.deviceId === deviceId,
+            );
+            if (issued === undefined) {
+              throw new WalletCoreError(
+                'INVALID_REQUEST',
+                'This root has no local record of issuing the requested device.',
+              );
+            }
+            return issued;
+          })();
+    if (deviceIdInput !== undefined && target.deviceId !== deviceIdInput) {
+      throw new WalletCoreError(
+        'INVALID_REQUEST',
+        'The selected device does not match this wallet.',
+      );
+    }
+    const genesisHash = base64Url32Schema.parse(
+      encodeBase64Url(await deriveGenesisHash(record.genesis, this.#crypto)),
+    );
+    const expectation = {
+      subject: record.subject,
+      genesisHash,
+      deviceId: target.deviceId,
+      authorizationId: target.authorizationId,
+    };
+    const rawStatus = await this.#registryClient.getDeviceStatus({
+      subject: expectation.subject,
+      deviceId: expectation.deviceId,
+      authorizationId: expectation.authorizationId,
+    });
+    const status = parseWalletInput(
+      () => deviceRegistryStatusV2Schema.parse(rawStatus),
+      'The device registry status response is malformed.',
+    );
+    const verified = await this.#verifyDeviceRegistryStatus(status, expectation);
+    const exact = deviceRegistryStatusV2Schema.parse(verified);
+    if (
+      exact.subject !== expectation.subject ||
+      exact.genesisHash !== expectation.genesisHash ||
+      exact.deviceId !== expectation.deviceId ||
+      exact.authorizationId !== expectation.authorizationId
+    ) {
+      throw new WalletCoreError(
+        'INVALID_REQUEST',
+        'The verified device status does not match the requested device authorization.',
+      );
+    }
+    const checkedAt = this.#clock.now();
+    validateEpochSeconds(checkedAt, 'clock.now()');
+    await this.#updateRecord(localId, (latest) => {
+      if (latest.deviceV2 !== undefined) {
+        if (
+          latest.deviceV2.deviceId !== exact.deviceId ||
+          latest.deviceV2.authorizationId !== exact.authorizationId
+        ) {
+          return latest;
+        }
+        const updated = {
+          ...latest.deviceV2,
+          registryState: exact.deviceState,
+          statusCheckedAt: checkedAt,
+        };
+        if (exact.revokedAt !== null) updated.registryRevokedAt = exact.revokedAt;
+        else delete updated.registryRevokedAt;
+        return { ...latest, deviceV2: updated };
+      }
+      return {
+        ...latest,
+        issuedDevicesV2: (latest.issuedDevicesV2 ?? []).map((device) => {
+          if (
+            device.deviceId !== exact.deviceId ||
+            device.authorizationId !== exact.authorizationId
+          ) {
+            return device;
+          }
+          const updated = {
+            ...device,
+            registryState: exact.deviceState,
+            statusCheckedAt: checkedAt,
+          };
+          if (exact.revokedAt !== null) updated.registryRevokedAt = exact.revokedAt;
+          else delete updated.registryRevokedAt;
+          return updated;
+        }),
+      };
+    });
+    return structuredClone(exact);
   }
 
   public async listIdentitySummaries(): Promise<LocalIdentitySummary[]> {
