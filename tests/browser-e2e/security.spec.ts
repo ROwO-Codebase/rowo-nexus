@@ -242,6 +242,11 @@ test.describe.serial('Nexus browser security boundary', () => {
         wallet.getByText('Device installed and activated for this identity.', { exact: true }),
       ).toBeVisible();
       await expect(wallet.getByText('Active device', { exact: true })).toBeVisible();
+      await wallet.getByRole('button', { name: 'Refresh status', exact: true }).click();
+      await expect(
+        wallet.getByText('Registry device status: active.', { exact: true }),
+      ).toBeVisible();
+      await expect(wallet.getByText(/Registry checked/u)).toBeVisible();
       await wallet.getByLabel('Edit identity nickname').click();
       await wallet.getByLabel('Identity nickname').fill('E2E phone');
       await wallet.getByRole('button', { name: 'Save', exact: true }).click();
