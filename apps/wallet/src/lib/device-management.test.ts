@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { nexusDeviceAuthorizationIdV2Schema, nexusDeviceIdV2Schema } from '@nexus/protocol';
+import {
+  encodeBase64Url,
+  nexusDeviceAuthorizationIdV2Schema,
+  nexusDeviceIdV2Schema,
+} from '@nexus/protocol';
 import type {
   DeviceTransferEnvelopeV2,
   ImportedDeviceV2,
@@ -70,7 +74,9 @@ describe('v2 wallet device management', () => {
         expiresAt: 2_100_000_000,
       },
     });
-    const secondDeviceId = nexusDeviceIdV2Schema.parse(`nxd2_${'B'.repeat(43)}`);
+    const secondDeviceId = nexusDeviceIdV2Schema.parse(
+      `nxd2_${encodeBase64Url(new Uint8Array(32).fill(2))}`,
+    );
     const root = identity({
       issuedDevices: [
         {
@@ -83,7 +89,9 @@ describe('v2 wallet device management', () => {
         },
         {
           deviceId: secondDeviceId,
-          authorizationId: nexusDeviceAuthorizationIdV2Schema.parse(`nxa2_${'C'.repeat(43)}`),
+          authorizationId: nexusDeviceAuthorizationIdV2Schema.parse(
+            `nxa2_${encodeBase64Url(new Uint8Array(32).fill(3))}`,
+          ),
           issuedAt: 4,
           activationDeadline: 5,
           expiresAt: 6,
