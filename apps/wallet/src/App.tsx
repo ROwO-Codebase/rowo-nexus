@@ -195,6 +195,18 @@ function App() {
     }
   };
 
+  const renameIdentity = async (identity: LocalIdentitySummary, nickname?: string) => {
+    await walletAdapter.setLabel(identity.localId, nickname);
+    await refresh();
+    setNotice({
+      kind: 'success',
+      message:
+        nickname === undefined
+          ? 'Local identity nickname removed.'
+          : `Local identity nickname changed to “${nickname}”.`,
+    });
+  };
+
   const issueDevice = async (
     identity: LocalIdentitySummary,
     options: IssueDeviceTransferOptions,
@@ -392,7 +404,7 @@ function App() {
               Identity wallet
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              Local labels and app scopes never leave this wallet.
+              Local nicknames and app scopes never leave this wallet.
             </p>
           </div>
           <div className="flex gap-2 text-xs font-medium text-slate-600">
@@ -485,6 +497,7 @@ function App() {
               onRetryRegistration={() => void retryRegistration(selectedIdentity)}
               clearingHistory={clearingHistoryId === selectedIdentity.localId}
               onClearHistory={() => clearAuthorizationHistory(selectedIdentity)}
+              onRename={(nickname) => renameIdentity(selectedIdentity, nickname)}
               onAddDevice={() => setFlow({ type: 'issue-device', identity: selectedIdentity })}
               onActivateDevice={() => activateDevice(selectedIdentity)}
               onSelfRevokeDevice={() =>

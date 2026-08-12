@@ -63,7 +63,7 @@ export function CreateIdentityModal({ onClose, onCreate }: CreateIdentityModalPr
       <form onSubmit={(event) => void submit(event)} className="space-y-5">
         <div>
           <label htmlFor="identity-label" className="ml-1 block text-sm font-medium text-slate-700">
-            Local label <span className="font-normal text-slate-400">(optional)</span>
+            Local nickname <span className="font-normal text-slate-400">(optional)</span>
           </label>
           <input
             id="identity-label"
@@ -241,7 +241,7 @@ export function RotateIdentityModal({ identity, onClose, onRotate }: RotateIdent
         </div>
         <div>
           <label htmlFor="rotated-label" className="ml-1 block text-sm font-medium text-slate-700">
-            New local label
+            New local nickname
           </label>
           <input
             id="rotated-label"

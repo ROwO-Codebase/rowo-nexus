@@ -91,7 +91,7 @@ test.describe.serial('Nexus browser security boundary', () => {
       wallet.getByRole('heading', { name: 'Choose who you are, each time.' }),
     ).toBeVisible();
     await wallet.getByRole('button', { name: 'Create first identity' }).click();
-    await wallet.getByLabel('Local label (optional)').fill(IDENTITY_LABEL);
+    await wallet.getByLabel('Local nickname (optional)').fill(IDENTITY_LABEL);
     await wallet.getByRole('button', { name: 'Create identity' }).click();
     await expect(wallet.getByRole('heading', { name: IDENTITY_LABEL }).first()).toBeVisible();
     await wallet.close();
@@ -195,7 +195,7 @@ test.describe.serial('Nexus browser security boundary', () => {
       const wallet = await v2Context.newPage();
       await wallet.goto(WALLET_ORIGIN);
       await wallet.getByRole('button', { name: 'Create first identity' }).click();
-      await wallet.getByLabel('Local label (optional)').fill('E2E v2 root');
+      await wallet.getByLabel('Local nickname (optional)').fill('E2E v2 root');
       await wallet.getByRole('button', { name: 'Create identity' }).click();
       await expect(wallet.getByRole('heading', { name: 'E2E v2 root' }).first()).toBeVisible();
 
@@ -218,7 +218,10 @@ test.describe.serial('Nexus browser security boundary', () => {
       await wallet.getByRole('button', { name: 'View details' }).click();
       await expect(wallet.getByRole('button', { name: 'Hide details' })).toBeVisible();
       await wallet.getByRole('button', { name: 'Add device' }).click();
-      await wallet.getByLabel('Device label').fill('E2E delegated device');
+      const deviceNickname = wallet.getByLabel('Device nickname');
+      await deviceNickname.focus();
+      await deviceNickname.pressSequentially('E2E delegated device');
+      await expect(deviceNickname).toBeFocused();
       await wallet.getByRole('checkbox').check();
       await wallet.getByRole('button', { name: 'Create device transfer' }).click();
       await expect(wallet.getByText('Device authorized', { exact: true })).toBeVisible();
@@ -239,6 +242,10 @@ test.describe.serial('Nexus browser security boundary', () => {
         wallet.getByText('Device installed and activated for this identity.', { exact: true }),
       ).toBeVisible();
       await expect(wallet.getByText('Active device', { exact: true })).toBeVisible();
+      await wallet.getByLabel('Edit identity nickname').click();
+      await wallet.getByLabel('Identity nickname').fill('E2E phone');
+      await wallet.getByRole('button', { name: 'Save', exact: true }).click();
+      await expect(wallet.getByRole('heading', { name: 'E2E phone' }).first()).toBeVisible();
 
       await rp.reload();
       const popupPromise = rp.waitForEvent('popup');
