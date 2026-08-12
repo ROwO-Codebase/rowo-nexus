@@ -1,4 +1,9 @@
-import { ownershipProofV1Schema } from '@nexus/protocol';
+import {
+  OWNERSHIP_PROOF_PROTOCOL_V1,
+  OWNERSHIP_PROOF_PROTOCOL_V2,
+  ownershipProofV1Schema,
+  ownershipProofV2Schema,
+} from '@nexus/protocol';
 
 import type {
   NoteDraft,
@@ -10,17 +15,32 @@ import type {
 import { RpWorkerError } from './errors';
 
 export function parseSubmitProof(value: unknown): SubmitProofInput {
-  const record = requireRecord(value, ['challengeId', 'operation', 'proof']);
+  if (!isRecord(value)) throw badRequest('Request body must be an object.');
+  const legacyV1 = !Object.hasOwn(value, 'proofProtocol');
+  const record = requireRecord(
+    value,
+    legacyV1
+      ? ['challengeId', 'operation', 'proof']
+      : ['challengeId', 'operation', 'proof', 'proofProtocol'],
+  );
   if (typeof record['challengeId'] !== 'string' || record['challengeId'].length < 20) {
     throw badRequest('challengeId is invalid.');
   }
-  const proof = ownershipProofV1Schema.safeParse(record['proof']);
-  if (!proof.success) throw badRequest('proof is invalid.');
-  return {
+  const common = {
     challengeId: record['challengeId'],
     operation: parseStartSessionOperation(record['operation']),
-    proof: proof.data,
   };
+  if (record['proofProtocol'] === OWNERSHIP_PROOF_PROTOCOL_V1 || legacyV1) {
+    const proof = ownershipProofV1Schema.safeParse(record['proof']);
+    if (!proof.success) throw badRequest('proof is invalid.');
+    return { ...common, proofProtocol: OWNERSHIP_PROOF_PROTOCOL_V1, proof: proof.data };
+  }
+  if (record['proofProtocol'] === OWNERSHIP_PROOF_PROTOCOL_V2) {
+    const proof = ownershipProofV2Schema.safeParse(record['proof']);
+    if (!proof.success) throw badRequest('proof is invalid.');
+    return { ...common, proofProtocol: OWNERSHIP_PROOF_PROTOCOL_V2, proof: proof.data };
+  }
+  throw badRequest('proofProtocol is not supported.');
 }
 
 export function parseStartSessionOperation(value: unknown): StartSessionOperation {

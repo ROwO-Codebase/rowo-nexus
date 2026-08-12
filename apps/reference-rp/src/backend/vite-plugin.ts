@@ -22,6 +22,7 @@ const SECURITY_HEADERS: Readonly<Record<string, string>> = {
 export interface ReferenceRpApiPluginOptions {
   audience: string;
   nexusApiUrl: string;
+  serviceKeyset: unknown;
   unsafeLocalLifecycle?: boolean;
 }
 
@@ -29,8 +30,12 @@ export function createReferenceRpApiPlugin(options: ReferenceRpApiPluginOptions)
   const lifecycle =
     options.unsafeLocalLifecycle === true
       ? new LocalLifecycleAuthority()
-      : new AuthoritativeRegistryLifecycleProvider(options.nexusApiUrl);
-  const repository = new ReferenceRpRepository({ audience: options.audience, lifecycle });
+      : new AuthoritativeRegistryLifecycleProvider(options.nexusApiUrl, options.serviceKeyset);
+  const repository = new ReferenceRpRepository({
+    audience: options.audience,
+    lifecycle,
+    deviceLifecycle: lifecycle,
+  });
   const attach = (server: ViteDevServer | PreviewServer): void => {
     server.middlewares.use((request, response, next) => {
       for (const [name, value] of Object.entries(SECURITY_HEADERS)) response.setHeader(name, value);

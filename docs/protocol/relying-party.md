@@ -51,6 +51,14 @@ valid `stapled-status`.
 
 Nexus does not need to observe subsequent requests made under an RP-local session.
 
+For an explicitly negotiated `nexus.ownership-proof.v2`, the RP additionally verifies the embedded
+root authorization and device signature and obtains fresh status for the exact subject, `nxd2_`
+device, and `nxa2_` authorization. A v1 subject-only status statement is insufficient. V2 sessions
+retain those identifiers so sibling or root revocation of that device can terminate its authority.
+The RP passes an explicit expected `contextHash` or `null`; omission is not an "accept anything"
+mode. A device authorization is expired at `now >= expiresAt`, regardless of a still-valid cached
+status statement. See the [v2 root/device profile](./device-delegation-v2.md).
+
 ## Cross-origin tests
 
 Browser E2E uses two distinct origins and proves that one cannot request or replay a proof for the

@@ -2,6 +2,8 @@ import { env } from 'cloudflare:workers';
 
 import {
   computeRevocationCommitment,
+  deriveDeviceAuthorizationIdV2,
+  deriveDeviceIdV2,
   deriveGenesisHash,
   deriveSubject,
   signProtocolPayload,
@@ -10,6 +12,13 @@ import {
   OWNERSHIP_PROOF_PROTOCOL_V1,
   REVOKE_PROTOCOL_V1,
   REVOKE_SECRET_PROTOCOL_V1,
+  base64Url32Schema,
+  base64Url64Schema,
+  deviceActivationRequestV2Schema,
+  deviceAuthorizationPayloadV2Schema,
+  deviceRegistryReceiptV2Schema,
+  deviceRootRevokeRequestV2Schema,
+  deviceStatusStatementV2Schema,
   encodeBase64Url,
   identityGenesisV1Schema,
   ownershipProofPayloadV1Schema,
@@ -19,7 +28,14 @@ import {
   revokeBySecretV1Schema,
   revokeBySignaturePayloadV1Schema,
   statusStatementV1Schema,
+  type DeviceActivationRequestV2,
+  type DeviceAuthorizationV2,
   type IdentityGenesisV1,
+  type DeviceRegistryEventV2,
+  type DeviceRegistryReceiptPayloadV2,
+  type DeviceRootRevokeRequestV2,
+  type DeviceStatusStatementPayloadV2,
+  type NexusDeviceIdV2,
   type NexusSubject,
   type OwnershipProofV1,
   type RegistryEventV1,
@@ -53,6 +69,12 @@ export interface AcceptanceIdentity {
   revocationSecret: Uint8Array;
 }
 
+export interface AcceptanceDevice {
+  authorization: DeviceAuthorizationV2;
+  activation: DeviceActivationRequestV2;
+  privateKey: CryptoKey;
+}
+
 export async function createAcceptanceIdentity(): Promise<AcceptanceIdentity> {
   const keyPair = await crypto.subtle.generateKey({ name: 'Ed25519' }, true, ['sign', 'verify']);
   const signingPublicKey = new Uint8Array(await crypto.subtle.exportKey('raw', keyPair.publicKey));
@@ -71,6 +93,71 @@ export async function createAcceptanceIdentity(): Promise<AcceptanceIdentity> {
     privateKey: keyPair.privateKey,
     revocationSecret,
   };
+}
+
+export async function createAcceptanceDevice(
+  identity: AcceptanceIdentity,
+  now: number,
+): Promise<AcceptanceDevice> {
+  const pair = await crypto.subtle.generateKey({ name: 'Ed25519' }, true, ['sign', 'verify']);
+  const publicKey = base64Url32Schema.parse(
+    encodeBase64Url(new Uint8Array(await crypto.subtle.exportKey('raw', pair.publicKey))),
+  );
+  const deviceId = await deriveDeviceIdV2({
+    subject: identity.subject,
+    signingKey: { alg: 'Ed25519', publicKey },
+  });
+  const payload = deviceAuthorizationPayloadV2Schema.parse({
+    protocol: 'nexus.device-authorization.v2',
+    subject: identity.subject,
+    genesisHash: identity.genesisHash,
+    deviceId,
+    signingKey: { alg: 'Ed25519', publicKey },
+    authorizationNonce: encodeBase64Url(crypto.getRandomValues(new Uint8Array(32))),
+    validFrom: now - 1,
+    activationDeadline: now + 300,
+    expiresAt: now + 3600,
+  });
+  const authorization: DeviceAuthorizationV2 = {
+    payload,
+    rootSignature: base64Url64Schema.parse(await signProtocolPayload(payload, identity.privateKey)),
+  };
+  const authorizationId = await deriveDeviceAuthorizationIdV2(payload);
+  const activationPayload = {
+    protocol: 'nexus.device-activation.v2',
+    subject: identity.subject,
+    deviceId,
+    authorizationId,
+    requestId: encodeBase64Url(crypto.getRandomValues(new Uint8Array(32))),
+    iat: now,
+    exp: now + 60,
+  } as const;
+  const activation = deviceActivationRequestV2Schema.parse({
+    authorization,
+    payload: activationPayload,
+    deviceSignature: await signProtocolPayload(activationPayload, pair.privateKey),
+  });
+  return { authorization, activation, privateKey: pair.privateKey };
+}
+
+export async function rootRevokeAcceptanceDevice(
+  identity: AcceptanceIdentity,
+  deviceId: NexusDeviceIdV2,
+  issuedAt: number,
+): Promise<DeviceRootRevokeRequestV2> {
+  const payload = {
+    protocol: 'nexus.device-root-revoke.v2',
+    subject: identity.subject,
+    genesisHash: identity.genesisHash,
+    deviceId,
+    requestId: encodeBase64Url(crypto.getRandomValues(new Uint8Array(32))),
+    issuedAt,
+    reasonCode: 'lost-device',
+  } as const;
+  return deviceRootRevokeRequestV2Schema.parse({
+    payload,
+    rootSignature: await signProtocolPayload(payload, identity.privateKey),
+  });
 }
 
 export function registryServiceAdapter(): RegistryService {
@@ -94,6 +181,32 @@ export function registryServiceAdapter(): RegistryService {
     async revokeBySecret(input) {
       return await env.IDENTITY_STATE.getByName(input.subject).revokeBySecret(input);
     },
+    async activateDevice(input) {
+      return await env.IDENTITY_STATE.getByName(input.payload.subject).activateDevice(input);
+    },
+    async deviceStatus(input) {
+      return await env.IDENTITY_STATE.getByName(input.subject).deviceStatus({
+        deviceId: input.deviceId,
+        authorizationId: input.authorizationId,
+      });
+    },
+    async deviceStatusBatch(inputs) {
+      return await Promise.all(
+        inputs.map(
+          async (input) =>
+            await env.IDENTITY_STATE.getByName(input.subject).deviceStatus({
+              deviceId: input.deviceId,
+              authorizationId: input.authorizationId,
+            }),
+        ),
+      );
+    },
+    async revokeDeviceSelf(input) {
+      return await env.IDENTITY_STATE.getByName(input.payload.subject).revokeDeviceSelf(input);
+    },
+    async revokeDeviceRoot(input) {
+      return await env.IDENTITY_STATE.getByName(input.payload.subject).revokeDeviceRoot(input);
+    },
   };
 }
 
@@ -103,6 +216,14 @@ function fakeReceiptSignature(payload: RegistryReceiptPayloadV1) {
 
 function fakeStatusSignature(payload: StatusStatementPayloadV1) {
   return Promise.resolve(statusStatementV1Schema.parse({ payload, signature: ZERO_64 }));
+}
+
+function fakeDeviceReceiptSignature(payload: DeviceRegistryReceiptPayloadV2) {
+  return Promise.resolve(deviceRegistryReceiptV2Schema.parse({ payload, signature: ZERO_64 }));
+}
+
+function fakeDeviceStatusSignature(payload: DeviceStatusStatementPayloadV2) {
+  return Promise.resolve(deviceStatusStatementV2Schema.parse({ payload, signature: ZERO_64 }));
 }
 
 export function createAcceptanceEdge(now: number) {
@@ -145,6 +266,8 @@ export function createAcceptanceEdge(now: number) {
     metricSink: null,
     signReceipt: fakeReceiptSignature,
     signStatus: fakeStatusSignature,
+    signDeviceReceipt: fakeDeviceReceiptSignature,
+    signDeviceStatus: fakeDeviceStatusSignature,
   });
   return { app, edgeEnv, registry };
 }
@@ -242,8 +365,11 @@ export async function authoritativeStatusThroughEdge(subject: NexusSubject, now:
 }
 
 export async function resetAcceptanceState(): Promise<void> {
-  await env.TEST_QUEUE_CONTROL.reset();
+  await Promise.all([env.TEST_QUEUE_CONTROL.reset(), env.TEST_DEVICE_QUEUE_CONTROL.reset()]);
   await env.INDEX_DB.batch([
+    env.INDEX_DB.prepare('DELETE FROM device_projection_heads'),
+    env.INDEX_DB.prepare('DELETE FROM device_states'),
+    env.INDEX_DB.prepare('DELETE FROM device_registry_events'),
     env.INDEX_DB.prepare('DELETE FROM registry_events'),
     env.INDEX_DB.prepare('DELETE FROM pending_registry_events'),
     env.INDEX_DB.prepare('DELETE FROM identities'),
@@ -257,4 +383,13 @@ export async function queuedEvents(expectedCount: number): Promise<RegistryEvent
     await new Promise((resolve) => setTimeout(resolve, 5));
   }
   throw new Error(`Timed out waiting for ${expectedCount} registry Queue messages.`);
+}
+
+export async function queuedDeviceEvents(expectedCount: number): Promise<DeviceRegistryEventV2[]> {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const messages = await env.TEST_DEVICE_QUEUE_CONTROL.getMessages();
+    if (messages.length >= expectedCount) return messages;
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  throw new Error(`Timed out waiting for ${expectedCount} device registry Queue messages.`);
 }

@@ -1,0 +1,68 @@
+{
+  "schema": "nexus.test-vectors.v2",
+  "warning": "NON-PRODUCTION TEST FIXTURE: public RFC 8032 key material; never use for real identities or services.",
+  "signingKeyId": "service-registry",
+  "keyset": {
+    "keys": [
+      {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "alg": "EdDSA",
+        "kid": "registry-fixture-2026-01",
+        "x": "_FHNjmIYoaONpH7QAjDwWAgW7RO6MwOsXeuRFUiQgCU",
+        "use": "sig"
+      }
+    ]
+  },
+  "verificationTime": 1786400046,
+  "payload": {
+    "protocol": "nexus.device-status-statement.v2",
+    "subject": "nx1_NZxiwvOxD3WCQ66ho5k9hF2vvDnhtZ7DsH9w4HnUWeo",
+    "genesisHash": "NZxiwvOxD3WCQ66ho5k9hF2vvDnhtZ7DsH9w4HnUWeo",
+    "identityState": "active",
+    "identitySequence": 0,
+    "deviceLedgerSequence": 1,
+    "deviceId": "nxd2_oc8fH_zsmrNfsyuqQxSrCb8IN7YrHLYMIBVju6uCr1c",
+    "authorizationId": "nxa2_O6_PZa8kB14rRNe3ePy3HC19qmyUHq9ahsG513Vcml4",
+    "deviceState": "active",
+    "activatedAt": 1786400015,
+    "authorizationExpiresAt": 1786486400,
+    "iat": 1786400016,
+    "exp": 1786400076,
+    "signerKid": "registry-fixture-2026-01"
+  },
+  "canonicalPayloadJcs": "{\"activatedAt\":1786400015,\"authorizationExpiresAt\":1786486400,\"authorizationId\":\"nxa2_O6_PZa8kB14rRNe3ePy3HC19qmyUHq9ahsG513Vcml4\",\"deviceId\":\"nxd2_oc8fH_zsmrNfsyuqQxSrCb8IN7YrHLYMIBVju6uCr1c\",\"deviceLedgerSequence\":1,\"deviceState\":\"active\",\"exp\":1786400076,\"genesisHash\":\"NZxiwvOxD3WCQ66ho5k9hF2vvDnhtZ7DsH9w4HnUWeo\",\"iat\":1786400016,\"identitySequence\":0,\"identityState\":\"active\",\"protocol\":\"nexus.device-status-statement.v2\",\"signerKid\":\"registry-fixture-2026-01\",\"subject\":\"nx1_NZxiwvOxD3WCQ66ho5k9hF2vvDnhtZ7DsH9w4HnUWeo\"}",
+  "signaturePreimageHex": "4e455855532d5349474e4154555245006e657875732e6465766963652d7374617475732d73746174656d656e742e7632007b226163746976617465644174223a313738363430303031352c22617574686f72697a6174696f6e457870697265734174223a313738363438363430302c22617574686f72697a6174696f6e4964223a226e7861325f4f365f505a61386b42313472524e65336550793348433139716d79554871396168734735313356636d6c34222c226465766963654964223a226e7864325f6f633866485f7a736d724e667379757151785372436238494e375972484c594d4942566a75367543723163222c226465766963654c656467657253657175656e6365223a312c226465766963655374617465223a22616374697665222c22657870223a313738363430303037362c2267656e6573697348617368223a224e5a786977764f7844335743513636686f356b396846327676446e68745a37447348397734486e5557656f222c22696174223a313738363430303031362c226964656e7469747953657175656e6365223a302c226964656e746974795374617465223a22616374697665222c2270726f746f636f6c223a226e657875732e6465766963652d7374617475732d73746174656d656e742e7632222c227369676e65724b6964223a2272656769737472792d666978747572652d323032362d3031222c227375626a656374223a226e78315f4e5a786977764f7844335743513636686f356b396846327676446e68745a37447348397734486e5557656f227d",
+  "signatureBase64Url": "nTzDS1hszaR7oUMMyGBCzUPfLgqDkGLAIfsP0_8JMSvO-YiR-ftTCQjtLh_LFM-aRUNaiMgEQrHTX_Mmf4AHAw",
+  "statement": {
+    "payload": {
+      "protocol": "nexus.device-status-statement.v2",
+      "subject": "nx1_NZxiwvOxD3WCQ66ho5k9hF2vvDnhtZ7DsH9w4HnUWeo",
+      "genesisHash": "NZxiwvOxD3WCQ66ho5k9hF2vvDnhtZ7DsH9w4HnUWeo",
+      "identityState": "active",
+      "identitySequence": 0,
+      "deviceLedgerSequence": 1,
+      "deviceId": "nxd2_oc8fH_zsmrNfsyuqQxSrCb8IN7YrHLYMIBVju6uCr1c",
+      "authorizationId": "nxa2_O6_PZa8kB14rRNe3ePy3HC19qmyUHq9ahsG513Vcml4",
+      "deviceState": "active",
+      "activatedAt": 1786400015,
+      "authorizationExpiresAt": 1786486400,
+      "iat": 1786400016,
+      "exp": 1786400076,
+      "signerKid": "registry-fixture-2026-01"
+    },
+    "signature": "nTzDS1hszaR7oUMMyGBCzUPfLgqDkGLAIfsP0_8JMSvO-YiR-ftTCQjtLh_LFM-aRUNaiMgEQrHTX_Mmf4AHAw"
+  },
+  "verification": {
+    "subject": "nx1_NZxiwvOxD3WCQ66ho5k9hF2vvDnhtZ7DsH9w4HnUWeo",
+    "genesisHash": "NZxiwvOxD3WCQ66ho5k9hF2vvDnhtZ7DsH9w4HnUWeo",
+    "deviceId": "nxd2_oc8fH_zsmrNfsyuqQxSrCb8IN7YrHLYMIBVju6uCr1c",
+    "authorizationId": "nxa2_O6_PZa8kB14rRNe3ePy3HC19qmyUHq9ahsG513Vcml4",
+    "identityState": "active",
+    "identitySequence": 0,
+    "deviceLedgerSequence": 1,
+    "deviceState": "active",
+    "authorizationExpiresAt": 1786486400,
+    "maxClockSkewSeconds": 0
+  }
+}

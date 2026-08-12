@@ -2,12 +2,22 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { createServer, type ServerOptions } from 'node:https';
 
 import {
+  deriveDeviceAuthorizationIdV2,
+  deriveDeviceIdV2,
+  deriveDeviceOperationIdV2,
   deriveGenesisHash,
   deriveSubject,
   signProtocolPayload,
+  verifyProtocolPayload,
 } from '../../packages/crypto/src/index.js';
 import {
   base64Url32Schema,
+  decodeBase64UrlExact,
+  deviceActivationRequestV2Schema,
+  deviceRegistryReceiptV2Schema,
+  deviceRegistryStatusV2Schema,
+  deviceStatusRequestV2Schema,
+  deviceStatusStatementV2Schema,
   encodeBase64Url,
   registerIdentityRequestV1Schema,
   registryReceiptV1Schema,
@@ -17,7 +27,10 @@ import {
   statusRequestV1Schema,
   statusStatementV1Schema,
   type Base64Url32,
+  type DeviceRegistryReceiptV2,
   type IdentityGenesisV1,
+  type NexusDeviceAuthorizationIdV2,
+  type NexusDeviceIdV2,
   type NexusSubject,
   type RegistryReceiptV1,
   type ServiceKeySet,
@@ -40,9 +53,24 @@ interface StoredIdentity {
   revokedAt?: number;
   registrationReceipt: RegistryReceiptV1;
   revocationReceipt?: RegistryReceiptV1;
+  deviceLedgerSequence: number;
+  devices: Map<NexusDeviceIdV2, StoredDevice>;
 }
 
-export async function startRegistryFixture(tls: ServerOptions): Promise<() => Promise<void>> {
+interface StoredDevice {
+  deviceId: NexusDeviceIdV2;
+  authorizationId: NexusDeviceAuthorizationIdV2;
+  activatedAt: number;
+  authorizationExpiresAt: number;
+  receipt: DeviceRegistryReceiptV2;
+}
+
+export interface StartedRegistryFixture {
+  readonly serviceKeyset: ServiceKeySet;
+  readonly stop: () => Promise<void>;
+}
+
+export async function startRegistryFixture(tls: ServerOptions): Promise<StartedRegistryFixture> {
   const registry = await TestRegistry.create();
   const server = createServer(tls, (request, response) => {
     void registry.route(request, response);
@@ -52,10 +80,13 @@ export async function startRegistryFixture(tls: ServerOptions): Promise<() => Pr
     server.once('error', reject);
     server.listen(port, '127.0.0.1', resolve);
   });
-  return () =>
-    new Promise<void>((resolve, reject) => {
-      server.close((error) => (error === undefined ? resolve() : reject(error)));
-    });
+  return {
+    serviceKeyset: registry.serviceKeyset,
+    stop: () =>
+      new Promise<void>((resolve, reject) => {
+        server.close((error) => (error === undefined ? resolve() : reject(error)));
+      }),
+  };
 }
 
 class TestRegistry {
@@ -65,6 +96,10 @@ class TestRegistry {
     private readonly privateKey: CryptoKey,
     private readonly keyset: ServiceKeySet,
   ) {}
+
+  public get serviceKeyset(): ServiceKeySet {
+    return this.keyset;
+  }
 
   public static async create(): Promise<TestRegistry> {
     const pair = await crypto.subtle.generateKey('Ed25519', true, ['sign', 'verify']);
@@ -122,6 +157,14 @@ class TestRegistry {
         await this.#revoke(await readJson(request), response);
         return;
       }
+      if (url.pathname === '/v2/device/activate') {
+        await this.#activateDevice(await readJson(request), response);
+        return;
+      }
+      if (url.pathname === '/v2/device/status') {
+        await this.#deviceStatus(await readJson(request), response);
+        return;
+      }
       sendError(response, 404, 'NOT_FOUND');
     } catch (error) {
       sendError(response, 400, error instanceof Error ? error.name : 'BAD_REQUEST');
@@ -158,6 +201,8 @@ class TestRegistry {
       genesisHash,
       registeredAt: acceptedAt,
       registrationReceipt,
+      deviceLedgerSequence: 0,
+      devices: new Map(),
     });
     sendJson(response, 201, { receipt: registrationReceipt });
   }
@@ -251,6 +296,145 @@ class TestRegistry {
     sendJson(response, 200, { receipt });
   }
 
+  async #activateDevice(value: unknown, response: ServerResponse): Promise<void> {
+    const request = deviceActivationRequestV2Schema.parse(value);
+    const authorization = request.authorization.payload;
+    const identity = this.#identities.get(authorization.subject);
+    if (identity === undefined) {
+      sendError(response, 404, 'IDENTITY_NOT_FOUND');
+      return;
+    }
+    if (identity.revokedAt !== undefined) {
+      sendError(response, 409, 'IDENTITY_REVOKED');
+      return;
+    }
+    const [deviceId, authorizationId] = await Promise.all([
+      deriveDeviceIdV2({ subject: authorization.subject, signingKey: authorization.signingKey }),
+      deriveDeviceAuthorizationIdV2(authorization),
+    ]);
+    if (
+      authorization.genesisHash !== identity.genesisHash ||
+      authorization.deviceId !== deviceId ||
+      request.payload.deviceId !== deviceId ||
+      request.payload.authorizationId !== authorizationId
+    ) {
+      sendError(response, 400, 'BAD_REQUEST');
+      return;
+    }
+    const rootKey = await importEd25519PublicKey(identity.genesis.signingKey.publicKey);
+    const deviceKey = await importEd25519PublicKey(authorization.signingKey.publicKey);
+    const [validRoot, validDevice] = await Promise.all([
+      verifyProtocolPayload(authorization, request.authorization.rootSignature, rootKey),
+      verifyProtocolPayload(request.payload, request.deviceSignature, deviceKey),
+    ]);
+    if (!validRoot || !validDevice) {
+      sendError(response, 403, 'INVALID_SIGNATURE');
+      return;
+    }
+    const now = nowSeconds();
+    if (
+      now < authorization.validFrom - 30 ||
+      now > authorization.activationDeadline + 30 ||
+      now >= authorization.expiresAt ||
+      now < request.payload.iat - 30 ||
+      now > request.payload.exp + 30 ||
+      request.payload.exp - request.payload.iat > 300
+    ) {
+      sendError(response, 400, 'BAD_REQUEST');
+      return;
+    }
+    const existing = identity.devices.get(deviceId);
+    if (existing !== undefined) {
+      if (existing.authorizationId !== authorizationId) {
+        sendError(response, 409, 'DEVICE_AUTHORIZATION_CONFLICT');
+        return;
+      }
+      sendJson(response, 200, { receipt: existing.receipt });
+      return;
+    }
+
+    const acceptedAt = now;
+    identity.deviceLedgerSequence += 1;
+    const operationId = await deriveDeviceOperationIdV2(request.payload);
+    const receipt = await this.#deviceReceipt({
+      eventId: await deviceEventId(`activated:${identity.subject}:${deviceId}`),
+      operationId,
+      eventType: 'activated',
+      subject: identity.subject,
+      genesisHash: identity.genesisHash,
+      identitySequence: 0,
+      identityState: 'active',
+      deviceLedgerSequence: identity.deviceLedgerSequence,
+      deviceId,
+      authorizationId,
+      deviceState: 'active',
+      authorizationExpiresAt: authorization.expiresAt,
+      acceptedAt,
+    });
+    identity.devices.set(deviceId, {
+      deviceId,
+      authorizationId,
+      activatedAt: acceptedAt,
+      authorizationExpiresAt: authorization.expiresAt,
+      receipt,
+    });
+    sendJson(response, 201, { receipt });
+  }
+
+  async #deviceStatus(value: unknown, response: ServerResponse): Promise<void> {
+    const request = deviceStatusRequestV2Schema.parse(value);
+    const identity = this.#identities.get(request.subject);
+    const device = identity?.devices.get(request.deviceId);
+    if (
+      identity === undefined ||
+      device === undefined ||
+      device.authorizationId !== request.authorizationId
+    ) {
+      sendError(response, 404, 'DEVICE_NOT_FOUND');
+      return;
+    }
+    const issuedAt = nowSeconds();
+    const identityRevoked = identity.revokedAt !== undefined;
+    const expired = issuedAt >= device.authorizationExpiresAt;
+    const deviceState = identityRevoked ? 'revoked' : expired ? 'expired' : 'active';
+    const statusPayload = {
+      protocol: 'nexus.device-status-statement.v2' as const,
+      subject: identity.subject,
+      genesisHash: identity.genesisHash,
+      identityState: identityRevoked ? ('revoked' as const) : ('active' as const),
+      identitySequence: identityRevoked ? 1 : 0,
+      deviceLedgerSequence: identity.deviceLedgerSequence,
+      deviceId: device.deviceId,
+      authorizationId: device.authorizationId,
+      deviceState,
+      activatedAt: device.activatedAt,
+      ...(identity.revokedAt === undefined ? {} : { revokedAt: identity.revokedAt }),
+      authorizationExpiresAt: device.authorizationExpiresAt,
+      iat: issuedAt,
+      exp: expired ? issuedAt + 60 : Math.min(issuedAt + 60, device.authorizationExpiresAt),
+      signerKid: SIGNER_KID,
+    };
+    const statusStatement = deviceStatusStatementV2Schema.parse({
+      payload: statusPayload,
+      signature: await signProtocolPayload(statusPayload, this.privateKey),
+    });
+    const status = deviceRegistryStatusV2Schema.parse({
+      subject: identity.subject,
+      genesisHash: identity.genesisHash,
+      identityState: statusPayload.identityState,
+      identitySequence: statusPayload.identitySequence,
+      deviceLedgerSequence: identity.deviceLedgerSequence,
+      deviceId: device.deviceId,
+      authorizationId: device.authorizationId,
+      deviceState,
+      activatedAt: device.activatedAt,
+      revokedAt: identity.revokedAt ?? null,
+      authorizationExpiresAt: device.authorizationExpiresAt,
+      statusStatement,
+    });
+    sendJson(response, 200, status);
+  }
+
   async #receipt(
     payload: Omit<RegistryReceiptV1['payload'], 'protocol' | 'signerKid'>,
   ): Promise<RegistryReceiptV1> {
@@ -260,6 +444,20 @@ class TestRegistry {
       signerKid: SIGNER_KID,
     };
     return registryReceiptV1Schema.parse({
+      payload: signedPayload,
+      signature: await signProtocolPayload(signedPayload, this.privateKey),
+    });
+  }
+
+  async #deviceReceipt(
+    payload: Omit<DeviceRegistryReceiptV2['payload'], 'protocol' | 'signerKid'>,
+  ): Promise<DeviceRegistryReceiptV2> {
+    const signedPayload = {
+      protocol: 'nexus.device-registry-receipt.v2' as const,
+      ...payload,
+      signerKid: SIGNER_KID,
+    };
+    return deviceRegistryReceiptV2Schema.parse({
       payload: signedPayload,
       signature: await signProtocolPayload(signedPayload, this.privateKey),
     });
@@ -309,6 +507,16 @@ function sendError(response: ServerResponse, status: number, code: string): void
 async function eventId(label: string): Promise<`nxe1_${string}`> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(label));
   return `nxe1_${encodeBase64Url(new Uint8Array(digest))}`;
+}
+
+async function deviceEventId(label: string): Promise<`nxde2_${string}`> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(label));
+  return `nxde2_${encodeBase64Url(new Uint8Array(digest))}`;
+}
+
+async function importEd25519PublicKey(encoded: string): Promise<CryptoKey> {
+  const publicKey = Uint8Array.from(decodeBase64UrlExact(encoded, 32));
+  return crypto.subtle.importKey('raw', publicKey, 'Ed25519', false, ['verify']);
 }
 
 function nowSeconds(): number {

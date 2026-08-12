@@ -3,19 +3,28 @@ import {
   registryStatusV1Schema,
   serviceKeySetSchema,
   type ContinuityLinkV1,
+  type DeviceActivationRequestV2,
+  type DeviceRegistryReceiptV2,
+  type DeviceRootRevokeRequestV2,
+  type DeviceSelfRevokeRequestV2,
   type OwnershipProofV1,
+  type OwnershipProofV2,
   type ProofRequest,
   type RegistryReceiptV1,
   type RevokeBySecretRequestV1,
   type RevokeBySignatureRequestV1,
   type ServiceKeySet,
 } from '@nexus/protocol';
-import { verifyRegistryReceipt } from '@nexus/verifier';
+import { verifyDeviceRegistryReceipt, verifyRegistryReceipt } from '@nexus/verifier';
 import {
   IndexedDbIdentityStore,
   WalletCore,
   WebCryptoIndexedDbKeyVault,
   type CreatedLocalIdentity,
+  type DeviceTransferEnvelopeV2,
+  type ImportedDeviceV2,
+  type IssueDeviceTransferOptions,
+  type IssuedDeviceTransferV2,
   type LocalIdentitySummary,
   type RegistryClient,
   type RegistryIdentityStatus,
@@ -24,6 +33,7 @@ import {
 } from '@nexus/wallet-core';
 
 import { retryIdentityRegistration } from './registration-recovery';
+import type { NexusOwnershipProofProtocol } from './popup-protocol';
 
 const API_MEDIA_TYPE = 'application/nexus+json';
 const DATABASE_NAME = 'rowo-nexus-wallet-v1';
@@ -134,6 +144,30 @@ class HttpRegistryClient implements RegistryClient {
     if (!isRecord(value)) throw new Error('The revocation response is malformed.');
     return registryReceiptV1Schema.parse(value.receipt);
   }
+
+  public async activateDevice(
+    request: DeviceActivationRequestV2,
+  ): Promise<DeviceRegistryReceiptV2> {
+    return this.#deviceMutation('/v2/device/activate', request);
+  }
+
+  public async revokeDeviceSelf(
+    request: DeviceSelfRevokeRequestV2,
+  ): Promise<DeviceRegistryReceiptV2> {
+    return this.#deviceMutation('/v2/device/revoke-self', request);
+  }
+
+  public async revokeDeviceRoot(
+    request: DeviceRootRevokeRequestV2,
+  ): Promise<DeviceRegistryReceiptV2> {
+    return this.#deviceMutation('/v2/device/revoke-root', request);
+  }
+
+  async #deviceMutation(path: string, request: unknown): Promise<DeviceRegistryReceiptV2> {
+    const value = await postRegistry(path, request);
+    if (!isRecord(value)) throw new Error('The device registry response is malformed.');
+    return verifyDeviceRegistryReceipt(value.receipt, await loadServiceKeyset());
+  }
 }
 
 const identityStore = new IndexedDbIdentityStore({ databaseName: DATABASE_NAME });
@@ -143,6 +177,8 @@ const walletCore = new WalletCore({
   registryClient: new HttpRegistryClient(),
   verifyRegistryReceipt: async (receipt) =>
     verifyRegistryReceipt(receipt, await loadServiceKeyset()),
+  verifyDeviceRegistryReceipt: async (receipt) =>
+    verifyDeviceRegistryReceipt(receipt, await loadServiceKeyset()),
 });
 
 export interface CreateIdentityInput {
@@ -184,8 +220,52 @@ export const walletAdapter = {
     return walletCore.proveAndRecordAuthorization(localId, boundary, request, addScope);
   },
 
+  async proveForProtocol(
+    localId: string,
+    boundary: TrustedWalletEventBoundary,
+    request: ProofRequest,
+    addScope: boolean,
+    proofProtocol: NexusOwnershipProofProtocol,
+  ): Promise<OwnershipProofV1 | OwnershipProofV2> {
+    if (proofProtocol === 'nexus.ownership-proof.v2') {
+      const proof = await walletCore.proveDevice(localId, boundary, request);
+      if (addScope) await walletCore.addScope(localId, boundary);
+      return proof;
+    }
+    return walletCore.proveAndRecordAuthorization(localId, boundary, request, addScope);
+  },
+
   clearAuthorizationHistory(localId: string): Promise<void> {
     return walletCore.clearAuthorizationHistory(localId);
+  },
+
+  issueDeviceTransfer(
+    rootLocalId: string,
+    options: IssueDeviceTransferOptions = {},
+  ): Promise<IssuedDeviceTransferV2> {
+    return walletCore.issueDeviceTransfer(rootLocalId, options);
+  },
+
+  importDeviceTransfer(
+    bundle: DeviceTransferEnvelopeV2,
+    transferKey: Uint8Array,
+  ): Promise<ImportedDeviceV2> {
+    return walletCore.importDeviceTransfer(bundle, transferKey);
+  },
+
+  activateDevice(localId: string): Promise<DeviceRegistryReceiptV2> {
+    return walletCore.activateDevice(localId);
+  },
+
+  revokeDeviceSelf(localId: string): Promise<DeviceRegistryReceiptV2> {
+    return walletCore.revokeDeviceSelf(localId, { reasonCode: 'replaced' });
+  },
+
+  revokeDeviceRoot(
+    rootLocalId: string,
+    deviceId: LocalIdentitySummary['issuedDevices'][number]['deviceId'],
+  ): Promise<DeviceRegistryReceiptV2> {
+    return walletCore.revokeDeviceRoot(rootLocalId, deviceId, { reasonCode: 'replaced' });
   },
 
   dispose(localId: string): Promise<RegistryReceiptV1> {

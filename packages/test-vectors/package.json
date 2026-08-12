@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "sideEffects": false,
-  "description": "Language-neutral deterministic cryptographic vectors for ROwO Nexus v1.",
+  "description": "Language-neutral deterministic cryptographic vectors for ROwO Nexus v1 and v2 device delegation.",
   "license": "MIT",
   "exports": {
     ".": {

@@ -18,6 +18,9 @@ describe('committed Nexus test vectors', () => {
   });
 
   it('pass independent protocol, crypto, and verifier checks', async () => {
-    await expect(verifyTestVectorDirectory(vectorDirectory)).resolves.toContain('continuity-link');
+    const verified = await verifyTestVectorDirectory(vectorDirectory);
+    expect(verified).toContain('continuity-link');
+    expect(verified).toContain('ownership-proof-v2');
+    expect(verified).toHaveLength(18);
   });
 });

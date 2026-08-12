@@ -1,7 +1,10 @@
 import {
+  deviceRegistryEventV2Schema,
+  deviceRegistryEventWithoutEventIdV2Schema,
   signedGlobalTransparencyCheckpointV1Schema,
   signedTransparencyCheckpointV1Schema,
 } from '@nexus/protocol';
+import { deriveDeviceRegistryEventIdV2 } from '@nexus/crypto';
 import { createExecutionContext, env, waitOnExecutionContext } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
 
@@ -66,6 +69,43 @@ async function requireObject(key: string): Promise<R2ObjectBody> {
 }
 
 describe('scheduled transparency publication', () => {
+  it('appends canonical v2 device events as idempotent hash-only leaves', async () => {
+    const ctx = createExecutionContext();
+    const worker = new TransparencyService(ctx, testEnv);
+    const value = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+    const eventWithoutId = deviceRegistryEventWithoutEventIdV2Schema.parse({
+      protocol: 'nexus.device-registry-event.v2',
+      operationId: `nxo2_${value}`,
+      eventType: 'activated',
+      subject: `nx1_${value}`,
+      genesisHash: value,
+      identitySequence: 0,
+      identityState: 'active',
+      deviceLedgerSequence: 1,
+      deviceId: `nxd2_${value}`,
+      authorizationId: `nxa2_${value}`,
+      deviceState: 'active',
+      authorizationExpiresAt: 1_820_000_000,
+      acceptedAt: 1_788_800_000,
+      actionHash: value,
+    });
+    const { eventId } = await deriveDeviceRegistryEventIdV2(eventWithoutId);
+    const event = deviceRegistryEventV2Schema.parse({ ...eventWithoutId, eventId });
+
+    const first = await worker.appendDevice(event);
+    const duplicate = await worker.appendDevice(event);
+
+    expect(first).toMatchObject({ eventId, duplicate: false });
+    expect(duplicate).toMatchObject({ eventId, duplicate: true });
+    expect(first).not.toHaveProperty('subject');
+    expect(first).not.toHaveProperty('deviceId');
+    expect(first).not.toHaveProperty('authorizationId');
+
+    await expect(
+      worker.appendDevice({ ...event, acceptedAt: event.acceptedAt + 1 }),
+    ).rejects.toMatchObject({ code: 'INVALID_EVENT_ID' });
+  });
+
   it('serves the transparency-specific verification keyset route', async () => {
     const ctx = createExecutionContext();
     const worker = new TransparencyService(ctx, testEnv);

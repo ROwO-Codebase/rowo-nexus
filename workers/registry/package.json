@@ -13,12 +13,12 @@
   },
   "dependencies": {
     "@nexus/crypto": "workspace:*",
-    "@nexus/protocol": "workspace:*",
-    "@nexus/verifier": "workspace:*"
+    "@nexus/protocol": "workspace:*"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.21.0",
     "@cloudflare/workers-types": "^5.20260811.1",
+    "@nexus/verifier": "workspace:*",
     "typescript": "^5.9.2",
     "vitest": "^4.1.0",
     "wrangler": "^4.120.1"

@@ -31,6 +31,20 @@ export function IdentityCard({
 }: IdentityCardProps) {
   const [copied, setCopied] = useState(false);
   const active = identity.localState === 'active';
+  const deviceState = identity.device?.localState;
+  const statusLabel =
+    deviceState === 'pending-activation'
+      ? 'Pending activation'
+      : deviceState === 'active'
+        ? 'Active device'
+        : deviceState === 'revoked'
+          ? 'Revoked device'
+          : active
+            ? identity.registered
+              ? 'Active'
+              : 'Unregistered'
+            : 'Disposed';
+  const ready = identity.proofReady;
 
   const copySubject = async () => {
     await navigator.clipboard.writeText(identity.subject);
@@ -71,7 +85,7 @@ export function IdentityCard({
               <span
                 className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${
                   active
-                    ? identity.registered
+                    ? ready
                       ? 'bg-emerald-100 text-emerald-800'
                       : 'bg-amber-100 text-amber-800'
                     : 'bg-rose-100 text-rose-800'
@@ -79,14 +93,10 @@ export function IdentityCard({
               >
                 <span
                   className={`h-1.5 w-1.5 rounded-full ${
-                    active
-                      ? identity.registered
-                        ? 'bg-emerald-500'
-                        : 'bg-amber-500'
-                      : 'bg-rose-500'
+                    active ? (ready ? 'bg-emerald-500' : 'bg-amber-500') : 'bg-rose-500'
                   }`}
                 />
-                {active ? (identity.registered ? 'Active' : 'Unregistered') : 'Disposed'}
+                {statusLabel}
               </span>
             </div>
             <div className="mt-1 flex items-center gap-1.5">

@@ -4,7 +4,9 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   NEXUS_POPUP_CHANNEL,
+  NEXUS_POPUP_CHANNEL_V2,
   announceWalletReady,
+  announceWalletReadyV2,
   parseProofRequestMessage,
   postProofError,
   postProofResult,
@@ -68,10 +70,15 @@ describe('wallet popup boundary', () => {
       origin: 'https://rp.example',
       boundary: { audience: 'https://rp.example' } as TrustedWalletEventBoundary,
       source: { postMessage } as unknown as Window,
+      popupProtocol: NEXUS_POPUP_CHANNEL,
+      acceptedProofProtocols: ['nexus.ownership-proof.v1'],
     };
-    const proof = { payload: {}, signature: 'signature' } as unknown as OwnershipProofV1;
+    const proof = {
+      payload: { protocol: 'nexus.ownership-proof.v1' },
+      signature: 'signature',
+    } as unknown as OwnershipProofV1;
 
-    postProofResult(pending, proof);
+    postProofResult(pending, { proofProtocol: 'nexus.ownership-proof.v1', proof });
     postProofError(pending, 'USER_CANCELLED');
 
     expect(postMessage).toHaveBeenNthCalledWith(
@@ -94,5 +101,116 @@ describe('wallet popup boundary', () => {
       { channel: NEXUS_POPUP_CHANNEL, type: 'NEXUS_READY' },
       '*',
     );
+  });
+
+  it('strictly parses an ordered v2 allow-list and pins it to the trusted event boundary', () => {
+    const channel = new MessageChannel();
+    const source = channel.port1 as unknown as Window;
+    const event = new MessageEvent('message', {
+      source,
+      origin: 'https://rp.example',
+      data: {
+        channel: NEXUS_POPUP_CHANNEL_V2,
+        type: 'NEXUS_PROOF_REQUEST',
+        requestId: REQUEST_ID,
+        request: proofRequest(1_788_000_120),
+        acceptedProofProtocols: ['nexus.ownership-proof.v2', 'nexus.ownership-proof.v1'],
+      },
+    });
+
+    const parsed = parseProofRequestMessage(event, source, 1_788_000_000);
+    expect(parsed).toMatchObject({
+      popupProtocol: NEXUS_POPUP_CHANNEL_V2,
+      acceptedProofProtocols: ['nexus.ownership-proof.v2', 'nexus.ownership-proof.v1'],
+      origin: 'https://rp.example',
+    });
+    expect(parsed?.boundary.audience).toBe('https://rp.example');
+  });
+
+  it.each<readonly [readonly string[]]>([
+    [[]],
+    [['nexus.ownership-proof.v2', 'nexus.ownership-proof.v2']],
+    [['nexus.ownership-proof.v3']],
+  ])('rejects invalid v2 protocol policy %j', (acceptedProofProtocols) => {
+    const channel = new MessageChannel();
+    const source = channel.port1 as unknown as Window;
+    const event = new MessageEvent('message', {
+      source,
+      origin: 'https://rp.example',
+      data: {
+        channel: NEXUS_POPUP_CHANNEL_V2,
+        type: 'NEXUS_PROOF_REQUEST',
+        requestId: REQUEST_ID,
+        request: proofRequest(1_788_000_120),
+        acceptedProofProtocols,
+      },
+    });
+    expect(parseProofRequestMessage(event, source, 1_788_000_000)).toBeUndefined();
+  });
+
+  it('advertises v2 without changing the exact v1 READY envelope', () => {
+    const postMessage = vi.fn();
+    const opener = { postMessage } as unknown as Window;
+    announceWalletReady(opener);
+    announceWalletReadyV2(opener);
+
+    expect(postMessage).toHaveBeenNthCalledWith(
+      1,
+      { channel: NEXUS_POPUP_CHANNEL, type: 'NEXUS_READY' },
+      '*',
+    );
+    expect(postMessage).toHaveBeenNthCalledWith(
+      2,
+      {
+        channel: NEXUS_POPUP_CHANNEL_V2,
+        type: 'NEXUS_READY',
+        supportedProofProtocols: ['nexus.ownership-proof.v2', 'nexus.ownership-proof.v1'],
+      },
+      '*',
+    );
+  });
+
+  it('never returns a v2 proof through the v1 channel', () => {
+    const pending: PendingProofRequest = {
+      requestId: REQUEST_ID,
+      request: proofRequest(1_788_000_120),
+      origin: 'https://rp.example',
+      boundary: { audience: 'https://rp.example' } as TrustedWalletEventBoundary,
+      source: { postMessage: vi.fn() } as unknown as Window,
+      popupProtocol: NEXUS_POPUP_CHANNEL,
+      acceptedProofProtocols: ['nexus.ownership-proof.v1'],
+    };
+
+    expect(() =>
+      postProofResult(pending, {
+        proofProtocol: 'nexus.ownership-proof.v2',
+        proof: {
+          payload: { protocol: 'nexus.ownership-proof.v2' },
+          deviceSignature: 'signature',
+        } as never,
+      }),
+    ).toThrow(/not accepted|v1 popup/u);
+  });
+
+  it('rejects a result whose selected protocol disagrees with its signed payload', () => {
+    const pending: PendingProofRequest = {
+      requestId: REQUEST_ID,
+      request: proofRequest(1_788_000_120),
+      origin: 'https://rp.example',
+      boundary: { audience: 'https://rp.example' } as TrustedWalletEventBoundary,
+      source: { postMessage: vi.fn() } as unknown as Window,
+      popupProtocol: NEXUS_POPUP_CHANNEL_V2,
+      acceptedProofProtocols: ['nexus.ownership-proof.v2', 'nexus.ownership-proof.v1'],
+    };
+
+    expect(() =>
+      postProofResult(pending, {
+        proofProtocol: 'nexus.ownership-proof.v2',
+        proof: {
+          payload: { protocol: 'nexus.ownership-proof.v1' },
+          deviceSignature: 'signature',
+        } as never,
+      }),
+    ).toThrow(/does not match/u);
   });
 });

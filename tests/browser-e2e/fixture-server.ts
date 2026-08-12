@@ -26,7 +26,7 @@ const tls = {
 // This process trusts only its own ephemeral test boundary. App code remains fail-closed.
 process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
 
-const stopRegistry = await startRegistryFixture(tls);
+const registryFixture = await startRegistryFixture(tls);
 const servers: ViteDevServer[] = [];
 
 try {
@@ -79,6 +79,7 @@ async function startRp(origin: string, cacheName: string): Promise<ViteDevServer
       createReferenceRpApiPlugin({
         audience: origin,
         nexusApiUrl: REGISTRY_ORIGIN,
+        serviceKeyset: registryFixture.serviceKeyset,
       }),
       productionHeaders(resolve(rpRoot, 'public', '_headers')),
     ],
@@ -141,5 +142,5 @@ async function readWildcardHeaders(file: string): Promise<Map<string, string>> {
 
 async function shutdown(): Promise<void> {
   await Promise.allSettled(servers.map((server) => server.close()));
-  await stopRegistry();
+  await registryFixture.stop();
 }

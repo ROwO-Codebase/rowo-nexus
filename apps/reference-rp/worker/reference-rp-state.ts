@@ -1,11 +1,24 @@
 import { DurableObject } from 'cloudflare:workers';
 
-import { audienceOriginSchema } from '@nexus/protocol';
-import type { Base64Url32, NexusSubject, VerificationExpectation } from '@nexus/protocol';
-import { verifyOwnershipProof } from '@nexus/verifier';
+import {
+  OWNERSHIP_PROOF_PROTOCOL_V1,
+  OWNERSHIP_PROOF_PROTOCOL_V2,
+  audienceOriginSchema,
+} from '@nexus/protocol';
+import type {
+  Base64Url32,
+  NexusDeviceAuthorizationIdV2,
+  NexusDeviceIdV2,
+  NexusSubject,
+  VerificationExpectation,
+  VerificationExpectationV2,
+} from '@nexus/protocol';
+import { verifyOwnershipProof, verifyOwnershipProofV2 } from '@nexus/verifier';
 
 import type {
   ApplicationReceipt,
+  AcceptedProofProtocol,
+  AcceptedProofProtocols,
   AuthorizationMethod,
   IssuedChallenge,
   NoteVisibility,
@@ -20,7 +33,11 @@ import type {
 } from '../src/shared/contracts';
 import { canonicalSha256, constantTimeTextEqual, secureToken, sha256Base64Url } from './crypto';
 import { RpWorkerError, toSafeWorkerError } from './errors';
-import { getAuthoritativeLifecycle, type LifecycleEnv } from './lifecycle';
+import {
+  getAuthoritativeDeviceStatus,
+  getAuthoritativeLifecycle,
+  type LifecycleEnv,
+} from './lifecycle';
 import {
   parseNoteId,
   parseSessionOperation,
@@ -50,6 +67,10 @@ const SESSION_POLICY = Object.freeze({
   resourcePolicy: 'public-notes-and-private-notes-owned-by-session-subject',
   ttlSeconds: SESSION_TTL_SECONDS,
 });
+const ACCEPTED_PROOF_PROTOCOLS: AcceptedProofProtocols = Object.freeze([
+  OWNERSHIP_PROOF_PROTOCOL_V2,
+  OWNERSHIP_PROOF_PROTOCOL_V1,
+]);
 
 export interface ReferenceRpEnv extends LifecycleEnv {
   readonly RP_AUDIENCE: string;
@@ -63,6 +84,7 @@ interface ChallengeRow extends Record<string, SqlStorageValue> {
   context_hash: string;
   expires_at: number;
   consumed_at: number | null;
+  accepted_proof_protocols: string;
 }
 
 interface NoteRow extends Record<string, SqlStorageValue> {
@@ -84,6 +106,9 @@ interface SessionRow extends Record<string, SqlStorageValue> {
   subject: string;
   expires_at: number;
   proof_hash: string;
+  proof_protocol: string | null;
+  device_id: string | null;
+  authorization_id: string | null;
 }
 
 interface ReplyRow extends Record<string, SqlStorageValue> {
@@ -110,6 +135,13 @@ interface ActiveSession {
   readonly tokenHash: string;
   readonly proofHash: string;
   readonly status: SessionStatus;
+}
+
+interface VerifiedSessionSigner {
+  readonly subject: NexusSubject;
+  readonly proofProtocol: AcceptedProofProtocol;
+  readonly deviceId?: NexusDeviceIdV2 | undefined;
+  readonly authorizationId?: NexusDeviceAuthorizationIdV2 | undefined;
 }
 
 export class ReferenceRpState extends DurableObject<ReferenceRpEnv> {
@@ -176,7 +208,11 @@ export class ReferenceRpState extends DurableObject<ReferenceRpEnv> {
 
   async #issueChallenge(operation: StartSessionOperation): Promise<IssuedChallenge> {
     const now = nowSeconds();
-    const contextHash = await canonicalSha256({ action: operation.action, policy: SESSION_POLICY });
+    const contextHash = await canonicalSha256({
+      action: operation.action,
+      policy: SESSION_POLICY,
+      acceptedProofProtocols: ACCEPTED_PROOF_PROTOCOLS,
+    });
     const nonce = secureToken(32);
     const challenge: IssuedChallenge = {
       challengeId: secureToken(16),
@@ -185,6 +221,7 @@ export class ReferenceRpState extends DurableObject<ReferenceRpEnv> {
       nonce: nonce as IssuedChallenge['nonce'],
       expiresAt: now + CHALLENGE_TTL_SECONDS,
       contextHash: contextHash as Base64Url32,
+      acceptedProofProtocols: ACCEPTED_PROOF_PROTOCOLS,
     };
     const nonceHash = await sha256Base64Url(nonce);
 
@@ -209,14 +246,16 @@ export class ReferenceRpState extends DurableObject<ReferenceRpEnv> {
       }
       this.ctx.storage.sql.exec(
         `INSERT INTO challenges
-          (challenge_id, nonce_hash, action, resource, context_hash, expires_at, consumed_at)
-         VALUES (?, ?, ?, ?, ?, ?, NULL)`,
+          (challenge_id, nonce_hash, action, resource, context_hash, expires_at, consumed_at,
+           accepted_proof_protocols)
+         VALUES (?, ?, ?, ?, ?, ?, NULL, ?)`,
         challenge.challengeId,
         nonceHash,
         challenge.action,
         challenge.resource,
         contextHash,
         challenge.expiresAt,
+        JSON.stringify(challenge.acceptedProofProtocols),
       );
     });
     return challenge;
@@ -226,9 +265,11 @@ export class ReferenceRpState extends DurableObject<ReferenceRpEnv> {
     const initial = this.#readChallenge(input.challengeId);
     const initialNow = nowSeconds();
     this.#assertChallengeUsable(initial, initialNow);
+    const acceptedProofProtocols = parseStoredProofProtocols(initial.accepted_proof_protocols);
     const contextHash = await canonicalSha256({
       action: input.operation.action,
       policy: SESSION_POLICY,
+      acceptedProofProtocols,
     });
     if (
       initial.action !== input.operation.action ||
@@ -239,6 +280,13 @@ export class ReferenceRpState extends DurableObject<ReferenceRpEnv> {
         'CHALLENGE_MISMATCH',
         'The session policy changed after this challenge was issued.',
         409,
+      );
+    }
+    if (!acceptedProofProtocols.includes(input.proofProtocol)) {
+      throw new RpWorkerError(
+        'UNSUPPORTED_PROOF_PROTOCOL',
+        'This challenge did not authorize the submitted proof protocol.',
+        403,
       );
     }
 
@@ -265,8 +313,27 @@ export class ReferenceRpState extends DurableObject<ReferenceRpEnv> {
       now: initialNow,
       maxClockSkewSeconds: MAX_CLOCK_SKEW_SECONDS,
     };
-    const verified = await verifyOwnershipProof(input.proof, expected);
-    const lifecycle = await getAuthoritativeLifecycle(this.env, verified.subject);
+    let normalizedVerified: VerifiedSessionSigner;
+    if (input.proofProtocol === OWNERSHIP_PROOF_PROTOCOL_V2) {
+      const expectedV2: VerificationExpectationV2 = {
+        ...expected,
+        contextHash: initial.context_hash as Base64Url32,
+      };
+      const verified = await verifyOwnershipProofV2(input.proof, expectedV2);
+      normalizedVerified = {
+        subject: verified.subject,
+        proofProtocol: OWNERSHIP_PROOF_PROTOCOL_V2,
+        deviceId: verified.deviceId,
+        authorizationId: verified.authorizationId,
+      };
+    } else {
+      const verified = await verifyOwnershipProof(input.proof, expected);
+      normalizedVerified = {
+        subject: verified.subject,
+        proofProtocol: OWNERSHIP_PROOF_PROTOCOL_V1,
+      };
+    }
+    const lifecycle = await getAuthoritativeLifecycle(this.env, normalizedVerified.subject);
     if (lifecycle.state === 'not-found') {
       throw new RpWorkerError(
         'IDENTITY_NOT_FOUND',
@@ -281,6 +348,25 @@ export class ReferenceRpState extends DurableObject<ReferenceRpEnv> {
         403,
       );
     }
+    if (
+      normalizedVerified.proofProtocol === OWNERSHIP_PROOF_PROTOCOL_V2 &&
+      normalizedVerified.deviceId !== undefined &&
+      normalizedVerified.authorizationId !== undefined
+    ) {
+      const device = await getAuthoritativeDeviceStatus(
+        this.env,
+        normalizedVerified.subject,
+        normalizedVerified.deviceId,
+        normalizedVerified.authorizationId,
+      );
+      if (device.identityState !== 'active' || device.deviceState !== 'active') {
+        throw new RpWorkerError(
+          'DEVICE_INACTIVE',
+          'This Nexus device is not active and cannot start a session.',
+          403,
+        );
+      }
+    }
 
     const proofHash = await canonicalSha256(input.proof);
     const token = secureToken(32);
@@ -289,7 +375,14 @@ export class ReferenceRpState extends DurableObject<ReferenceRpEnv> {
     return this.#commitStartedSession({
       input,
       expectedChallenge: initial,
-      subject: verified.subject,
+      subject: normalizedVerified.subject,
+      proofProtocol: normalizedVerified.proofProtocol,
+      ...(normalizedVerified.deviceId === undefined
+        ? {}
+        : { deviceId: normalizedVerified.deviceId }),
+      ...(normalizedVerified.authorizationId === undefined
+        ? {}
+        : { authorizationId: normalizedVerified.authorizationId }),
       proofHash,
       token,
       tokenHash,
@@ -307,6 +400,9 @@ export class ReferenceRpState extends DurableObject<ReferenceRpEnv> {
     tokenHash: string;
     receiptId: string;
     sequence: number;
+    proofProtocol: AcceptedProofProtocol;
+    deviceId?: NexusDeviceIdV2 | undefined;
+    authorizationId?: NexusDeviceAuthorizationIdV2 | undefined;
   }): StartedSession {
     return this.ctx.storage.transactionSync<StartedSession>(() => {
       const now = nowSeconds();
@@ -316,7 +412,9 @@ export class ReferenceRpState extends DurableObject<ReferenceRpEnv> {
         currentChallenge.nonce_hash !== prepared.expectedChallenge.nonce_hash ||
         currentChallenge.action !== prepared.expectedChallenge.action ||
         currentChallenge.resource !== prepared.expectedChallenge.resource ||
-        currentChallenge.context_hash !== prepared.expectedChallenge.context_hash
+        currentChallenge.context_hash !== prepared.expectedChallenge.context_hash ||
+        currentChallenge.accepted_proof_protocols !==
+          prepared.expectedChallenge.accepted_proof_protocols
       ) {
         throw new RpWorkerError(
           'CHALLENGE_MISMATCH',
@@ -362,15 +460,26 @@ export class ReferenceRpState extends DurableObject<ReferenceRpEnv> {
         sequence: prepared.sequence,
         expiresAt: now + SESSION_TTL_SECONDS,
         checkedAt: now,
+        ...(prepared.proofProtocol === OWNERSHIP_PROOF_PROTOCOL_V2
+          ? {
+              proofProtocol: prepared.proofProtocol,
+              deviceId: prepared.deviceId,
+              authorizationId: prepared.authorizationId,
+            }
+          : {}),
       };
       this.ctx.storage.sql.exec('DELETE FROM sessions WHERE expires_at <= ?', now);
       this.ctx.storage.sql.exec(
-        `INSERT INTO sessions (token_hash, subject, expires_at, proof_hash)
-         VALUES (?, ?, ?, ?)`,
+        `INSERT INTO sessions
+          (token_hash, subject, expires_at, proof_hash, proof_protocol, device_id, authorization_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
         prepared.tokenHash,
         prepared.subject,
         session.expiresAt,
         prepared.proofHash,
+        prepared.proofProtocol === OWNERSHIP_PROOF_PROTOCOL_V2 ? prepared.proofProtocol : null,
+        prepared.deviceId ?? null,
+        prepared.authorizationId ?? null,
       );
       return { token: prepared.token, result: { receipt, session } };
     });
@@ -383,7 +492,9 @@ export class ReferenceRpState extends DurableObject<ReferenceRpEnv> {
     const tokenHash = await sha256Base64Url(token);
     const row = this.ctx.storage.sql
       .exec<SessionRow>(
-        'SELECT token_hash, subject, expires_at, proof_hash FROM sessions WHERE token_hash = ?',
+        `SELECT token_hash, subject, expires_at, proof_hash, proof_protocol, device_id,
+                authorization_id
+           FROM sessions WHERE token_hash = ?`,
         tokenHash,
       )
       .toArray()[0];
@@ -399,6 +510,29 @@ export class ReferenceRpState extends DurableObject<ReferenceRpEnv> {
     if (lifecycle.state !== 'active') {
       throw new RpWorkerError('SESSION_INVALID', 'The Nexus identity is revoked.', 401);
     }
+    const v2Session = row.proof_protocol === OWNERSHIP_PROOF_PROTOCOL_V2;
+    if (
+      v2Session &&
+      (row.device_id === null ||
+        row.authorization_id === null ||
+        !row.device_id.startsWith('nxd2_') ||
+        !row.authorization_id.startsWith('nxa2_'))
+    ) {
+      throw new RpWorkerError('SESSION_INVALID', 'The RP session device binding is invalid.', 401);
+    }
+    if (v2Session && row.device_id !== null && row.authorization_id !== null) {
+      const deviceId = row.device_id as NexusDeviceIdV2;
+      const authorizationId = row.authorization_id as NexusDeviceAuthorizationIdV2;
+      const device = await getAuthoritativeDeviceStatus(
+        this.env,
+        subject,
+        deviceId,
+        authorizationId,
+      );
+      if (device.identityState !== 'active' || device.deviceState !== 'active') {
+        throw new RpWorkerError('SESSION_INVALID', 'The Nexus device is no longer active.', 401);
+      }
+    }
     return {
       tokenHash,
       proofHash: row.proof_hash,
@@ -409,6 +543,13 @@ export class ReferenceRpState extends DurableObject<ReferenceRpEnv> {
         sequence: lifecycle.sequence,
         expiresAt: row.expires_at,
         checkedAt: now,
+        ...(v2Session
+          ? {
+              proofProtocol: OWNERSHIP_PROOF_PROTOCOL_V2,
+              deviceId: row.device_id as NexusDeviceIdV2,
+              authorizationId: row.authorization_id as NexusDeviceAuthorizationIdV2,
+            }
+          : {}),
       },
     };
   }
@@ -783,7 +924,8 @@ export class ReferenceRpState extends DurableObject<ReferenceRpEnv> {
   #readChallenge(challengeId: string): ChallengeRow {
     const challenge = this.ctx.storage.sql
       .exec<ChallengeRow>(
-        `SELECT challenge_id, nonce_hash, action, resource, context_hash, expires_at, consumed_at
+        `SELECT challenge_id, nonce_hash, action, resource, context_hash, expires_at, consumed_at,
+                accepted_proof_protocols
            FROM challenges WHERE challenge_id = ?`,
         challengeId,
       )
@@ -815,7 +957,7 @@ export class ReferenceRpState extends DurableObject<ReferenceRpEnv> {
         version INTEGER NOT NULL,
         seeded INTEGER NOT NULL CHECK (seeded IN (0, 1))
       );
-      INSERT OR IGNORE INTO schema_meta (singleton, version, seeded) VALUES (1, 3, 0);
+      INSERT OR IGNORE INTO schema_meta (singleton, version, seeded) VALUES (1, 4, 0);
       CREATE TABLE IF NOT EXISTS challenges (
         challenge_id TEXT PRIMARY KEY,
         nonce_hash TEXT NOT NULL UNIQUE,
@@ -823,7 +965,9 @@ export class ReferenceRpState extends DurableObject<ReferenceRpEnv> {
         resource TEXT NOT NULL,
         context_hash TEXT NOT NULL,
         expires_at INTEGER NOT NULL,
-        consumed_at INTEGER
+        consumed_at INTEGER,
+        accepted_proof_protocols TEXT NOT NULL
+          DEFAULT '["nexus.ownership-proof.v1"]'
       );
       CREATE INDEX IF NOT EXISTS challenges_expiry ON challenges (expires_at);
       CREATE TABLE IF NOT EXISTS notes (
@@ -849,7 +993,15 @@ export class ReferenceRpState extends DurableObject<ReferenceRpEnv> {
         token_hash TEXT PRIMARY KEY,
         subject TEXT NOT NULL,
         expires_at INTEGER NOT NULL,
-        proof_hash TEXT NOT NULL
+        proof_hash TEXT NOT NULL,
+        proof_protocol TEXT,
+        device_id TEXT,
+        authorization_id TEXT,
+        CHECK (
+          (device_id IS NULL AND authorization_id IS NULL) OR
+          (proof_protocol = 'nexus.ownership-proof.v2' AND
+           device_id IS NOT NULL AND authorization_id IS NOT NULL)
+        )
       );
       CREATE INDEX IF NOT EXISTS sessions_expiry ON sessions (expires_at);
       CREATE TABLE IF NOT EXISTS receipts (
@@ -911,7 +1063,18 @@ export class ReferenceRpState extends DurableObject<ReferenceRpEnv> {
       this.ctx.storage.sql.exec('UPDATE schema_meta SET version = 3 WHERE singleton = 1');
       version = 3;
     }
-    if (version !== 3) throw new Error('Reference RP schema version is unsupported.');
+    if (version === 3) {
+      this.ctx.storage.sql.exec(`
+        ALTER TABLE challenges ADD COLUMN accepted_proof_protocols TEXT NOT NULL
+          DEFAULT '["nexus.ownership-proof.v1"]';
+        ALTER TABLE sessions ADD COLUMN proof_protocol TEXT;
+        ALTER TABLE sessions ADD COLUMN device_id TEXT;
+        ALTER TABLE sessions ADD COLUMN authorization_id TEXT;
+        UPDATE schema_meta SET version = 4 WHERE singleton = 1;
+      `);
+      version = 4;
+    }
+    if (version !== 4) throw new Error('Reference RP schema version is unsupported.');
   }
 
   #seedNotes(): void {
@@ -1012,6 +1175,28 @@ function createSessionCookie(token: string): string {
 
 function clearSessionCookie(): string {
   return `${SESSION_COOKIE_NAME}=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Strict`;
+}
+
+function parseStoredProofProtocols(value: string): AcceptedProofProtocols {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    throw new Error('Stored challenge proof protocols are invalid.');
+  }
+  if (
+    !Array.isArray(parsed) ||
+    parsed.length === 0 ||
+    parsed.length > 2 ||
+    parsed.some(
+      (protocol) =>
+        protocol !== OWNERSHIP_PROOF_PROTOCOL_V1 && protocol !== OWNERSHIP_PROOF_PROTOCOL_V2,
+    ) ||
+    new Set(parsed).size !== parsed.length
+  ) {
+    throw new Error('Stored challenge proof protocols are invalid.');
+  }
+  return parsed as unknown as AcceptedProofProtocols;
 }
 
 function assertSessionMutationRequest(request: Request): void {

@@ -32,6 +32,8 @@
     // Replace both placeholders with the exact production HTTPS origins before deployment.
     "RP_AUDIENCE": "https://notes.rowo.link",
     "NEXUS_API_ORIGIN": "https://nexus.rowo.link",
+    // Pin the registry status verification keys. Rotate this alongside edge-api SERVICE_JWKS_JSON.
+    "SERVICE_JWKS_JSON": "{\"keys\":[{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"alg\":\"EdDSA\",\"kid\":\"rowo-receipt-2026-08\",\"x\":\"hSyFSUMtVI92_SAlsuDiDFsjh4UnhSuqhUigecztMU0\",\"use\":\"sig\"},{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"alg\":\"EdDSA\",\"kid\":\"rowo-status-2026-08\",\"x\":\"p_0wFlB-khNLDc_66RYGHG98JY_lrhXtzj5tNEuy4SE\",\"use\":\"sig\"}]}",
   },
   "observability": {
     "enabled": true,

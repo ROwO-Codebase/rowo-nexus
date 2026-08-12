@@ -27,6 +27,7 @@ import {
   type RegistryReceiptVerifier,
   type TrustedWalletEventBoundary,
 } from '../src/index.js';
+import { signManagedProtocolPayload } from '../src/key-vault.js';
 
 const NOW = 1_786_400_000;
 
@@ -119,7 +120,10 @@ describe('WebCrypto IndexedDB vault', () => {
     const secretRef = await first.storeRevocationSecret(new Uint8Array(32).fill(0x5a));
     const publicKey = await first.readPublicKey(signingRef);
     const agreementPublicKey = await first.readPublicKey(agreementRef);
-    const firstSignature = await first.sign(signingRef, new Uint8Array([1, 2, 3]));
+    const firstSignature = await signManagedProtocolPayload(first, signingRef, {
+      protocol: 'nexus.ownership-proof.v1',
+      nonce: 'first',
+    });
     expect(publicKey).toHaveLength(32);
     expect(agreementPublicKey).toHaveLength(32);
     expect(firstSignature).toHaveLength(64);
@@ -129,7 +133,12 @@ describe('WebCrypto IndexedDB vault', () => {
     expect(await reopened.readPublicKey(signingRef)).toEqual(publicKey);
     expect(await reopened.readPublicKey(agreementRef)).toEqual(agreementPublicKey);
     expect(await reopened.readRevocationSecret(secretRef)).toEqual(new Uint8Array(32).fill(0x5a));
-    expect(await reopened.sign(signingRef, new Uint8Array([4, 5, 6]))).toHaveLength(64);
+    expect(
+      await signManagedProtocolPayload(reopened, signingRef, {
+        protocol: 'nexus.ownership-proof.v1',
+        nonce: 'reopened',
+      }),
+    ).toHaveLength(64);
 
     await reopened.deleteKey(signingRef);
     await reopened.deleteKey(agreementRef);

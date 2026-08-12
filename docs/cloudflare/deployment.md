@@ -13,11 +13,12 @@ nexus.rowo.link (edge validation, CORS, receipts/status signing)
         |
         +-- REGISTRY_SERVICE --> registry Worker
         |                           +-- IdentityState SQLite DOs (authority)
-        |                           +-- durable DO outbox --> registry-events Queue
-        |                                                        +-- D1 projector (sole consumer)
-        |                                                              +-- TRANSPARENCY_SERVICE RPC
-        |                                                                    +-- shard DOs
-        |                                                                    +-- R2 checkpoints
+        |                           +-- v1 outbox --> nexus-registry-events Queue --+
+        |                           +-- v2 device outbox                           |
+        |                                 --> nexus-registry-device-events Queue --+--> D1 projector
+        |                                                                              +-- TRANSPARENCY_SERVICE RPC
+        |                                                                                    +-- shard DOs
+        |                                                                                    +-- R2 checkpoints
 
 status.rowo.link (optional controlled transparency/checkpoint publication)
 
@@ -70,12 +71,18 @@ Public read/status CORS may use a wildcard only because responses are public and
 credentials. Mutation endpoints admit only the wallet origin and explicitly approved native/CLI
 clients. Wildcard CORS is never combined with credentials.
 
+Discovery is versioned for strict-client compatibility. `/.well-known/nexus.json` retains the exact
+v1 response. V2-aware clients use `/.well-known/nexus-v2.json`, which advertises v1 and v2 proof
+protocols, the `/v2/device` registry base, `nexus.popup.v2` and `nexus.popup.v1`, and a link back to
+the v1 discovery document. Adding v2 MUST NOT widen the legacy response.
+
 ## Bindings and authority
 
-- Registry Worker: `IDENTITY_STATE` SQLite Durable Objects and a producer binding to
-  `nexus-registry-events`.
-- Projector Worker: Queue consumer, non-authoritative `INDEX_DB` D1, and internal transparency
-  binding.
+- Registry Worker: `IDENTITY_STATE` SQLite Durable Objects, `REGISTRY_EVENTS` producing to
+  `nexus-registry-events`, and `REGISTRY_DEVICE_EVENTS` producing to the separate
+  `nexus-registry-device-events` queue.
+- Projector Worker: separate consumers for both queues, non-authoritative `INDEX_DB` D1, and an
+  internal transparency binding. Each queue has its own dead-letter queue.
 - Edge Worker: internal `REGISTRY_SERVICE`, coarse rate limiter, and aggregate-only metrics.
 - Transparency Worker: shard Durable Objects and R2 checkpoint storage.
 - Reference RP Worker: static assets, a coarse API rate limiter, and one SQLite Durable Object for
@@ -86,6 +93,11 @@ clients. Wildcard CORS is never combined with credentials.
 Lifecycle mutations and outbox events commit atomically inside the subject Durable Object. Queue
 failure may delay projection/transparency, but cannot roll back or weaken revocation. D1 is rebuilt
 from events and never queried to authorize current control.
+
+The identity and device queues are independently at-least-once and unordered. Projector deployment
+must tolerate a v2 device event arriving before its v1 registration anchor, deduplicate each event
+by its deterministic ID, and reconcile materialized device state after the anchor appears. Device
+events are never parsed as v1 lifecycle events and never change the v1 identity sequence.
 
 The transparency Worker publishes all 256 shard checkpoints and the ordered global manifest through
 its daily UTC cron. There is no public checkpoint-administration endpoint. Alert on failed scheduled
@@ -107,12 +119,17 @@ Cloudflare secrets, logs, environment variables, or storage.
 2. Verify no production credentials are present in PR/preview context and resource IDs resolve only
    to the target environment.
 3. Apply version-controlled D1 migrations to a restored realistic fixture; confirm projector replay,
-   duplicate, and out-of-order behavior.
+   duplicate, and out-of-order behavior. Before enabling the device queue consumer, apply
+   `migrations/d1/0002_device_projection_v2.sql`; confirm early device-event reconciliation and that
+   existing v1 tables and projections remain unchanged.
 4. Apply Durable Object class/storage migrations using versioned Wrangler migration tags and
    application-level schema migration code.
-5. Deploy internal services before the public edge, then the wallet/reference surfaces.
-6. Run smoke checks for discovery/JWKS, register/status/revoke, service receipt verification, outbox
-   recovery, and D1 non-authority.
+5. Provision both source queues and their distinct dead-letter queues. Deploy the projector with
+   both consumers, then the registry with both producer bindings. Deploy remaining internal services
+   before the public edge, then the wallet/reference surfaces.
+6. Run smoke checks for exact v1 discovery, versioned v2 discovery, JWKS,
+   register/status/revoke/device operations, service receipt verification, both outboxes and queues,
+   early-event reconciliation, and D1 non-authority.
 7. Confirm wallet CSP, exact-origin popup behavior, and absence of key/proof material in network and
    logs.
 8. Monitor privacy-safe error/latency buckets and outbox/projector lag; do not add identifiers to

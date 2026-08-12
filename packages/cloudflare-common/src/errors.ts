@@ -21,11 +21,27 @@ export const NEXUS_ERROR_CODES = [
   'SERVICE_UNAVAILABLE',
 ] as const;
 
+export const NEXUS_DEVICE_ERROR_CODES = [
+  ...NEXUS_ERROR_CODES,
+  'DEVICE_NOT_FOUND',
+  'DEVICE_REVOKED',
+  'DEVICE_AUTHORIZATION_CONFLICT',
+] as const;
+
 export type NexusErrorCode = (typeof NEXUS_ERROR_CODES)[number];
+export type NexusDeviceErrorCode = (typeof NEXUS_DEVICE_ERROR_CODES)[number];
 
 export interface NexusErrorBody {
   readonly error: {
     readonly code: NexusErrorCode;
+    readonly message: string;
+    readonly requestId?: string;
+  };
+}
+
+export interface NexusDeviceErrorBody {
+  readonly error: {
+    readonly code: NexusDeviceErrorCode;
     readonly message: string;
     readonly requestId?: string;
   };
@@ -36,7 +52,7 @@ interface ErrorDefinition {
   readonly message: string;
 }
 
-const ERROR_DEFINITIONS: Readonly<Record<NexusErrorCode, ErrorDefinition>> = {
+const ERROR_DEFINITIONS: Readonly<Record<NexusDeviceErrorCode, ErrorDefinition>> = {
   BAD_REQUEST: { status: 400, message: 'The request is invalid.' },
   UNSUPPORTED_PROTOCOL: { status: 400, message: 'The protocol version is not supported.' },
   UNSUPPORTED_SUITE: { status: 400, message: 'The cryptographic suite is not supported.' },
@@ -49,6 +65,12 @@ const ERROR_DEFINITIONS: Readonly<Record<NexusErrorCode, ErrorDefinition>> = {
   SUBJECT_GENESIS_CONFLICT: {
     status: 409,
     message: 'The subject conflicts with existing genesis data.',
+  },
+  DEVICE_NOT_FOUND: { status: 404, message: 'The device was not found.' },
+  DEVICE_REVOKED: { status: 409, message: 'The device is revoked.' },
+  DEVICE_AUTHORIZATION_CONFLICT: {
+    status: 409,
+    message: 'The device authorization conflicts with existing state.',
   },
   RATE_LIMITED: { status: 429, message: 'Too many requests.' },
   TURNSTILE_REQUIRED: { status: 403, message: 'An anti-abuse check is required.' },
@@ -72,15 +94,39 @@ export class NexusFault extends Error {
   }
 }
 
+export class NexusDeviceFault extends Error {
+  public readonly code: NexusDeviceErrorCode;
+
+  public constructor(code: NexusDeviceErrorCode, options?: { readonly cause?: unknown }) {
+    super(ERROR_DEFINITIONS[code].message, options);
+    this.name = 'NexusDeviceFault';
+    this.code = code;
+  }
+}
+
 export function isNexusErrorCode(value: unknown): value is NexusErrorCode {
   return typeof value === 'string' && (NEXUS_ERROR_CODES as readonly string[]).includes(value);
+}
+
+export function isNexusDeviceErrorCode(value: unknown): value is NexusDeviceErrorCode {
+  return (
+    typeof value === 'string' && (NEXUS_DEVICE_ERROR_CODES as readonly string[]).includes(value)
+  );
 }
 
 export function nexusErrorStatus(code: NexusErrorCode): number {
   return ERROR_DEFINITIONS[code].status;
 }
 
+export function nexusDeviceErrorStatus(code: NexusDeviceErrorCode): number {
+  return ERROR_DEFINITIONS[code].status;
+}
+
 export function nexusErrorMessage(code: NexusErrorCode): string {
+  return ERROR_DEFINITIONS[code].message;
+}
+
+export function nexusDeviceErrorMessage(code: NexusDeviceErrorCode): string {
   return ERROR_DEFINITIONS[code].message;
 }
 
@@ -91,6 +137,13 @@ export function faultCode(error: unknown): NexusErrorCode {
   return isNexusErrorCode(error) ? error : 'INTERNAL_ERROR';
 }
 
+export function deviceFaultCode(error: unknown): NexusDeviceErrorCode {
+  if (error instanceof NexusDeviceFault || error instanceof NexusFault) {
+    return error.code;
+  }
+  return isNexusDeviceErrorCode(error) ? error : 'INTERNAL_ERROR';
+}
+
 export function isNexusRequestId(value: unknown): value is string {
   return typeof value === 'string' && /^nxr_[A-Za-z0-9_-]{22}$/u.test(value);
 }
@@ -99,6 +152,17 @@ export function createNexusErrorBody(code: NexusErrorCode, requestId?: string): 
   const error = !isNexusRequestId(requestId)
     ? { code, message: nexusErrorMessage(code) }
     : { code, message: nexusErrorMessage(code), requestId };
+
+  return { error };
+}
+
+export function createNexusDeviceErrorBody(
+  code: NexusDeviceErrorCode,
+  requestId?: string,
+): NexusDeviceErrorBody {
+  const error = !isNexusRequestId(requestId)
+    ? { code, message: nexusDeviceErrorMessage(code) }
+    : { code, message: nexusDeviceErrorMessage(code), requestId };
 
   return { error };
 }
@@ -119,6 +183,26 @@ export function toNexusErrorResponse(
 
   return new Response(JSON.stringify(createNexusErrorBody(code, options.requestId)), {
     status: nexusErrorStatus(code),
+    headers,
+  });
+}
+
+export function toNexusDeviceErrorResponse(
+  error: unknown,
+  options: {
+    readonly requestId?: string | undefined;
+    readonly headers?: HeadersInit;
+  } = {},
+): Response {
+  const code = deviceFaultCode(error);
+  const headers = new Headers(options.headers);
+  headers.set('Cache-Control', 'no-store');
+  headers.set('Content-Type', 'application/nexus+json');
+  headers.set('Referrer-Policy', 'no-referrer');
+  headers.set('X-Content-Type-Options', 'nosniff');
+
+  return new Response(JSON.stringify(createNexusDeviceErrorBody(code, options.requestId)), {
+    status: nexusDeviceErrorStatus(code),
     headers,
   });
 }

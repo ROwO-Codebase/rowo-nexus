@@ -1,6 +1,12 @@
 import type {
   Base64Url32,
+  DeviceActivationRequestV2,
+  DeviceRegistryEventV2,
+  DeviceRootRevokeRequestV2,
+  DeviceSelfRevokeRequestV2,
   IdentityGenesisV1,
+  NexusDeviceAuthorizationIdV2,
+  NexusDeviceIdV2,
   NexusSubject,
   RegistryEventV1,
   RevokeBySecretV1,
@@ -17,6 +23,9 @@ export type RegistryErrorCode =
   | 'INVALID_REVOCATION_SECRET'
   | 'IDENTITY_NOT_FOUND'
   | 'IDENTITY_REVOKED'
+  | 'DEVICE_NOT_FOUND'
+  | 'DEVICE_REVOKED'
+  | 'DEVICE_AUTHORIZATION_CONFLICT'
   | 'SEQUENCE_CONFLICT'
   | 'SUBJECT_GENESIS_CONFLICT'
   | 'INTERNAL_ERROR';
@@ -57,6 +66,47 @@ export interface RegistryMutation extends AuthoritativeStatus {
   event: RegistryEventV1;
 }
 
+export interface DeviceStatusCommand {
+  subject: NexusSubject;
+  deviceId: NexusDeviceIdV2;
+  authorizationId: NexusDeviceAuthorizationIdV2;
+}
+
+export type DeviceStatusState = 'active' | 'revoked' | 'expired' | 'unknown';
+
+export interface AuthoritativeDeviceStatusV2 {
+  subject: NexusSubject;
+  genesisHash: Base64Url32;
+  identityState: 'active' | 'revoked';
+  identitySequence: number;
+  deviceLedgerSequence: number;
+  deviceId: NexusDeviceIdV2;
+  authorizationId: NexusDeviceAuthorizationIdV2;
+  deviceState: DeviceStatusState;
+  activatedAt: number | null;
+  revokedAt: number | null;
+  authorizationExpiresAt: number | null;
+}
+
+export interface DeviceRegistryMutationV2 {
+  subject: NexusSubject;
+  genesisHash: Base64Url32;
+  identityState: 'active' | 'revoked';
+  identitySequence: number;
+  deviceLedgerSequence: number;
+  deviceId: NexusDeviceIdV2;
+  authorizationId: NexusDeviceAuthorizationIdV2 | null;
+  deviceState: 'active' | 'revoked';
+  activatedAt: number | null;
+  revokedAt: number | null;
+  authorizationExpiresAt: number | null;
+  operationId: string;
+  eventId: string;
+  eventType: 'activated' | 'revoked';
+  acceptedAt: number;
+  event: DeviceRegistryEventV2;
+}
+
 export interface PreparedRegistration {
   subject: NexusSubject;
   genesis: IdentityGenesisV1;
@@ -73,11 +123,24 @@ export interface IdentityStateRpc {
   status(): Promise<RegistryResult<AuthoritativeStatus>>;
   revokeBySignature(input: RevokeBySignatureCommand): Promise<RegistryResult<RegistryMutation>>;
   revokeBySecret(input: RevokeBySecretCommand): Promise<RegistryResult<RegistryMutation>>;
+  activateDevice(
+    input: DeviceActivationRequestV2,
+  ): Promise<RegistryResult<DeviceRegistryMutationV2>>;
+  deviceStatus(
+    input: Omit<DeviceStatusCommand, 'subject'>,
+  ): Promise<RegistryResult<AuthoritativeDeviceStatusV2>>;
+  revokeDeviceSelf(
+    input: DeviceSelfRevokeRequestV2,
+  ): Promise<RegistryResult<DeviceRegistryMutationV2>>;
+  revokeDeviceRoot(
+    input: DeviceRootRevokeRequestV2,
+  ): Promise<RegistryResult<DeviceRegistryMutationV2>>;
 }
 
 export interface RegistryEnv {
   IDENTITY_STATE: DurableObjectNamespace<IdentityState>;
   REGISTRY_EVENTS: Pick<Queue<RegistryEventV1>, 'send'>;
+  REGISTRY_DEVICE_EVENTS: Pick<Queue<DeviceRegistryEventV2>, 'send'>;
   METRICS?: AnalyticsEngineDataset;
 }
 
@@ -105,4 +168,19 @@ export interface StoredOutboxRow {
   created_at: number;
   published_at: number | null;
   attempt_count: number;
+}
+
+export interface StoredDeviceRow {
+  [key: string]: SqlStorageValue;
+  device_id: string;
+  authorization_id: string | null;
+  authorization_jcs: string | null;
+  signing_public_key: ArrayBuffer | null;
+  state: 'active' | 'revoked';
+  authorization_expires_at: number | null;
+  activated_at: number | null;
+  revoked_at: number | null;
+  revoked_by: 'root' | 'device' | null;
+  activation_event_id: string | null;
+  revocation_event_id: string | null;
 }

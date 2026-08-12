@@ -8,6 +8,10 @@ import {
   createProtocolSignaturePreimage,
   createRegistryEventHashPreimage,
   createRevocationCommitmentPreimage,
+  deriveDeviceAuthorizationIdV2,
+  deriveDeviceIdV2,
+  deriveDeviceOperationIdV2,
+  deriveDeviceRegistryEventIdV2,
   deriveGenesisHash,
   deriveRegistryEventId,
   deriveSubject,
@@ -19,11 +23,24 @@ import {
 import {
   canonicalize,
   continuityLinkV1Schema,
+  createDeviceAuthorizationHashPreimageV2,
+  createDeviceIdHashPreimageV2,
+  createDeviceOperationHashPreimageV2,
+  createDeviceRegistryEventHashPreimageV2,
   createGlobalTransparencyCheckpointSignaturePreimage,
   createTransparencyCheckpointSignaturePreimage,
   decodeBase64Url,
+  deviceActivationPayloadV2Schema,
+  deviceActivationRequestV2Schema,
+  deviceAuthorizationV2Schema,
+  deviceIdInputV2Schema,
+  deviceRegistryEventV2Schema,
+  deviceRegistryEventWithoutEventIdV2Schema,
+  deviceRegistryReceiptV2Schema,
+  deviceStatusStatementV2Schema,
   encodeBase64Url,
   identityGenesisV1Schema,
+  ownershipProofV2Schema,
   ownershipProofV1Schema,
   registryEventV1Schema,
   registryEventWithoutEventIdV1Schema,
@@ -41,6 +58,9 @@ import {
   verifyGlobalTransparencyCheckpoint,
   verifyInclusionProof,
   verifyOwnershipProof,
+  verifyOwnershipProofV2,
+  verifyDeviceRegistryReceipt,
+  verifyDeviceStatusStatement,
   verifyRegistryReceipt,
   verifyRevokeBySignature,
   verifyStatusStatement,
@@ -85,10 +105,19 @@ function integer(value: unknown, label: string): number {
   return value;
 }
 
-async function loadVector(directory: URL, name: string): Promise<JsonObject> {
+function tamperBase64Url(value: string): string {
+  assert.ok(value.length > 0, 'Cannot tamper with an empty base64url value.');
+  return `${value[0] === 'A' ? 'B' : 'A'}${value.slice(1)}`;
+}
+
+async function loadVector(
+  directory: URL,
+  name: string,
+  schema = 'nexus.test-vectors.v1',
+): Promise<JsonObject> {
   const parsed: unknown = JSON.parse(await readFile(new URL(name, directory), 'utf8'));
   const vector = object(parsed, name);
-  assert.equal(vector.schema, 'nexus.test-vectors.v1', `${name}: schema`);
+  assert.equal(vector.schema, schema, `${name}: schema`);
   return vector;
 }
 
@@ -216,6 +245,286 @@ export async function verifyTestVectorDirectory(
   const subject = await deriveSubject(genesis);
   assert.equal(subject, identity.subject);
   await verifySubject(genesis, subject);
+
+  const deviceAuthorizationVector = await loadVector(
+    directory,
+    'device-authorization-v2.json',
+    'nexus.test-vectors.v2',
+  );
+  assert.match(
+    string(deviceAuthorizationVector.warning, 'device authorization warning'),
+    /NON-PRODUCTION/u,
+  );
+  assert.equal(deviceAuthorizationVector.identityGenesisProtocol, 'nexus.identity.v1');
+  assert.deepEqual(identityGenesisV1Schema.parse(deviceAuthorizationVector.genesis), genesis);
+  assert.equal(deviceAuthorizationVector.genesisHashBase64Url, encodeBase64Url(genesisHash));
+  const deviceIdInput = deviceIdInputV2Schema.parse(deviceAuthorizationVector.deviceIdInput);
+  assert.equal(canonicalize(deviceIdInput), deviceAuthorizationVector.canonicalDeviceIdInputJcs);
+  assert.equal(
+    bytesToHex(createDeviceIdHashPreimageV2(deviceIdInput)),
+    deviceAuthorizationVector.deviceIdHashPreimageHex,
+  );
+  const deviceId = await deriveDeviceIdV2(deviceIdInput);
+  assert.equal(deviceId, deviceAuthorizationVector.deviceId);
+
+  const authorization = deviceAuthorizationV2Schema.parse(deviceAuthorizationVector.authorization);
+  assertExpectedSignedFields(
+    deviceAuthorizationVector,
+    authorization.payload,
+    authorization.rootSignature,
+  );
+  assert.equal(
+    bytesToHex(createDeviceAuthorizationHashPreimageV2(authorization.payload)),
+    deviceAuthorizationVector.authorizationIdHashPreimageHex,
+  );
+  const authorizationId = await deriveDeviceAuthorizationIdV2(authorization.payload);
+  assert.equal(authorizationId, deviceAuthorizationVector.authorizationId);
+  assert.equal(
+    await signProtocolPayload(authorization.payload, identityKeyA.privateKey),
+    authorization.rootSignature,
+  );
+  assert.equal(
+    await verifyProtocolPayload(
+      authorization.payload,
+      authorization.rootSignature,
+      identityKeyA.publicKey,
+    ),
+    true,
+  );
+  assert.equal(
+    await verifyProtocolPayload(
+      authorization.payload,
+      tamperBase64Url(authorization.rootSignature),
+      identityKeyA.publicKey,
+    ),
+    false,
+  );
+  const authorizationPayloadTampered = {
+    ...authorization.payload,
+    expiresAt: authorization.payload.expiresAt + 1,
+  };
+  assert.notEqual(
+    await deriveDeviceAuthorizationIdV2(authorizationPayloadTampered),
+    authorizationId,
+  );
+  assert.equal(
+    await verifyProtocolPayload(
+      authorizationPayloadTampered,
+      authorization.rootSignature,
+      identityKeyA.publicKey,
+    ),
+    false,
+  );
+  assert.notEqual(
+    await deriveDeviceIdV2(
+      deviceIdInputV2Schema.parse({
+        ...deviceIdInput,
+        signingKey: {
+          ...deviceIdInput.signingKey,
+          publicKey: serviceKey.publicKeyBase64Url,
+        },
+      }),
+    ),
+    deviceId,
+  );
+
+  const activationVector = await loadVector(
+    directory,
+    'device-activation-v2.json',
+    'nexus.test-vectors.v2',
+  );
+  const activation = deviceActivationRequestV2Schema.parse(activationVector.request);
+  assert.deepEqual(activation.authorization, authorization);
+  assertExpectedSignedFields(activationVector, activation.payload, activation.deviceSignature);
+  assert.equal(
+    bytesToHex(createDeviceOperationHashPreimageV2(activation.payload)),
+    activationVector.operationIdHashPreimageHex,
+  );
+  const operationId = await deriveDeviceOperationIdV2(activation.payload);
+  assert.equal(operationId, activationVector.operationId);
+  assert.equal(
+    await signProtocolPayload(activation.payload, identityKeyB.privateKey),
+    activation.deviceSignature,
+  );
+  assert.equal(
+    await verifyProtocolPayload(
+      activation.payload,
+      activation.deviceSignature,
+      identityKeyB.publicKey,
+    ),
+    true,
+  );
+  assert.equal(
+    await verifyProtocolPayload(
+      activation.payload,
+      tamperBase64Url(activation.deviceSignature),
+      identityKeyB.publicKey,
+    ),
+    false,
+  );
+  assert.notEqual(
+    await deriveDeviceOperationIdV2({
+      ...activation.payload,
+      requestId: authorization.payload.authorizationNonce,
+    }),
+    operationId,
+  );
+
+  const ownershipV2Vector = await loadVector(
+    directory,
+    'ownership-proof-v2.json',
+    'nexus.test-vectors.v2',
+  );
+  const proofV2 = ownershipProofV2Schema.parse(ownershipV2Vector.proof);
+  assert.deepEqual(proofV2.payload.genesis, genesis);
+  assert.deepEqual(proofV2.payload.authorization, authorization);
+  assertExpectedSignedFields(ownershipV2Vector, proofV2.payload, proofV2.deviceSignature);
+  assert.equal(
+    await signProtocolPayload(proofV2.payload, identityKeyB.privateKey),
+    proofV2.deviceSignature,
+  );
+  assert.equal(
+    await verifyProtocolPayload(proofV2.payload, proofV2.deviceSignature, identityKeyB.publicKey),
+    true,
+  );
+  const ownershipV2Expectation = {
+    audience: proofV2.payload.aud,
+    action: proofV2.payload.act,
+    resource: proofV2.payload.resource,
+    nonce: proofV2.payload.nonce,
+    contextHash: proofV2.payload.contextHash ?? null,
+    now: proofV2.payload.iat,
+    maxClockSkewSeconds: 0,
+  };
+  const verifiedDevice = await verifyOwnershipProofV2(proofV2, ownershipV2Expectation);
+  assert.equal(verifiedDevice.subject, subject);
+  assert.equal(verifiedDevice.deviceId, deviceId);
+  assert.equal(verifiedDevice.authorizationId, authorizationId);
+  await assert.rejects(
+    verifyOwnershipProofV2(
+      { ...proofV2, deviceSignature: tamperBase64Url(proofV2.deviceSignature) },
+      ownershipV2Expectation,
+    ),
+  );
+
+  const deviceEventVector = await loadVector(
+    directory,
+    'device-registry-event-v2.json',
+    'nexus.test-vectors.v2',
+  );
+  const deviceEventWithoutId = deviceRegistryEventWithoutEventIdV2Schema.parse(
+    deviceEventVector.eventWithoutEventId,
+  );
+  const deviceEvent = deviceRegistryEventV2Schema.parse(deviceEventVector.event);
+  const eventOperationPayload = deviceActivationPayloadV2Schema.parse(
+    deviceEventVector.operationPayload,
+  );
+  assert.deepEqual(eventOperationPayload, activation.payload);
+  assert.equal(
+    bytesToHex(createDeviceOperationHashPreimageV2(eventOperationPayload)),
+    deviceEventVector.operationIdHashPreimageHex,
+  );
+  assert.equal(canonicalize(deviceEventWithoutId), deviceEventVector.canonicalEventJcs);
+  assert.equal(
+    bytesToHex(createDeviceRegistryEventHashPreimageV2(deviceEventWithoutId)),
+    deviceEventVector.eventHashPreimageHex,
+  );
+  const derivedDeviceEvent = await deriveDeviceRegistryEventIdV2(deviceEventWithoutId);
+  assert.equal(bytesToHex(derivedDeviceEvent.eventHash), deviceEventVector.eventHashHex);
+  assert.equal(encodeBase64Url(derivedDeviceEvent.eventHash), deviceEventVector.eventHashBase64Url);
+  assert.equal(derivedDeviceEvent.eventId, deviceEventVector.eventId);
+  assert.equal(deviceEvent.eventId, derivedDeviceEvent.eventId);
+  assert.equal(deviceEvent.operationId, operationId);
+  assert.notEqual(
+    (
+      await deriveDeviceRegistryEventIdV2({
+        ...deviceEventWithoutId,
+        acceptedAt: deviceEventWithoutId.acceptedAt + 1,
+      })
+    ).eventId,
+    deviceEvent.eventId,
+  );
+
+  const deviceReceiptVector = await loadVector(
+    directory,
+    'device-registry-receipt-v2.json',
+    'nexus.test-vectors.v2',
+  );
+  const deviceReceipt = deviceRegistryReceiptV2Schema.parse(deviceReceiptVector.receipt);
+  const deviceReceiptKeyset = serviceKeySetSchema.parse(deviceReceiptVector.keyset);
+  assertExpectedSignedFields(deviceReceiptVector, deviceReceipt.payload, deviceReceipt.signature);
+  assert.equal(
+    await signProtocolPayload(deviceReceipt.payload, serviceKey.privateKey),
+    deviceReceipt.signature,
+  );
+  assert.equal(deviceReceipt.payload.eventId, deviceEvent.eventId);
+  assert.equal(deviceReceipt.payload.operationId, deviceEvent.operationId);
+  assert.ok(deviceReceipt.payload.authorizationId);
+  assert.ok(deviceReceipt.payload.authorizationExpiresAt);
+  const receiptAuthorizationId = deviceReceipt.payload.authorizationId;
+  const receiptAuthorizationExpiresAt = deviceReceipt.payload.authorizationExpiresAt;
+  await verifyDeviceRegistryReceipt(deviceReceipt, deviceReceiptKeyset, {
+    eventId: deviceReceipt.payload.eventId,
+    operationId: deviceReceipt.payload.operationId,
+    subject: deviceReceipt.payload.subject,
+    genesisHash: deviceReceipt.payload.genesisHash,
+    eventType: deviceReceipt.payload.eventType,
+    identityState: deviceReceipt.payload.identityState,
+    identitySequence: deviceReceipt.payload.identitySequence,
+    deviceLedgerSequence: deviceReceipt.payload.deviceLedgerSequence,
+    deviceId: deviceReceipt.payload.deviceId,
+    authorizationId: receiptAuthorizationId,
+    deviceState: deviceReceipt.payload.deviceState,
+    authorizationExpiresAt: receiptAuthorizationExpiresAt,
+    acceptedAt: deviceReceipt.payload.acceptedAt,
+  });
+  await assert.rejects(
+    verifyDeviceRegistryReceipt(
+      { ...deviceReceipt, signature: tamperBase64Url(deviceReceipt.signature) },
+      deviceReceiptKeyset,
+    ),
+  );
+
+  const deviceStatusVector = await loadVector(
+    directory,
+    'device-status-statement-v2.json',
+    'nexus.test-vectors.v2',
+  );
+  const deviceStatus = deviceStatusStatementV2Schema.parse(deviceStatusVector.statement);
+  const deviceStatusKeyset = serviceKeySetSchema.parse(deviceStatusVector.keyset);
+  assertExpectedSignedFields(deviceStatusVector, deviceStatus.payload, deviceStatus.signature);
+  assert.equal(
+    await signProtocolPayload(deviceStatus.payload, serviceKey.privateKey),
+    deviceStatus.signature,
+  );
+  assert.equal(deviceStatus.payload.deviceId, deviceReceipt.payload.deviceId);
+  assert.equal(deviceStatus.payload.authorizationId, deviceReceipt.payload.authorizationId);
+  assert.ok(deviceStatus.payload.authorizationExpiresAt);
+  const statusAuthorizationExpiresAt = deviceStatus.payload.authorizationExpiresAt;
+  await verifyDeviceStatusStatement(
+    deviceStatus,
+    deviceStatusKeyset,
+    integer(deviceStatusVector.verificationTime, 'device status verificationTime'),
+    {
+      subject: deviceStatus.payload.subject,
+      genesisHash: deviceStatus.payload.genesisHash,
+      deviceId: deviceStatus.payload.deviceId,
+      authorizationId: deviceStatus.payload.authorizationId,
+      identityState: deviceStatus.payload.identityState,
+      identitySequence: deviceStatus.payload.identitySequence,
+      deviceLedgerSequence: deviceStatus.payload.deviceLedgerSequence,
+      deviceState: deviceStatus.payload.deviceState,
+      authorizationExpiresAt: statusAuthorizationExpiresAt,
+      maxClockSkewSeconds: 0,
+    },
+  );
+  await assert.rejects(
+    verifyDeviceStatusStatement(
+      { ...deviceStatus, signature: tamperBase64Url(deviceStatus.signature) },
+      deviceStatusKeyset,
+      deviceStatus.payload.iat,
+    ),
+  );
 
   const ownership = await loadVector(directory, 'ownership-proof.json');
   const proof = ownershipProofV1Schema.parse(ownership.proof);
@@ -496,6 +805,12 @@ export async function verifyTestVectorDirectory(
     'status-statement',
     'signing-key-revoke',
     'continuity-link',
+    'device-activation-v2',
+    'device-authorization-v2',
+    'device-registry-event-v2',
+    'device-registry-receipt-v2',
+    'device-status-statement-v2',
+    'ownership-proof-v2',
     'transparency',
   ];
 }

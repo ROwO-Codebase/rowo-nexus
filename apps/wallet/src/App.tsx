@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { LocalIdentitySummary } from '@nexus/wallet-core';
+import type {
+  DeviceTransferEnvelopeV2,
+  IssueDeviceTransferOptions,
+  IssuedDeviceTransferV2,
+  LocalIdentitySummary,
+} from '@nexus/wallet-core';
 import {
   AlertTriangle,
   Fingerprint,
@@ -9,10 +14,16 @@ import {
   Plus,
   ShieldCheck,
   Sparkles,
+  Upload,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 
 import { IdentityCard } from './components/IdentityCard';
+import {
+  InstallDeviceModal,
+  IssueDeviceModal,
+  RevokeDeviceModal,
+} from './components/DeviceManagement';
 import { IdentityDetail } from './components/IdentityDetail';
 import { ProofConsentScreen } from './components/ProofConsentScreen';
 import { WalletLayout } from './components/WalletLayout';
@@ -24,11 +35,14 @@ import {
 } from './components/flows';
 import {
   announceWalletReady,
+  announceWalletReadyV2,
   parseProofRequestMessage,
   postProofError,
   postProofResult,
   type PendingProofRequest,
+  type NexusOwnershipProofProtocol,
 } from './lib/popup-protocol';
+import { installAndActivateDevice, type DeviceInstallResult } from './lib/device-management';
 import {
   walletAdapter,
   type CreateIdentityInput,
@@ -37,6 +51,14 @@ import {
 
 type Flow =
   | { type: 'create' }
+  | { type: 'install-device' }
+  | { type: 'issue-device'; identity: LocalIdentitySummary }
+  | { type: 'self-revoke-device'; identity: LocalIdentitySummary }
+  | {
+      type: 'root-revoke-device';
+      identity: LocalIdentitySummary;
+      device: LocalIdentitySummary['issuedDevices'][number];
+    }
   | { type: 'dispose'; identity: LocalIdentitySummary }
   | { type: 'rotate'; identity: LocalIdentitySummary }
   | { type: 'continuity'; identity: LocalIdentitySummary };
@@ -56,6 +78,7 @@ function App() {
   const [pending, setPending] = useState<PendingProofRequest>();
   const [retryingRegistrationId, setRetryingRegistrationId] = useState<string>();
   const [clearingHistoryId, setClearingHistoryId] = useState<string>();
+  const [deviceActionId, setDeviceActionId] = useState<string>();
   const pendingRef = useRef<PendingProofRequest | undefined>(undefined);
 
   const refresh = useCallback(async () => {
@@ -88,6 +111,7 @@ function App() {
     };
     window.addEventListener('message', onMessage);
     announceWalletReady(opener);
+    announceWalletReadyV2(opener);
     return () => window.removeEventListener('message', onMessage);
   }, []);
 
@@ -171,15 +195,95 @@ function App() {
     }
   };
 
-  const approveProof = async (localId: string, rememberScope: boolean) => {
+  const issueDevice = async (
+    identity: LocalIdentitySummary,
+    options: IssueDeviceTransferOptions,
+  ): Promise<IssuedDeviceTransferV2> => {
+    const issued = await walletAdapter.issueDeviceTransfer(identity.localId, options);
+    await refresh();
+    return issued;
+  };
+
+  const installDevice = async (
+    bundle: DeviceTransferEnvelopeV2,
+    transferKey: Uint8Array,
+  ): Promise<DeviceInstallResult> => {
+    const result = await installAndActivateDevice(walletAdapter, bundle, transferKey);
+    await refresh();
+    setSelectedId(result.imported.localId);
+    setFlow(undefined);
+    setNotice(
+      result.state === 'active'
+        ? { kind: 'success', message: 'Device installed and activated for this identity.' }
+        : {
+            kind: 'error',
+            message: `Device installed safely, but activation is still pending. Open it and retry. ${result.activationError}`,
+          },
+    );
+    return result;
+  };
+
+  const activateDevice = async (identity: LocalIdentitySummary) => {
+    if (deviceActionId !== undefined) return;
+    setDeviceActionId(identity.localId);
+    try {
+      await walletAdapter.activateDevice(identity.localId);
+      await refresh();
+      setNotice({ kind: 'success', message: 'Device activation confirmed by the registry.' });
+    } catch (error) {
+      setNotice({
+        kind: 'error',
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Activation failed. The installed device key was retained for retry.',
+      });
+    } finally {
+      setDeviceActionId(undefined);
+    }
+  };
+
+  const selfRevokeDevice = async (identity: LocalIdentitySummary) => {
+    setDeviceActionId(identity.localId);
+    try {
+      await walletAdapter.revokeDeviceSelf(identity.localId);
+      await refresh();
+      setFlow(undefined);
+      setNotice({ kind: 'success', message: 'This device was removed from the identity.' });
+    } finally {
+      setDeviceActionId(undefined);
+    }
+  };
+
+  const rootRevokeDevice = async (
+    identity: LocalIdentitySummary,
+    device: LocalIdentitySummary['issuedDevices'][number],
+  ) => {
+    setDeviceActionId(device.deviceId);
+    try {
+      await walletAdapter.revokeDeviceRoot(identity.localId, device.deviceId);
+      await refresh();
+      setFlow(undefined);
+      setNotice({ kind: 'success', message: 'The root identity removed that device.' });
+    } finally {
+      setDeviceActionId(undefined);
+    }
+  };
+
+  const approveProof = async (
+    localId: string,
+    rememberScope: boolean,
+    proofProtocol: NexusOwnershipProofProtocol,
+  ) => {
     if (pending === undefined) return;
-    const proof = await walletAdapter.prove(
+    const proof = await walletAdapter.proveForProtocol(
       localId,
       pending.boundary,
       pending.request,
       rememberScope,
+      proofProtocol,
     );
-    postProofResult(pending, proof);
+    postProofResult(pending, { proofProtocol, proof } as Parameters<typeof postProofResult>[1]);
     window.close();
     pendingRef.current = undefined;
     setPending(undefined);
@@ -259,13 +363,22 @@ function App() {
               dispose of any identity permanently.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => setFlow({ type: 'create' })}
-            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-bold text-indigo-600 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-indigo-50"
-          >
-            <Plus className="h-4 w-4" aria-hidden="true" /> New identity
-          </button>
+          <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
+            <button
+              type="button"
+              onClick={() => setFlow({ type: 'install-device' })}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/30 bg-white/10 px-5 py-3 text-sm font-bold text-white transition-all hover:-translate-y-0.5 hover:bg-white/20"
+            >
+              <Upload className="h-4 w-4" aria-hidden="true" /> Install device
+            </button>
+            <button
+              type="button"
+              onClick={() => setFlow({ type: 'create' })}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-bold text-indigo-600 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-indigo-50"
+            >
+              <Plus className="h-4 w-4" aria-hidden="true" /> New identity
+            </button>
+          </div>
         </div>
       </motion.section>
 
@@ -372,6 +485,15 @@ function App() {
               onRetryRegistration={() => void retryRegistration(selectedIdentity)}
               clearingHistory={clearingHistoryId === selectedIdentity.localId}
               onClearHistory={() => clearAuthorizationHistory(selectedIdentity)}
+              onAddDevice={() => setFlow({ type: 'issue-device', identity: selectedIdentity })}
+              onActivateDevice={() => activateDevice(selectedIdentity)}
+              onSelfRevokeDevice={() =>
+                setFlow({ type: 'self-revoke-device', identity: selectedIdentity })
+              }
+              onRootRevokeDevice={(device) =>
+                setFlow({ type: 'root-revoke-device', identity: selectedIdentity, device })
+              }
+              deviceActionBusy={deviceActionId !== undefined}
             />
           </div>
         )}
@@ -398,6 +520,32 @@ function App() {
       <AnimatePresence>
         {flow?.type === 'create' && (
           <CreateIdentityModal onClose={() => setFlow(undefined)} onCreate={createIdentity} />
+        )}
+        {flow?.type === 'install-device' && (
+          <InstallDeviceModal onClose={() => setFlow(undefined)} onInstall={installDevice} />
+        )}
+        {flow?.type === 'issue-device' && (
+          <IssueDeviceModal
+            identity={flow.identity}
+            onClose={() => setFlow(undefined)}
+            onIssue={(options) => issueDevice(flow.identity, options)}
+          />
+        )}
+        {flow?.type === 'self-revoke-device' && (
+          <RevokeDeviceModal
+            role="device"
+            {...(flow.identity.label === undefined ? {} : { deviceLabel: flow.identity.label })}
+            onClose={() => setFlow(undefined)}
+            onRevoke={() => selfRevokeDevice(flow.identity)}
+          />
+        )}
+        {flow?.type === 'root-revoke-device' && (
+          <RevokeDeviceModal
+            role="root"
+            {...(flow.device.label === undefined ? {} : { deviceLabel: flow.device.label })}
+            onClose={() => setFlow(undefined)}
+            onRevoke={() => rootRevokeDevice(flow.identity, flow.device)}
+          />
         )}
         {flow?.type === 'dispose' && (
           <DisposeIdentityModal

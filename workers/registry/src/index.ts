@@ -4,6 +4,9 @@ import { fail } from './errors';
 export { IdentityState } from './identity-state-do';
 import type {
   AuthoritativeStatus,
+  AuthoritativeDeviceStatusV2,
+  DeviceRegistryMutationV2,
+  DeviceStatusCommand,
   RegisterCommand,
   RegistryEnv,
   RegistryMutation,
@@ -11,7 +14,16 @@ import type {
   RevokeBySecretCommand,
   RevokeBySignatureCommand,
 } from './types';
+import type {
+  DeviceActivationRequestV2,
+  DeviceRootRevokeRequestV2,
+  DeviceSelfRevokeRequestV2,
+} from '@nexus/protocol';
 import {
+  parseDeviceActivationCommand,
+  parseDeviceRootRevokeCommand,
+  parseDeviceSelfRevokeCommand,
+  parseDeviceStatusCommand,
   parseSecretCommand,
   parseSignatureCommand,
   parseStatusSubject,
@@ -93,10 +105,80 @@ export default class RegistryService extends WorkerEntrypoint<RegistryEnv> {
       return fail('INTERNAL_ERROR');
     }
   }
+
+  async activateDevice(
+    input: DeviceActivationRequestV2,
+  ): Promise<RegistryResult<DeviceRegistryMutationV2>> {
+    const parsed = parseDeviceActivationCommand(input);
+    if (!parsed.ok) return parsed;
+    try {
+      return await this.env.IDENTITY_STATE.getByName(parsed.value.payload.subject).activateDevice(
+        parsed.value,
+      );
+    } catch {
+      return fail('INTERNAL_ERROR');
+    }
+  }
+
+  async deviceStatus(
+    input: DeviceStatusCommand,
+  ): Promise<RegistryResult<AuthoritativeDeviceStatusV2>> {
+    const parsed = parseDeviceStatusCommand(input);
+    if (!parsed.ok) return parsed;
+    try {
+      return await this.env.IDENTITY_STATE.getByName(parsed.value.subject).deviceStatus({
+        deviceId: parsed.value.deviceId,
+        authorizationId: parsed.value.authorizationId,
+      });
+    } catch {
+      return fail('INTERNAL_ERROR');
+    }
+  }
+
+  async deviceStatusBatch(
+    inputs: DeviceStatusCommand[],
+  ): Promise<Array<RegistryResult<AuthoritativeDeviceStatusV2>>> {
+    if (!Array.isArray(inputs) || inputs.length > MAX_STATUS_BATCH) {
+      const size = Array.isArray(inputs) ? inputs.length : 1;
+      return Array.from({ length: size }, () => fail('BAD_REQUEST'));
+    }
+    return await Promise.all(inputs.map(async (input) => await this.deviceStatus(input)));
+  }
+
+  async revokeDeviceSelf(
+    input: DeviceSelfRevokeRequestV2,
+  ): Promise<RegistryResult<DeviceRegistryMutationV2>> {
+    const parsed = parseDeviceSelfRevokeCommand(input);
+    if (!parsed.ok) return parsed;
+    try {
+      return await this.env.IDENTITY_STATE.getByName(parsed.value.payload.subject).revokeDeviceSelf(
+        parsed.value,
+      );
+    } catch {
+      return fail('INTERNAL_ERROR');
+    }
+  }
+
+  async revokeDeviceRoot(
+    input: DeviceRootRevokeRequestV2,
+  ): Promise<RegistryResult<DeviceRegistryMutationV2>> {
+    const parsed = parseDeviceRootRevokeCommand(input);
+    if (!parsed.ok) return parsed;
+    try {
+      return await this.env.IDENTITY_STATE.getByName(parsed.value.payload.subject).revokeDeviceRoot(
+        parsed.value,
+      );
+    } catch {
+      return fail('INTERNAL_ERROR');
+    }
+  }
 }
 
 export type {
   AuthoritativeStatus,
+  AuthoritativeDeviceStatusV2,
+  DeviceRegistryMutationV2,
+  DeviceStatusCommand,
   RegisterCommand,
   RegistryErrorCode,
   RegistryFault,

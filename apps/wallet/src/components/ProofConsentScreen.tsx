@@ -15,25 +15,54 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 
-import type { PendingProofRequest } from '../lib/popup-protocol';
+import {
+  selectProofProtocol,
+  type NexusOwnershipProofProtocol,
+  type PendingProofRequest,
+} from '../lib/popup-protocol';
+import { canCreateProof } from '../lib/identity-capabilities';
 import { Brand } from './Brand';
 
 interface ProofConsentScreenProps {
   pending: PendingProofRequest;
   identities: LocalIdentitySummary[];
-  onApprove: (localId: string, rememberScope: boolean) => Promise<void>;
+  onApprove: (
+    localId: string,
+    rememberScope: boolean,
+    proofProtocol: NexusOwnershipProofProtocol,
+  ) => Promise<void>;
   onCancel: () => void;
+}
+
+export function identityProofProtocols(
+  identity: LocalIdentitySummary,
+): readonly NexusOwnershipProofProtocol[] {
+  if (identity.device !== undefined) {
+    return identity.device.localState === 'active' ? ['nexus.ownership-proof.v2'] : [];
+  }
+  return ['nexus.ownership-proof.v1'];
 }
 
 export function resolveConsentIdentityId(
   identities: readonly LocalIdentitySummary[],
   selectedId: string,
 ): string {
-  const eligible = identities.filter(
-    (identity) => identity.localState === 'active' && identity.registered,
-  );
+  const eligible = identities.filter(canCreateProof);
   if (eligible.some((identity) => identity.localId === selectedId)) return selectedId;
-  return eligible[0]?.localId ?? '';
+  return (
+    eligible.find(
+      (identity) => identity.device !== undefined && identity.device.localState === 'active',
+    )?.localId ??
+    eligible[0]?.localId ??
+    ''
+  );
+}
+
+export function requiresLegacyRootConfirmation(
+  identity: LocalIdentitySummary | undefined,
+  proofProtocol: NexusOwnershipProofProtocol | undefined,
+): boolean {
+  return identity?.device === undefined && proofProtocol === 'nexus.ownership-proof.v1';
 }
 
 export function ProofConsentScreen({
@@ -43,17 +72,29 @@ export function ProofConsentScreen({
   onCancel,
 }: ProofConsentScreenProps) {
   const eligible = useMemo(
-    () => identities.filter((identity) => identity.localState === 'active' && identity.registered),
-    [identities],
+    () =>
+      identities.filter(
+        (identity) =>
+          canCreateProof(identity) &&
+          selectProofProtocol(pending.acceptedProofProtocols, identityProofProtocols(identity)) !==
+            undefined,
+      ),
+    [identities, pending.acceptedProofProtocols],
   );
-  const [selectedId, setSelectedId] = useState(() => resolveConsentIdentityId(identities, ''));
+  const [selectedId, setSelectedId] = useState(() => resolveConsentIdentityId(eligible, ''));
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
+  const [legacyRootConfirmed, setLegacyRootConfirmed] = useState(false);
   const selected = eligible.find((identity) => identity.localId === selectedId);
+  const selectedProofProtocol =
+    selected === undefined
+      ? undefined
+      : selectProofProtocol(pending.acceptedProofProtocols, identityProofProtocols(selected));
   const crossScope = selected !== undefined && !selected.localScopes.includes(pending.origin);
   const secondsRemaining = Math.max(0, pending.request.expiresAt - now);
   const expired = secondsRemaining === 0;
+  const legacyRootProof = requiresLegacyRootConfirmation(selected, selectedProofProtocol);
 
   useEffect(() => {
     const handle = window.setInterval(() => setNow(Math.floor(Date.now() / 1000)), 250);
@@ -61,15 +102,25 @@ export function ProofConsentScreen({
   }, []);
 
   useEffect(() => {
-    setSelectedId((current) => resolveConsentIdentityId(identities, current));
-  }, [identities]);
+    setSelectedId((current) => resolveConsentIdentityId(eligible, current));
+  }, [eligible]);
+
+  useEffect(() => {
+    setLegacyRootConfirmed(false);
+  }, [selectedId]);
 
   const approve = async () => {
-    if (selected === undefined || expired) return;
+    if (
+      selected === undefined ||
+      selectedProofProtocol === undefined ||
+      expired ||
+      (legacyRootProof && !legacyRootConfirmed)
+    )
+      return;
     setBusy(true);
     setError(undefined);
     try {
-      await onApprove(selected.localId, crossScope);
+      await onApprove(selected.localId, crossScope, selectedProofProtocol);
     } catch (cause) {
       setBusy(false);
       setError(cause instanceof Error ? cause.message : 'The wallet could not create this proof.');
@@ -195,6 +246,9 @@ export function ProofConsentScreen({
                 {eligible.map((identity) => (
                   <option key={identity.localId} value={identity.localId}>
                     {identity.label ?? identity.subject}
+                    {identity.device === undefined
+                      ? ' — root key (legacy v1)'
+                      : ' — device key (v2)'}
                   </option>
                 ))}
               </select>
@@ -229,6 +283,37 @@ export function ProofConsentScreen({
             </div>
           )}
 
+          {legacyRootProof && (
+            <div
+              role="alert"
+              className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-950"
+            >
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-rose-600" />
+                <div>
+                  <div className="font-semibold">Legacy root-key proof</div>
+                  <p className="mt-1 text-xs leading-relaxed">
+                    This signs directly with the identity's root key because this app accepts v1.
+                    Prefer an active device key when possible; root compromise affects the whole
+                    identity.
+                  </p>
+                </div>
+              </div>
+              <label className="mt-3 flex items-start gap-2 rounded-lg border border-rose-200 bg-white/70 p-3">
+                <input
+                  type="checkbox"
+                  checked={legacyRootConfirmed}
+                  onChange={(event) => setLegacyRootConfirmed(event.target.checked)}
+                  disabled={busy}
+                  className="mt-0.5 accent-rose-600"
+                />
+                <span className="text-xs font-semibold leading-relaxed">
+                  Use this root key for this legacy v1 proof.
+                </span>
+              </label>
+            </div>
+          )}
+
           {expired && (
             <div
               role="alert"
@@ -259,7 +344,12 @@ export function ProofConsentScreen({
             <button
               type="button"
               onClick={() => void approve()}
-              disabled={busy || expired || selected === undefined}
+              disabled={
+                busy ||
+                expired ||
+                selectedProofProtocol === undefined ||
+                (legacyRootProof && !legacyRootConfirmed)
+              }
               className="flex flex-[1.4] items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-400"
             >
               {busy ? (

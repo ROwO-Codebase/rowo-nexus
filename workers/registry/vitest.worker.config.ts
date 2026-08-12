@@ -24,6 +24,7 @@ export default defineConfig({
       miniflare: {
         serviceBindings: {
           REGISTRY_EVENTS: 'registry-test-queue',
+          REGISTRY_DEVICE_EVENTS: 'registry-test-queue',
           TEST_QUEUE_CONTROL: 'registry-test-queue',
         },
         workers: [

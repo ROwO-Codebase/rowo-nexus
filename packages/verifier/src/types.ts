@@ -1,8 +1,13 @@
 import type {
+  Base64Url32,
+  DeviceAuthorizationIdV2,
+  DeviceRegistryReceiptPayloadV2,
   GlobalCheckpointShardV1,
+  NexusDeviceIdV2,
   NexusSubject,
   RegistryReceiptPayloadV1,
 } from '@nexus/protocol';
+import type { OWNERSHIP_PROOF_PROTOCOL_V1, OWNERSHIP_PROOF_PROTOCOL_V2 } from '@nexus/protocol';
 
 export const MAX_SIGNED_OBJECT_LIFETIME_SECONDS = 120;
 
@@ -95,4 +100,71 @@ export type AuthoritativeLifecycleState =
 
 export interface LifecycleProvider {
   getAuthoritativeStatus(subject: NexusSubject): Promise<AuthoritativeLifecycleState>;
+}
+
+export interface VerifiedDeviceSubject {
+  protocol: typeof OWNERSHIP_PROOF_PROTOCOL_V2;
+  subject: NexusSubject;
+  rootSigningPublicKey: Uint8Array;
+  deviceId: NexusDeviceIdV2;
+  deviceSigningPublicKey: Uint8Array;
+  authorizationId: DeviceAuthorizationIdV2;
+}
+
+export interface OwnershipProofAnyOptions {
+  acceptedProtocols: readonly (
+    typeof OWNERSHIP_PROOF_PROTOCOL_V1 | typeof OWNERSHIP_PROOF_PROTOCOL_V2
+  )[];
+}
+
+export type AuthoritativeDeviceLifecycleState =
+  | { state: 'not-found' }
+  | {
+      state: 'active' | 'revoked' | 'expired';
+      identityState: 'active' | 'revoked';
+      identitySequence: number;
+      deviceId: NexusDeviceIdV2;
+      authorizationId: DeviceAuthorizationIdV2;
+      deviceLedgerSequence: number;
+      activatedAt?: number;
+      revokedAt?: number;
+      authorizationExpiresAt?: number;
+    };
+
+export interface DeviceLifecycleProvider {
+  getAuthoritativeDeviceStatus(
+    subject: NexusSubject,
+    deviceId: NexusDeviceIdV2,
+    authorizationId: DeviceAuthorizationIdV2,
+  ): Promise<AuthoritativeDeviceLifecycleState>;
+}
+
+export interface DeviceStatusStatementExpectation {
+  subject?: NexusSubject;
+  genesisHash?: Base64Url32;
+  deviceId?: NexusDeviceIdV2;
+  authorizationId?: DeviceAuthorizationIdV2;
+  identityState?: 'active' | 'revoked';
+  identitySequence?: number;
+  deviceLedgerSequence?: number;
+  deviceState?: 'active' | 'revoked' | 'expired' | 'unknown';
+  authorizationExpiresAt?: number;
+  maxClockSkewSeconds?: number;
+}
+
+export interface DeviceRegistryReceiptExpectation {
+  eventId?: DeviceRegistryReceiptPayloadV2['eventId'];
+  operationId?: DeviceRegistryReceiptPayloadV2['operationId'];
+  subject?: NexusSubject;
+  genesisHash?: Base64Url32;
+  eventType?: DeviceRegistryReceiptPayloadV2['eventType'];
+  identityState?: DeviceRegistryReceiptPayloadV2['identityState'];
+  identitySequence?: number;
+  deviceLedgerSequence?: number;
+  deviceId?: NexusDeviceIdV2;
+  authorizationId?: DeviceAuthorizationIdV2;
+  deviceState?: DeviceRegistryReceiptPayloadV2['deviceState'];
+  authorizationExpiresAt?: number;
+  acceptedAt?: number;
+  revokedBy?: DeviceRegistryReceiptPayloadV2['revokedBy'];
 }

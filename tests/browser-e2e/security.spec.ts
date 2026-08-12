@@ -10,7 +10,7 @@ import {
   type Page,
   type Request,
 } from '@playwright/test';
-import type { OwnershipProofV1, ProofRequest } from '@nexus/protocol';
+import type { OwnershipProofV1, OwnershipProofV2, ProofRequest } from '@nexus/protocol';
 
 import {
   REGISTRY_ORIGIN,
@@ -31,6 +31,10 @@ interface LoggedRequest {
 
 interface IssuedChallenge extends ProofRequest {
   challengeId: string;
+  acceptedProofProtocols: readonly [
+    'nexus.ownership-proof.v2' | 'nexus.ownership-proof.v1',
+    ...('nexus.ownership-proof.v2' | 'nexus.ownership-proof.v1')[],
+  ];
 }
 
 interface NoteView {
@@ -52,7 +56,8 @@ interface RawWalletResponse {
     channel: string;
     type: string;
     requestId: string;
-    proof?: OwnershipProofV1;
+    proofProtocol?: 'nexus.ownership-proof.v2' | 'nexus.ownership-proof.v1';
+    proof?: OwnershipProofV1 | OwnershipProofV2;
     error?: { code: string };
   };
 }
@@ -120,10 +125,12 @@ test.describe.serial('Nexus browser security boundary', () => {
     const loginBody = JSON.parse(loginRequest?.body ?? '') as {
       challengeId: string;
       operation: { action: string };
+      proofProtocol: 'nexus.ownership-proof.v1';
       proof: OwnershipProofV1;
     };
     proofForA = loginBody.proof;
     expect(loginBody.operation).toEqual({ action: 'session.start' });
+    expect(loginBody.proofProtocol).toBe('nexus.ownership-proof.v1');
     expect(proofForA.payload.aud).toBe(RP_A_ORIGIN);
     expect(proofForA.payload.act).toBe('session.start');
     expect(proofForA.payload.resource).toBe('urn:rowo:nexus-notes:session');
@@ -169,6 +176,106 @@ test.describe.serial('Nexus browser security boundary', () => {
     await expect(historyPage.getByText(proofForA.payload.nonce, { exact: true })).toHaveCount(0);
     await historyPage.close();
     await page.close();
+  });
+
+  test('installs a root-authorized device and completes a negotiated v2 RP session', async () => {
+    const browser = context.browser();
+    if (browser === null) throw new Error('Expected a browser.');
+    const v2Context = await browser.newContext({ ignoreHTTPSErrors: true, acceptDownloads: true });
+    const v2Requests: LoggedRequest[] = [];
+    v2Context.on('request', (request) => {
+      v2Requests.push({
+        method: request.method(),
+        url: request.url(),
+        body: request.postData(),
+      });
+    });
+
+    try {
+      const wallet = await v2Context.newPage();
+      await wallet.goto(WALLET_ORIGIN);
+      await wallet.getByRole('button', { name: 'Create first identity' }).click();
+      await wallet.getByLabel('Local label (optional)').fill('E2E v2 root');
+      await wallet.getByRole('button', { name: 'Create identity' }).click();
+      await expect(wallet.getByRole('heading', { name: 'E2E v2 root' }).first()).toBeVisible();
+
+      const rp = await v2Context.newPage();
+      await rp.goto(RP_A_ORIGIN);
+      const negotiationChallenge = await issueChallengeIn(v2Context, RP_A_ORIGIN);
+      const v2OnlyRequest = await openRawWalletRequestV2(rp, toProofRequest(negotiationChallenge), [
+        'nexus.ownership-proof.v2',
+      ]);
+      await expect(
+        v2OnlyRequest.popup.getByText(/No active, registered identity is available/u),
+      ).toBeVisible();
+      await waitForRawV2RequestToBeSent(rp);
+      await rp.waitForTimeout(300);
+      expect(await hasRawV2WalletResponse(rp)).toBe(false);
+      await v2OnlyRequest.popup.close();
+
+      await wallet.reload();
+      await expect(wallet.getByRole('heading', { name: 'E2E v2 root' }).first()).toBeVisible();
+      await wallet.getByRole('button', { name: 'View details' }).click();
+      await expect(wallet.getByRole('button', { name: 'Hide details' })).toBeVisible();
+      await wallet.getByRole('button', { name: 'Add device' }).click();
+      await wallet.getByLabel('Device label').fill('E2E delegated device');
+      await wallet.getByRole('checkbox').check();
+      await wallet.getByRole('button', { name: 'Create device transfer' }).click();
+      await expect(wallet.getByText('Device authorized', { exact: true })).toBeVisible();
+      const transferKey = await wallet.getByLabel(/Transfer key/u).inputValue();
+      expect(transferKey).toMatch(/^[A-Za-z0-9_-]{43}$/u);
+      const downloadPromise = wallet.waitForEvent('download');
+      await wallet.getByRole('button', { name: 'Download encrypted transfer file' }).click();
+      const transferDownload = await downloadPromise;
+      const transferPath = await transferDownload.path();
+      if (transferPath === null) throw new Error('The encrypted device transfer was not saved.');
+      await wallet.getByRole('button', { name: 'Done' }).click();
+
+      await wallet.getByRole('button', { name: 'Install device' }).click();
+      await wallet.locator('#device-transfer-file').setInputFiles(transferPath);
+      await wallet.getByLabel('Transfer key', { exact: true }).fill(transferKey);
+      await wallet.getByRole('button', { name: 'Install and activate' }).click();
+      await expect(
+        wallet.getByText('Device installed and activated for this identity.', { exact: true }),
+      ).toBeVisible();
+      await expect(wallet.getByText('Active device', { exact: true })).toBeVisible();
+
+      await rp.reload();
+      const popupPromise = rp.waitForEvent('popup');
+      await rp.getByRole('button', { name: 'Log in', exact: true }).click();
+      const popup = await popupPromise;
+      await expect(popup.getByRole('heading', { name: 'Allow a bound proof?' })).toBeVisible();
+      await expect(popup.getByRole('option', { name: /device key \(v2\)/u })).toHaveJSProperty(
+        'selected',
+        true,
+      );
+      await approveWallet(popup);
+      await expect(rp.getByText('Session active', { exact: true })).toBeVisible();
+
+      const operation = findLastRequest(v2Requests, '/api/operations');
+      expect(operation).toBeDefined();
+      const body = JSON.parse(operation?.body ?? '') as {
+        proofProtocol: string;
+        proof: OwnershipProofV2;
+      };
+      expect(body.proofProtocol).toBe('nexus.ownership-proof.v2');
+      expect(body.proof.payload.protocol).toBe('nexus.ownership-proof.v2');
+      expect(body.proof.payload.deviceId).toMatch(/^nxd2_/u);
+      expect(body.proof.payload.authorizationId).toMatch(/^nxa2_/u);
+
+      const sessionResponse = await v2Context.request.get(`${RP_A_ORIGIN}/api/session`);
+      expect(sessionResponse.status()).toBe(200);
+      const sessionBody = (await sessionResponse.json()) as {
+        session: { proofProtocol?: string; deviceId?: string; authorizationId?: string };
+      };
+      expect(sessionBody.session).toMatchObject({
+        proofProtocol: 'nexus.ownership-proof.v2',
+        deviceId: body.proof.payload.deviceId,
+        authorizationId: body.proof.payload.authorizationId,
+      });
+    } finally {
+      await v2Context.close();
+    }
   });
 
   test('supports private notes, replies, and idempotent likes in the browser', async () => {
@@ -295,6 +402,7 @@ test.describe.serial('Nexus browser security boundary', () => {
       data: {
         challengeId: challenge.challengeId,
         operation: { action: 'session.start' },
+        proofProtocol: 'nexus.ownership-proof.v1',
         proof: proofForA,
       },
     });
@@ -320,7 +428,8 @@ test.describe.serial('Nexus browser security boundary', () => {
       data: {
         challengeId: challenge.challengeId,
         operation: { action: 'session.start' },
-        proof: response.data.proof,
+        proofProtocol: 'nexus.ownership-proof.v1',
+        proof: response.data.proof as OwnershipProofV1,
       },
     });
     expect(accepted.status()).toBe(200);
@@ -436,6 +545,9 @@ test.describe.serial('Nexus browser security boundary', () => {
   });
 
   test('authoritative revocation invalidates the existing session before its next mutation', async () => {
+    await context.request.delete(`${RP_A_ORIGIN}/api/session`, {
+      headers: { 'X-Nexus-Notes-Session': '1' },
+    });
     const page = await context.newPage();
     await page.goto(RP_A_ORIGIN);
     const popupPromise = page.waitForEvent('popup');
@@ -473,16 +585,128 @@ test.describe.serial('Nexus browser security boundary', () => {
 async function approveWallet(popup: Page): Promise<void> {
   const button = popup.getByRole('button', { name: /Approve (new scope|and sign)/u });
   await expect(button).toBeVisible();
+  const legacyRootConfirmation = popup.getByRole('checkbox', {
+    name: 'Use this root key for this legacy v1 proof.',
+  });
+  if (!(await button.isEnabled())) {
+    await expect(legacyRootConfirmation).toBeVisible();
+    await legacyRootConfirmation.check();
+  }
+  await expect(button).toBeEnabled();
   await button.click();
 }
 
 async function issueChallenge(origin: string): Promise<IssuedChallenge> {
-  const response = await context.request.post(`${origin}/api/challenges`, {
+  return issueChallengeIn(context, origin);
+}
+
+async function issueChallengeIn(
+  browserContext: BrowserContext,
+  origin: string,
+): Promise<IssuedChallenge> {
+  const response = await browserContext.request.post(`${origin}/api/challenges`, {
     data: { action: 'session.start' },
   });
   expect(response.status()).toBe(201);
   const value = (await response.json()) as { challenge: IssuedChallenge };
   return value.challenge;
+}
+
+async function openRawWalletRequestV2(
+  page: Page,
+  request: ProofRequest,
+  acceptedProofProtocols: readonly ['nexus.ownership-proof.v2'],
+): Promise<{ popup: Page; requestId: string }> {
+  const requestId = randomBytes(16).toString('base64url');
+  await page.evaluate(
+    ({ requestId: id, proofRequest, protocols, walletOrigin }) => {
+      type E2eV2State = {
+        listener: (event: MessageEvent<unknown>) => void;
+        popup: Window | null;
+        response?: RawWalletResponse;
+        requestSent: boolean;
+      };
+      type E2eV2Window = Window & { __nexusE2eV2?: E2eV2State };
+      const target = window as E2eV2Window;
+      if (target.__nexusE2eV2 !== undefined) {
+        window.removeEventListener('message', target.__nexusE2eV2.listener);
+      }
+      const state = { popup: null, requestSent: false } as E2eV2State;
+      state.listener = (event: MessageEvent<unknown>): void => {
+        if (event.source !== state.popup || event.origin !== walletOrigin) return;
+        const data = event.data as { channel?: string; type?: string; requestId?: string };
+        if (
+          data?.channel === 'nexus.popup.v2' &&
+          data.type === 'NEXUS_READY' &&
+          !state.requestSent
+        ) {
+          state.requestSent = true;
+          state.popup?.postMessage(
+            {
+              channel: 'nexus.popup.v2',
+              type: 'NEXUS_PROOF_REQUEST',
+              requestId: id,
+              request: proofRequest,
+              acceptedProofProtocols: protocols,
+            },
+            walletOrigin,
+          );
+          return;
+        }
+        if (
+          data?.channel === 'nexus.popup.v2' &&
+          data.requestId === id &&
+          (data.type === 'NEXUS_PROOF_RESULT' || data.type === 'NEXUS_PROOF_ERROR')
+        ) {
+          state.response = {
+            origin: event.origin,
+            sourceMatches: event.source === state.popup,
+            data: event.data as RawWalletResponse['data'],
+          };
+          window.removeEventListener('message', state.listener);
+        }
+      };
+      target.__nexusE2eV2 = state;
+      window.addEventListener('message', state.listener);
+
+      const trigger = document.createElement('button');
+      trigger.id = 'nexus-e2e-open-wallet-v2';
+      trigger.type = 'button';
+      trigger.textContent = 'Open E2E wallet v2';
+      trigger.addEventListener(
+        'click',
+        () => {
+          state.popup = window.open(walletOrigin, '_blank', 'popup,width=480,height=720');
+          trigger.remove();
+        },
+        { once: true },
+      );
+      document.body.append(trigger);
+    },
+    {
+      requestId,
+      proofRequest: request,
+      protocols: acceptedProofProtocols,
+      walletOrigin: WALLET_ORIGIN,
+    },
+  );
+  const popupPromise = page.waitForEvent('popup');
+  await page.locator('#nexus-e2e-open-wallet-v2').click();
+  return { popup: await popupPromise, requestId };
+}
+
+async function waitForRawV2RequestToBeSent(page: Page): Promise<void> {
+  await page.waitForFunction(() => {
+    const target = window as Window & { __nexusE2eV2?: { requestSent: boolean } };
+    return target.__nexusE2eV2?.requestSent === true;
+  });
+}
+
+function hasRawV2WalletResponse(page: Page): Promise<boolean> {
+  return page.evaluate(() => {
+    const target = window as Window & { __nexusE2eV2?: { response?: RawWalletResponse } };
+    return target.__nexusE2eV2?.response !== undefined;
+  });
 }
 
 async function listNotes(origin: string): Promise<NoteView[]> {
@@ -597,8 +821,15 @@ function hasRawWalletResponse(page: Page): Promise<boolean> {
 }
 
 function lastRequest(pathname: string): LoggedRequest | undefined {
-  for (let index = networkLog.length - 1; index >= 0; index -= 1) {
-    const request = networkLog[index];
+  return findLastRequest(networkLog, pathname);
+}
+
+function findLastRequest(
+  requests: readonly LoggedRequest[],
+  pathname: string,
+): LoggedRequest | undefined {
+  for (let index = requests.length - 1; index >= 0; index -= 1) {
+    const request = requests[index];
     if (
       request !== undefined &&
       request.method === 'POST' &&

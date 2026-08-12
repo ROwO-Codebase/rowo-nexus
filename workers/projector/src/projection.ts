@@ -1,5 +1,10 @@
 import { IDENTITY_PROTOCOL_V1, NEXUS_SUITE_V1, type RegistryEventV1 } from '@nexus/protocol';
 
+import {
+  assertRegistrationDeviceGenesis,
+  reconcileDeviceEventsForIdentity,
+} from './device-projection';
+
 interface IdentityGenesisRow {
   genesis_hash: string;
 }
@@ -26,6 +31,7 @@ async function assertIdentityGenesis(database: D1Database, event: RegistryEventV
 
 async function applyRegistration(database: D1Database, event: RegistryEventV1): Promise<void> {
   await assertIdentityGenesis(database, event);
+  await assertRegistrationDeviceGenesis(database, event);
 
   await database.batch([
     database
@@ -130,6 +136,10 @@ async function applyRegistration(database: D1Database, event: RegistryEventV1): 
       )
       .bind(event.subject),
   ]);
+
+  // Device events use a separate Queue and may arrive first. Reconcile only
+  // after the matching v1 anchor has been projected.
+  await reconcileDeviceEventsForIdentity(database, event.subject);
 }
 
 async function applyRevocation(database: D1Database, event: RegistryEventV1): Promise<void> {
