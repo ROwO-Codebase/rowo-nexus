@@ -11,7 +11,9 @@ import {
   deviceManagementCapabilities,
   encodeDeviceTransferKey,
   installAndActivateDevice,
+  parseDeviceTransferQr,
   serializeDeviceTransferBundle,
+  serializeDeviceTransferQr,
 } from './device-management';
 
 function identity(overrides: Partial<LocalIdentitySummary> = {}): LocalIdentitySummary {
@@ -36,6 +38,15 @@ const bundle: DeviceTransferEnvelopeV2 = {
   salt: 'salt',
   iv: 'iv',
   ciphertext: 'ciphertext',
+};
+
+const qrBundle: DeviceTransferEnvelopeV2 = {
+  protocol: 'nexus.device-transfer.v2',
+  suite: 'NX-HKDF-SHA256-AES256GCM-v2',
+  bundleId: encodeDeviceTransferKey(new Uint8Array(32).fill(1)),
+  salt: encodeDeviceTransferKey(new Uint8Array(32).fill(2)),
+  iv: 'AwMDAwMDAwMDAwMD',
+  ciphertext: 'BAQEBAQEBAQEBAQEBAQEBA',
 };
 
 const imported = {
@@ -101,6 +112,28 @@ describe('v2 wallet device management', () => {
       'salt',
       'suite',
     ]);
+  });
+
+  it('round-trips a complete offline QR bearer credential', () => {
+    const key = encodeDeviceTransferKey(new Uint8Array(32).fill(5));
+    const payload = serializeDeviceTransferQr(qrBundle, key);
+
+    expect(payload).toContain(key);
+    expect(payload).not.toContain('https://');
+    expect(parseDeviceTransferQr(payload)).toEqual({ bundle: qrBundle, transferKey: key });
+  });
+
+  it('strictly rejects non-Nexus, malformed, and oversized QR payloads', () => {
+    expect(() => parseDeviceTransferQr('https://example.com/device-transfer')).toThrow(
+      'not a Nexus device transfer',
+    );
+    const key = encodeDeviceTransferKey(new Uint8Array(32).fill(5));
+    const payload = serializeDeviceTransferQr(qrBundle, key);
+    expect(() => parseDeviceTransferQr(`${payload}.extra`)).toThrow('malformed');
+    expect(() => parseDeviceTransferQr(`${payload.slice(0, -1)}!`)).toThrow('43-character');
+    expect(() =>
+      serializeDeviceTransferQr({ ...qrBundle, ciphertext: 'A'.repeat(2_100) }, key),
+    ).toThrow('too large for one QR code');
   });
 
   it('retains the installed device for retry when activation fails and wipes key bytes', async () => {
