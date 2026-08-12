@@ -426,6 +426,16 @@ describe('v2 root-authorized devices', () => {
     );
     expect(importedSummary?.hasAgreementKey).toBe(false);
 
+    await wallet.setLabel(imported.localId, 'Travel phone');
+    expect(
+      (await wallet.listIdentitySummaries()).find(
+        (summary) => summary.localId === imported.localId,
+      ),
+    ).toMatchObject({ label: 'Travel phone' });
+    await expect(wallet.setLabel(imported.localId, 'x'.repeat(129))).rejects.toMatchObject({
+      code: 'INVALID_REQUEST',
+    });
+
     const proofRequest = proofRequestSchema.parse({
       action: 'post.edit',
       resource: 'post:01JABC',

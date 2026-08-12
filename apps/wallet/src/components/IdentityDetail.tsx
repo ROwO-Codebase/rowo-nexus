@@ -9,6 +9,7 @@ import {
   KeySquare,
   Link2,
   Loader2,
+  Pencil,
   Plus,
   RefreshCw,
   ShieldCheck,
@@ -36,6 +37,7 @@ interface IdentityDetailProps {
   onRetryRegistration: () => void;
   clearingHistory: boolean;
   onClearHistory: () => Promise<void>;
+  onRename: (nickname?: string) => Promise<void>;
   onAddDevice: () => void;
   onActivateDevice: () => Promise<void>;
   onSelfRevokeDevice: () => void;
@@ -53,6 +55,7 @@ export function IdentityDetail({
   onRetryRegistration,
   clearingHistory,
   onClearHistory,
+  onRename,
   onAddDevice,
   onActivateDevice,
   onSelfRevokeDevice,
@@ -62,6 +65,10 @@ export function IdentityDetail({
   const active = identity.localState === 'active';
   const registeredActions = canUseRegisteredIdentityActions(identity);
   const [confirmClearHistory, setConfirmClearHistory] = useState(false);
+  const [editingNickname, setEditingNickname] = useState(false);
+  const [nickname, setNickname] = useState(identity.label ?? '');
+  const [renaming, setRenaming] = useState(false);
+  const [renameError, setRenameError] = useState<string>();
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1_000));
   const deviceCapabilities = deviceManagementCapabilities(identity, now);
 
@@ -73,6 +80,34 @@ export function IdentityDetail({
     const handle = window.setTimeout(() => setNow(Math.floor(Date.now() / 1_000)), delay);
     return () => window.clearTimeout(handle);
   }, [identity.device, now]);
+
+  useEffect(() => {
+    if (!editingNickname) setNickname(identity.label ?? '');
+  }, [editingNickname, identity.label]);
+
+  const saveNickname = async () => {
+    const normalized = nickname.trim();
+    if (normalized.length > 128) {
+      setRenameError('The nickname cannot exceed 128 characters.');
+      return;
+    }
+    setRenaming(true);
+    setRenameError(undefined);
+    try {
+      await onRename(normalized === '' ? undefined : normalized);
+      setEditingNickname(false);
+    } catch (error) {
+      setRenameError(error instanceof Error ? error.message : 'The nickname could not be saved.');
+    } finally {
+      setRenaming(false);
+    }
+  };
+
+  const cancelNickname = () => {
+    setNickname(identity.label ?? '');
+    setRenameError(undefined);
+    setEditingNickname(false);
+  };
 
   const clearHistory = async () => {
     if (!confirmClearHistory) {
@@ -101,12 +136,71 @@ export function IdentityDetail({
               <p className="text-xs font-semibold uppercase tracking-wider text-indigo-600">
                 Local identity
               </p>
-              <h2
-                id="identity-details-title"
-                className="mt-0.5 truncate text-xl font-bold text-slate-900"
-              >
-                {identity.label ?? 'Untitled identity'}
-              </h2>
+              <div className="mt-0.5 flex items-center gap-2">
+                <h2
+                  id="identity-details-title"
+                  className="truncate text-xl font-bold text-slate-900"
+                >
+                  {identity.label ?? 'Untitled identity'}
+                </h2>
+                {!editingNickname && (
+                  <button
+                    type="button"
+                    onClick={() => setEditingNickname(true)}
+                    className="shrink-0 rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-indigo-50 hover:text-indigo-700"
+                    aria-label="Edit identity nickname"
+                  >
+                    <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                  </button>
+                )}
+              </div>
+              {editingNickname && (
+                <form
+                  className="mt-3"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void saveNickname();
+                  }}
+                >
+                  <label htmlFor="identity-nickname" className="sr-only">
+                    Identity nickname
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    <input
+                      id="identity-nickname"
+                      autoFocus
+                      value={nickname}
+                      onChange={(event) => setNickname(event.target.value)}
+                      maxLength={128}
+                      autoComplete="off"
+                      placeholder="Nickname on this wallet"
+                      disabled={renaming}
+                      className="min-w-48 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-900 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500"
+                    />
+                    <button type="submit" disabled={renaming} className={smallPrimaryButton}>
+                      {renaming && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                      {renaming ? 'Saving…' : 'Save'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={cancelNickname}
+                      disabled={renaming}
+                      className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  <p className="mt-1.5 text-xs leading-relaxed text-slate-400">
+                    Stored only in this wallet. It does not change your identity or appear in
+                    proofs.
+                  </p>
+                  {renameError !== undefined && (
+                    <p role="alert" className="mt-1.5 text-xs font-medium text-rose-700">
+                      {renameError}
+                    </p>
+                  )}
+                </form>
+              )}
             </div>
           </div>
           <button

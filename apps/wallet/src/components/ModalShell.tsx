@@ -24,6 +24,10 @@ export function ModalShell({
   const titleId = useId();
   const descriptionId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  const closeDisabledRef = useRef(closeDisabled);
+  onCloseRef.current = onClose;
+  closeDisabledRef.current = closeDisabled;
 
   useEffect(() => {
     const previousFocus =
@@ -37,9 +41,9 @@ export function ModalShell({
     document.body.style.overflow = 'hidden';
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !closeDisabled) {
+      if (event.key === 'Escape' && !closeDisabledRef.current) {
         event.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (event.key !== 'Tab' || panel === null) return;
@@ -66,7 +70,7 @@ export function ModalShell({
       document.body.style.overflow = previousOverflow;
       previousFocus?.focus();
     };
-  }, [closeDisabled, onClose]);
+  }, []);
 
   return (
     <motion.div

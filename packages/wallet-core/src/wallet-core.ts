@@ -1237,6 +1237,12 @@ export class WalletCore implements WalletCoreApi {
   }
 
   public async setLabel(localId: string, label?: string): Promise<void> {
+    if (label !== undefined && (label.length === 0 || label.length > 128)) {
+      throw new WalletCoreError(
+        'INVALID_REQUEST',
+        'A local identity nickname must contain between 1 and 128 characters.',
+      );
+    }
     await this.#updateRecord(localId, (latest) => {
       if (label !== undefined) return { ...latest, label };
       const withoutLabel = { ...latest };

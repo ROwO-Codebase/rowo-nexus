@@ -146,7 +146,7 @@ export function IssueDeviceModal({ identity, onClose, onIssue }: IssueDeviceModa
           <TransferMethodSelector method={method} onChange={setMethod} disabled={state.busy} />
           <div>
             <label htmlFor="device-label" className="ml-1 block text-sm font-medium text-slate-700">
-              Device label <span className="font-normal text-slate-400">(local only)</span>
+              Device nickname <span className="font-normal text-slate-400">(local only)</span>
             </label>
             <input
               id="device-label"
