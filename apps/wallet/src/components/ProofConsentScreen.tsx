@@ -246,9 +246,7 @@ export function ProofConsentScreen({
                 {eligible.map((identity) => (
                   <option key={identity.localId} value={identity.localId}>
                     {identity.label ?? identity.subject}
-                    {identity.device === undefined
-                      ? ' — root key (legacy v1)'
-                      : ' — device key (v2)'}
+                    {identity.device === undefined ? ' — root key' : ' — device key'}
                   </option>
                 ))}
               </select>
@@ -291,11 +289,10 @@ export function ProofConsentScreen({
               <div className="flex items-start gap-3">
                 <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-rose-600" />
                 <div>
-                  <div className="font-semibold">Legacy root-key proof</div>
+                  <div className="font-semibold">Root-key proof</div>
                   <p className="mt-1 text-xs leading-relaxed">
-                    This signs directly with the identity's root key because this app accepts v1.
-                    Prefer an active device key when possible; root compromise affects the whole
-                    identity.
+                    This signs directly with the identity's root key. Prefer an active device key
+                    when possible; root compromise affects the whole identity.
                   </p>
                 </div>
               </div>
@@ -308,7 +305,7 @@ export function ProofConsentScreen({
                   className="mt-0.5 accent-rose-600"
                 />
                 <span className="text-xs font-semibold leading-relaxed">
-                  Use this root key for this legacy v1 proof.
+                  Use this root key for this proof.
                 </span>
               </label>
             </div>

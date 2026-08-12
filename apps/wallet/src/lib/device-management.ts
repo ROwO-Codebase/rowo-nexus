@@ -15,6 +15,15 @@ export interface DeviceManagementCapabilities {
   rootRevokeDevice: boolean;
 }
 
+/** Returns every logical device whose registry status belongs to this local identity view. */
+export function deviceStatusRefreshTargets(
+  identity: LocalIdentitySummary,
+): LocalIdentitySummary['issuedDevices'][number]['deviceId'][] {
+  return identity.device === undefined
+    ? identity.issuedDevices.map((device) => device.deviceId)
+    : [identity.device.deviceId];
+}
+
 export function deviceManagementCapabilities(
   identity: LocalIdentitySummary,
   now = Math.floor(Date.now() / 1_000),

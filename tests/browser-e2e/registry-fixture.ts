@@ -162,7 +162,11 @@ class TestRegistry {
         return;
       }
       if (url.pathname === '/v2/device/status') {
-        await this.#deviceStatus(await readJson(request), response);
+        await this.#deviceStatus(
+          await readJson(request),
+          response,
+          request.headers.origin === WALLET_ORIGIN,
+        );
         return;
       }
       sendError(response, 404, 'NOT_FOUND');
@@ -381,7 +385,11 @@ class TestRegistry {
     sendJson(response, 201, { receipt });
   }
 
-  async #deviceStatus(value: unknown, response: ServerResponse): Promise<void> {
+  async #deviceStatus(
+    value: unknown,
+    response: ServerResponse,
+    exerciseWalletClockSkew: boolean,
+  ): Promise<void> {
     const request = deviceStatusRequestV2Schema.parse(value);
     const identity = this.#identities.get(request.subject);
     const device = identity?.devices.get(request.deviceId);
@@ -393,7 +401,8 @@ class TestRegistry {
       sendError(response, 404, 'DEVICE_NOT_FOUND');
       return;
     }
-    const issuedAt = nowSeconds();
+    // Exercise the wallet's bounded clock-skew handling without changing the RP fixture's clock.
+    const issuedAt = nowSeconds() + (exerciseWalletClockSkew ? 5 : 0);
     const identityRevoked = identity.revokedAt !== undefined;
     const expired = issuedAt >= device.authorizationExpiresAt;
     const deviceState = identityRevoked ? 'revoked' : expired ? 'expired' : 'active';

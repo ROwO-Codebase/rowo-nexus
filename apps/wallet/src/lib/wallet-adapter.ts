@@ -44,6 +44,7 @@ import type { NexusOwnershipProofProtocol } from './popup-protocol';
 
 const API_MEDIA_TYPE = 'application/nexus+json';
 const DATABASE_NAME = 'rowo-nexus-wallet-v1';
+const DEVICE_STATUS_MAX_CLOCK_SKEW_SECONDS = 60;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -196,7 +197,7 @@ const walletCore = new WalletCore({
       parsed.statusStatement,
       await loadServiceKeyset(),
       Math.floor(Date.now() / 1_000),
-      expected,
+      { ...expected, maxClockSkewSeconds: DEVICE_STATUS_MAX_CLOCK_SKEW_SECONDS },
     );
     return parsed;
   },
