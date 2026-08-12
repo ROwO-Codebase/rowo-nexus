@@ -272,6 +272,32 @@ describe('identity lifecycle', () => {
     expect(retained?.revocationSecretRef).toBeUndefined();
   });
 
+  it('removes a revoked identity and any remaining private material from the local wallet', async () => {
+    const { wallet, identityStore, keyVault } = createHarness();
+    const identity = await wallet.createIdentity({ withAgreementKey: true });
+    const before = await identityStore.get(identity.localId);
+    if (
+      before?.signingPrivateKeyRef === undefined ||
+      before.agreementPrivateKeyRef === undefined ||
+      before.revocationSecretRef === undefined
+    ) {
+      throw new Error('test identity is missing active private references');
+    }
+
+    await expect(wallet.removeLocalIdentity(identity.localId)).rejects.toMatchObject({
+      code: 'INVALID_REQUEST',
+    });
+    await wallet.revoke(identity.localId);
+    expect(await keyVault.hasKey(before.signingPrivateKeyRef)).toBe(true);
+
+    await wallet.removeLocalIdentity(identity.localId);
+
+    expect(await identityStore.get(identity.localId)).toBeUndefined();
+    expect(await keyVault.hasKey(before.signingPrivateKeyRef)).toBe(false);
+    expect(await keyVault.hasKey(before.agreementPrivateKeyRef)).toBe(false);
+    expect(await keyVault.hasSecret(before.revocationSecretRef)).toBe(false);
+  });
+
   it.each(['signature', 'secret'] as const)(
     'recovers %s disposal after the registry commits but its response is dropped',
     async (method) => {

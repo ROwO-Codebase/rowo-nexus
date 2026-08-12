@@ -31,6 +31,7 @@ import {
   ContinuityLinkModal,
   CreateIdentityModal,
   DisposeIdentityModal,
+  RemoveLocalIdentityModal,
   RotateIdentityModal,
 } from './components/flows';
 import {
@@ -64,6 +65,7 @@ type Flow =
       device: LocalIdentitySummary['issuedDevices'][number];
     }
   | { type: 'dispose'; identity: LocalIdentitySummary }
+  | { type: 'remove-local'; identity: LocalIdentitySummary }
   | { type: 'rotate'; identity: LocalIdentitySummary }
   | { type: 'continuity'; identity: LocalIdentitySummary };
 
@@ -167,6 +169,14 @@ function App() {
       kind: 'success',
       message: 'Identity revoked. It is cryptographically disabled for future control.',
     });
+  };
+
+  const removeLocalIdentity = async (identity: LocalIdentitySummary) => {
+    await walletAdapter.removeLocalIdentity(identity.localId);
+    setSelectedId(undefined);
+    await refresh();
+    setFlow(undefined);
+    setNotice({ kind: 'success', message: 'Identity removed from this wallet.' });
   };
 
   const rotateIdentity = async (identity: LocalIdentitySummary, input: RotateIdentityInput) => {
@@ -555,6 +565,7 @@ function App() {
               onClose={() => setSelectedId(undefined)}
               onRotate={() => setFlow({ type: 'rotate', identity: selectedIdentity })}
               onDispose={() => setFlow({ type: 'dispose', identity: selectedIdentity })}
+              onRemoveLocal={() => setFlow({ type: 'remove-local', identity: selectedIdentity })}
               onContinuity={() => setFlow({ type: 'continuity', identity: selectedIdentity })}
               retryingRegistration={retryingRegistrationId === selectedIdentity.localId}
               onRetryRegistration={() => void retryRegistration(selectedIdentity)}
@@ -630,6 +641,13 @@ function App() {
             identity={flow.identity}
             onClose={() => setFlow(undefined)}
             onDispose={() => disposeIdentity(flow.identity)}
+          />
+        )}
+        {flow?.type === 'remove-local' && (
+          <RemoveLocalIdentityModal
+            identity={flow.identity}
+            onClose={() => setFlow(undefined)}
+            onRemove={() => removeLocalIdentity(flow.identity)}
           />
         )}
         {flow?.type === 'rotate' && (

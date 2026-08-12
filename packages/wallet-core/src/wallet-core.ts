@@ -538,6 +538,61 @@ export class WalletCore implements WalletCoreApi {
     return structuredClone(terminal.receipt);
   }
 
+  public async removeLocalIdentity(localId: string): Promise<void> {
+    const record = await this.#getRecord(localId);
+    const now = this.#clock.now();
+    validateEpochSeconds(now, 'clock.now()');
+    const device = record.deviceV2;
+    const removable =
+      record.localState === 'revoked' ||
+      (device !== undefined &&
+        (device.localState === 'revoked' ||
+          device.registryState === 'revoked' ||
+          device.registryState === 'expired' ||
+          now >= device.authorization.payload.expiresAt));
+    if (!removable) {
+      throw new WalletCoreError(
+        'INVALID_REQUEST',
+        'Only a revoked or expired identity can be removed from this wallet.',
+      );
+    }
+
+    const keyRefs = new Set<KeyRef>();
+    if (record.signingPrivateKeyRef !== undefined) keyRefs.add(record.signingPrivateKeyRef);
+    if (record.agreementPrivateKeyRef !== undefined) keyRefs.add(record.agreementPrivateKeyRef);
+    if (device?.signingPrivateKeyRef !== undefined) keyRefs.add(device.signingPrivateKeyRef);
+    const deletions = await Promise.allSettled([
+      ...[...keyRefs].map((ref) => this.#keyVault.deleteKey(ref)),
+      ...(record.revocationSecretRef === undefined
+        ? []
+        : [this.#keyVault.deleteSecret(record.revocationSecretRef)]),
+    ]);
+    const deletionFailure = deletions.find(
+      (result): result is PromiseRejectedResult => result.status === 'rejected',
+    );
+    if (deletionFailure !== undefined) {
+      throw new WalletCoreError(
+        'STORAGE_ERROR',
+        'The identity remains in the wallet because some local private material could not be deleted.',
+        { cause: deletionFailure.reason },
+      );
+    }
+
+    await this.#updateRecord(localId, (latest) => {
+      const publicRecord = { ...latest };
+      delete publicRecord.signingPrivateKeyRef;
+      delete publicRecord.agreementPrivateKeyRef;
+      delete publicRecord.revocationSecretRef;
+      if (publicRecord.deviceV2 !== undefined) {
+        const publicDevice = { ...publicRecord.deviceV2 };
+        delete publicDevice.signingPrivateKeyRef;
+        publicRecord.deviceV2 = publicDevice;
+      }
+      return publicRecord;
+    });
+    await this.#identityStore.delete(localId);
+  }
+
   public async rotate(
     oldLocalId: string,
     boundary: TrustedWalletEventBoundary,

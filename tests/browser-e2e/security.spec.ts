@@ -576,6 +576,15 @@ test.describe.serial('Nexus browser security boundary', () => {
     await wallet.locator('#dispose-confirmation').fill(IDENTITY_LABEL);
     await wallet.getByRole('button', { name: 'Dispose forever' }).click();
     await expect(wallet.getByText('Disposed', { exact: true })).toBeVisible();
+    await wallet.getByRole('button', { name: 'Remove from wallet', exact: true }).click();
+    const removalDialog = wallet.getByRole('dialog', { name: 'Remove from this wallet' });
+    await removalDialog
+      .getByRole('checkbox', {
+        name: 'Remove this identity and its remaining local data from this wallet.',
+      })
+      .check();
+    await removalDialog.getByRole('button', { name: 'Remove from wallet', exact: true }).click();
+    await expect(wallet.getByRole('button', { name: 'Create first identity' })).toBeVisible();
     await wallet.close();
 
     const response = await context.request.post(`${RP_A_ORIGIN}/api/session-operations`, {

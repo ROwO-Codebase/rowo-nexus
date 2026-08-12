@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   canCreateProof,
+  canRemoveLocalIdentity,
   canUseRegisteredIdentityActions,
   needsRegistrationRecovery,
 } from './identity-capabilities';
@@ -74,5 +75,18 @@ describe('identity action capabilities', () => {
     };
 
     expect(canCreateProof(expiredDevice)).toBe(false);
+    expect(canRemoveLocalIdentity(expiredDevice, 1_799_999_999)).toBe(false);
+    expect(canRemoveLocalIdentity(expiredDevice, 1_800_000_000)).toBe(true);
+    expect(
+      canRemoveLocalIdentity({
+        ...expiredDevice,
+        device: { ...expiredDevice.device!, registryState: 'revoked' },
+      }),
+    ).toBe(true);
+  });
+
+  it('offers local removal for a revoked root identity but not an active root', () => {
+    expect(canRemoveLocalIdentity(identity('active', true))).toBe(false);
+    expect(canRemoveLocalIdentity(identity('revoked', true))).toBe(true);
   });
 });

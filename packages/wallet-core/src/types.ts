@@ -321,6 +321,8 @@ export interface WalletCoreApi {
   clearAuthorizationHistory(localId: string): Promise<void>;
   revoke(localId: string, options?: RevokeIdentityOptions): Promise<RegistryReceiptV1>;
   dispose(localId: string, options?: DisposeIdentityOptions): Promise<RegistryReceiptV1>;
+  /** Deletes a terminally revoked or expired identity and its remaining material from this wallet. */
+  removeLocalIdentity(localId: string): Promise<void>;
   rotate(
     oldLocalId: string,
     boundary: TrustedWalletEventBoundary,

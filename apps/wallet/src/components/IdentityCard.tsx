@@ -32,13 +32,20 @@ export function IdentityCard({
   const [copied, setCopied] = useState(false);
   const active = identity.localState === 'active';
   const deviceState = identity.device?.localState;
-  const statusLabel =
-    deviceState === 'pending-activation'
-      ? 'Pending activation'
-      : deviceState === 'active'
-        ? 'Active device'
-        : deviceState === 'revoked'
-          ? 'Revoked device'
+  const deviceRevoked = deviceState === 'revoked' || identity.device?.registryState === 'revoked';
+  const deviceExpired =
+    identity.device !== undefined &&
+    (identity.device.registryState === 'expired' ||
+      Math.floor(Date.now() / 1_000) >= identity.device.expiresAt);
+  const terminal = !active || deviceRevoked;
+  const statusLabel = deviceRevoked
+    ? 'Revoked device'
+    : deviceExpired
+      ? 'Expired device'
+      : deviceState === 'pending-activation'
+        ? 'Pending activation'
+        : deviceState === 'active'
+          ? 'Active device'
           : active
             ? identity.registered
               ? 'Active'
@@ -57,7 +64,7 @@ export function IdentityCard({
       layout
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      {...(active ? { whileHover: { y: -2 } } : {})}
+      {...(!terminal ? { whileHover: { y: -2 } } : {})}
       className={`overflow-hidden rounded-2xl border bg-white transition-all ${
         selected
           ? 'border-indigo-300 ring-2 ring-indigo-100'
@@ -68,10 +75,10 @@ export function IdentityCard({
         <div className="flex items-start gap-3">
           <div
             className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${
-              active ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'
+              !terminal ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'
             }`}
           >
-            {active ? (
+            {!terminal ? (
               <KeyRound className="h-5 w-5" aria-hidden="true" />
             ) : (
               <Unplug className="h-5 w-5" aria-hidden="true" />
@@ -84,7 +91,7 @@ export function IdentityCard({
               </h2>
               <span
                 className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${
-                  active
+                  !terminal
                     ? ready
                       ? 'bg-emerald-100 text-emerald-800'
                       : 'bg-amber-100 text-amber-800'
@@ -93,7 +100,7 @@ export function IdentityCard({
               >
                 <span
                   className={`h-1.5 w-1.5 rounded-full ${
-                    active ? (ready ? 'bg-emerald-500' : 'bg-amber-500') : 'bg-rose-500'
+                    !terminal ? (ready ? 'bg-emerald-500' : 'bg-amber-500') : 'bg-rose-500'
                   }`}
                 />
                 {statusLabel}

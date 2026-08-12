@@ -22,6 +22,7 @@ import { motion } from 'motion/react';
 import type { LocalIdentitySummary } from '@nexus/wallet-core';
 
 import {
+  canRemoveLocalIdentity,
   canUseRegisteredIdentityActions,
   needsRegistrationRecovery,
 } from '../lib/identity-capabilities';
@@ -32,6 +33,7 @@ interface IdentityDetailProps {
   onClose: () => void;
   onRotate: () => void;
   onDispose: () => void;
+  onRemoveLocal: () => void;
   onContinuity: () => void;
   retryingRegistration: boolean;
   onRetryRegistration: () => void;
@@ -52,6 +54,7 @@ export function IdentityDetail({
   onClose,
   onRotate,
   onDispose,
+  onRemoveLocal,
   onContinuity,
   retryingRegistration,
   onRetryRegistration,
@@ -77,10 +80,19 @@ export function IdentityDetail({
   const deviceCapabilities = deviceManagementCapabilities(identity, now);
   const installedRegistryState = identity.device?.registryState;
   const hasDeviceStatuses = identity.device !== undefined || identity.issuedDevices.length > 0;
+  const removableLocally = canRemoveLocalIdentity(identity, now);
+  const installedDeviceExpired =
+    identity.device !== undefined &&
+    (installedRegistryState === 'expired' || now >= identity.device.expiresAt);
+  const installedDeviceRevoked =
+    identity.device?.localState === 'revoked' || installedRegistryState === 'revoked';
 
   useEffect(() => {
-    if (identity.device?.localState !== 'pending-activation') return;
-    const cutoff = Math.min(identity.device.activationDeadline, identity.device.expiresAt);
+    if (identity.device === undefined || identity.device.localState === 'revoked') return;
+    const cutoff =
+      identity.device.localState === 'pending-activation'
+        ? Math.min(identity.device.activationDeadline, identity.device.expiresAt)
+        : identity.device.expiresAt;
     if (now >= cutoff) return;
     const delay = Math.min((cutoff - now) * 1_000 + 25, 2_147_483_647);
     const handle = window.setTimeout(() => setNow(Math.floor(Date.now() / 1_000)), delay);
@@ -250,11 +262,13 @@ export function IdentityDetail({
             <dd className="mt-2 flex items-center gap-2 text-sm font-semibold text-slate-900">
               <ShieldCheck className="h-4 w-4 text-indigo-600" aria-hidden="true" />
               {identity.device !== undefined
-                ? identity.device.localState === 'active'
-                  ? 'Active delegated device'
-                  : identity.device.localState === 'pending-activation'
-                    ? 'Delegated device pending activation'
-                    : 'Delegated device revoked'
+                ? installedDeviceRevoked
+                  ? 'Delegated device revoked'
+                  : installedDeviceExpired
+                    ? 'Delegated device expired'
+                    : identity.device.localState === 'active'
+                      ? 'Active delegated device'
+                      : 'Delegated device pending activation'
                 : active && identity.registered
                   ? 'Active and registered'
                   : active
@@ -326,9 +340,9 @@ export function IdentityDetail({
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-slate-900">
-                      {installedRegistryState === 'revoked'
+                      {installedDeviceRevoked
                         ? 'Revoked delegated key'
-                        : installedRegistryState === 'expired'
+                        : installedDeviceExpired
                           ? 'Expired delegated key'
                           : installedRegistryState === 'unknown'
                             ? 'Not active at registry'
@@ -589,6 +603,26 @@ export function IdentityDetail({
             visible to the wallet.
           </p>
         </div>
+
+        {removableLocally && (
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4">
+            <div>
+              <h3 className="text-sm font-semibold text-rose-950">Remove local wallet entry</h3>
+              <p className="mt-1 text-xs leading-relaxed text-rose-800">
+                This identity is revoked or expired and can no longer create proofs. Remove its
+                local metadata and any remaining private material from this wallet.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onRemoveLocal}
+              disabled={deviceActionBusy || refreshingDevices}
+              className={smallDangerButton}
+            >
+              <Trash2 className="h-3.5 w-3.5" /> Remove from wallet
+            </button>
+          </div>
+        )}
 
         {registeredActions && (
           <div className="mt-6 grid gap-3 border-t border-slate-100 pt-6 sm:grid-cols-3">
