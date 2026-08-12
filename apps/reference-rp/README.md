@@ -24,6 +24,24 @@ It is an RP-local convenience session, not a Nexus account or a reusable bearer 
 another origin. Revocation invalidates it before the next protected operation, and expiration never
 extends beyond five minutes.
 
+## RP-local subject restrictions
+
+Notes does not register subjects as accounts or maintain an active-subject directory. Access is
+allowed by default. Its SQLite Durable Object stores only sparse RP-local restrictions when Notes
+has an application-specific reason to deny a subject.
+
+A permanent `ban` has no expiry. Temporary `hold` and `suspect` restrictions have an explicit
+expiry. Any restriction that has not been lifted and has not expired prevents a new session cookie
+from being issued. If an existing session encounters an effective restriction, its server-side
+session is deleted and the wallet proof must be repeated after the restriction no longer applies.
+Expired restrictions are ignored by authorization without being modified or deleted on the request
+path.
+
+These records are Notes application policy, not Nexus registry lifecycle state and not evidence
+about a person or account. This reference implementation intentionally exposes no ban, lift, or
+restriction-management endpoint; the authority and audit model for those mutations requires separate
+review.
+
 ## Shareable note URLs
 
 Opening a note updates the browser to `/notes/<note-id>`. A specific reply uses

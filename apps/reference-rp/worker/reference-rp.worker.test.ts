@@ -80,6 +80,7 @@ describe('deployed reference RP Worker', () => {
         DELETE FROM replies;
         DELETE FROM notes;
         DELETE FROM profiles;
+        DELETE FROM subject_restrictions;
         DELETE FROM challenges;
         DELETE FROM sessions;
         DELETE FROM receipts;
@@ -110,6 +111,7 @@ describe('deployed reference RP Worker', () => {
     });
     expect(denied.status).toBe(429);
     expect(denied.headers.get('Retry-After')).toBe('60');
+    await expect(denied.json()).resolves.toMatchObject({ error: { code: 'RATE_LIMITED' } });
     expect(await countChallenges()).toBe(before);
     const keys = await env.RP_API_RATE_LIMITER.getKeys();
     expect(keys).toHaveLength(1);
@@ -118,6 +120,9 @@ describe('deployed reference RP Worker', () => {
     await env.RP_API_RATE_LIMITER.setMode('fail');
     const unavailable = await postJson('/api/challenges', { action: 'session.start' });
     expect(unavailable.status).toBe(503);
+    await expect(unavailable.json()).resolves.toMatchObject({
+      error: { code: 'SERVICE_UNAVAILABLE' },
+    });
     expect(await countChallenges()).toBe(before);
   });
 
@@ -167,6 +172,7 @@ describe('deployed reference RP Worker', () => {
     });
     const denied = await postJson('/api/challenges', { action: 'session.start' });
     expect(denied.status).toBe(429);
+    await expect(denied.json()).resolves.toMatchObject({ error: { code: 'RATE_LIMITED' } });
   });
 
   it('starts one hash-only five-minute session and rejects proof replay', async () => {
@@ -185,7 +191,12 @@ describe('deployed reference RP Worker', () => {
     expect(attempts.map((response) => response.status).sort()).toEqual([200, 409]);
     const accepted = attempts.find((response) => response.status === 200);
     if (accepted === undefined) throw new Error('Expected one accepted session.');
-    const result: SessionStartResult = await accepted.clone().json();
+    const rejected = attempts.find((response) => response.status === 409);
+    if (rejected === undefined) throw new Error('Expected one rejected session replay.');
+    const result: SessionStartResult = await accepted.json();
+    await expect(rejected.json()).resolves.toMatchObject({
+      error: { code: 'CHALLENGE_EXPIRED' },
+    });
     const setCookie = accepted.headers.get('Set-Cookie');
     expect(setCookie).toContain('__Host-nexus_notes_session=');
     expect(setCookie).toContain('Max-Age=300');
@@ -209,6 +220,12 @@ describe('deployed reference RP Worker', () => {
             identity.subject,
           )
           .one(),
+        restrictions: state.storage.sql
+          .exec<{ count: number }>(
+            'SELECT COUNT(*) AS count FROM subject_restrictions WHERE subject = ?',
+            identity.subject,
+          )
+          .one().count,
       }),
     );
     expect(snapshot.challenge.nonce_hash).not.toBe(challenge.nonce);
@@ -216,6 +233,7 @@ describe('deployed reference RP Worker', () => {
     expect(snapshot.session.token_hash).not.toBe(cookie.split('=')[1]);
     expect(snapshot.session.proof_hash).toBe(result.receipt.proofHash);
     expect(snapshot.session.expires_at - result.receipt.acceptedAt).toBe(300);
+    expect(snapshot.restrictions).toBe(0);
     expect(JSON.stringify(snapshot)).not.toContain(input.proof.signature);
 
     const current = await fetchWithCookie('/api/session', cookie);
@@ -224,6 +242,190 @@ describe('deployed reference RP Worker', () => {
       session: { subject: identity.subject, state: 'active' },
     });
   });
+
+  it('denies permanent and effective temporary restrictions without issuing a session', async () => {
+    const now = Math.floor(Date.now() / 1_000);
+    for (const [kind, expiresAt] of [
+      ['ban', null],
+      ['hold', now + 60],
+      ['suspect', now + 60],
+    ] as const) {
+      const identity = await createRegisteredIdentity();
+      await insertRestriction(identity.subject, kind, now - 60, expiresAt);
+      const { challenge, response } = await startSessionResponse(identity);
+
+      expect(response.status).toBe(403);
+      expect(response.headers.get('Set-Cookie')).toBeNull();
+      await expect(response.json()).resolves.toMatchObject({
+        error: { code: 'SUBJECT_RESTRICTED' },
+      });
+      const snapshot = await runInDurableObject(
+        env.RP_STATE.getByName('reference-rp-primary'),
+        (_instance, state) => ({
+          sessions: state.storage.sql
+            .exec<{ count: number }>(
+              'SELECT COUNT(*) AS count FROM sessions WHERE subject = ?',
+              identity.subject,
+            )
+            .one().count,
+          receipts: state.storage.sql
+            .exec<{ count: number }>(
+              'SELECT COUNT(*) AS count FROM receipts WHERE subject = ?',
+              identity.subject,
+            )
+            .one().count,
+          consumedAt: state.storage.sql
+            .exec<{ consumed_at: number | null }>(
+              'SELECT consumed_at FROM challenges WHERE challenge_id = ?',
+              challenge.challengeId,
+            )
+            .one().consumed_at,
+        }),
+      );
+      expect(snapshot).toEqual({ sessions: 0, receipts: 0, consumedAt: null });
+    }
+  });
+
+  it('derives restrictions from every effective row without rewriting expired history', async () => {
+    const now = Math.floor(Date.now() / 1_000);
+    const expired = await createRegisteredIdentity();
+    await insertRestriction(expired.subject, 'hold', now - 120, now - 1);
+    const expiredLogin = await startSessionResponse(expired);
+    expect(expiredLogin.response.status).toBe(200);
+    await expect(expiredLogin.response.json()).resolves.toMatchObject({
+      session: { subject: expired.subject },
+    });
+
+    const lifted = await createRegisteredIdentity();
+    const liftedId = await insertRestriction(lifted.subject, 'ban', now - 120, null);
+    await liftRestriction(liftedId, now - 1);
+    const liftedLogin = await startSessionResponse(lifted);
+    expect(liftedLogin.response.status).toBe(200);
+    await expect(liftedLogin.response.json()).resolves.toMatchObject({
+      session: { subject: lifted.subject },
+    });
+
+    const overlapping = await createRegisteredIdentity();
+    await insertRestriction(overlapping.subject, 'ban', now - 180, null);
+    await insertRestriction(overlapping.subject, 'suspect', now - 120, now - 1);
+    const overlapLogin = await startSessionResponse(overlapping);
+    expect(overlapLogin.response.status).toBe(403);
+    await expect(overlapLogin.response.json()).resolves.toMatchObject({
+      error: { code: 'SUBJECT_RESTRICTED' },
+    });
+
+    const retained = await runInDurableObject(
+      env.RP_STATE.getByName('reference-rp-primary'),
+      (_instance, state) =>
+        state.storage.sql
+          .exec<{ count: number }>(
+            'SELECT COUNT(*) AS count FROM subject_restrictions WHERE subject IN (?, ?, ?)',
+            expired.subject,
+            lifted.subject,
+            overlapping.subject,
+          )
+          .one().count,
+    );
+    expect(retained).toBe(4);
+  });
+
+  it('invalidates an existing session when a restriction becomes effective', async () => {
+    const owner = await login(await createRegisteredIdentity());
+    const now = Math.floor(Date.now() / 1_000);
+    const restrictionId = await insertRestriction(owner.identity.subject, 'hold', now, now + 60);
+
+    const denied = await fetchWithCookie('/api/session', owner.cookie);
+    expect(denied.status).toBe(401);
+    await expect(denied.json()).resolves.toMatchObject({ error: { code: 'SESSION_INVALID' } });
+    const remaining = await runInDurableObject(
+      env.RP_STATE.getByName('reference-rp-primary'),
+      (_instance, state) =>
+        state.storage.sql
+          .exec<{ count: number }>(
+            'SELECT COUNT(*) AS count FROM sessions WHERE subject = ?',
+            owner.identity.subject,
+          )
+          .one().count,
+    );
+    expect(remaining).toBe(0);
+
+    await liftRestriction(restrictionId, now + 1);
+    const stillInvalid = await fetchWithCookie('/api/session', owner.cookie);
+    expect(stillInvalid.status).toBe(401);
+    await expect(stillInvalid.json()).resolves.toMatchObject({
+      error: { code: 'SESSION_INVALID' },
+    });
+  });
+
+  it('evaluates registry lifecycle before the RP-local restriction', async () => {
+    const identity = await createRegisteredIdentity();
+    const now = Math.floor(Date.now() / 1_000);
+    await insertRestriction(identity.subject, 'ban', now - 60, null);
+    await lifecycleControl('/__test/revoke', identity);
+
+    const { response } = await startSessionResponse(identity);
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: 'IDENTITY_REVOKED' },
+    });
+  });
+
+  it('migrates existing v3 state and enforces restriction shape constraints', async () => {
+    const stub = env.RP_STATE.getByName('reference-rp-primary');
+    await runInDurableObject(stub, (_instance, state) => {
+      state.storage.sql.exec(
+        `INSERT INTO sessions (token_hash, subject, expires_at, proof_hash)
+         VALUES ('preserved-token', ?, ?, 'preserved-proof')`,
+        `nx1_${'M'.repeat(43)}`,
+        Math.floor(Date.now() / 1_000) + 60,
+      );
+      state.storage.sql.exec('DROP INDEX subject_restrictions_lookup');
+      state.storage.sql.exec('DROP TABLE subject_restrictions');
+      state.storage.sql.exec('UPDATE schema_meta SET version = 3 WHERE singleton = 1');
+    });
+    await evictDurableObject(stub);
+
+    const health = await SELF.fetch(`${AUDIENCE}/api/health`);
+    expect(health.status).toBe(200);
+    await expect(health.json()).resolves.toEqual({ ok: true });
+    const migrated = await runInDurableObject(stub, (_instance, state) => ({
+      version: state.storage.sql
+        .exec<{ version: number }>('SELECT version FROM schema_meta WHERE singleton = 1')
+        .one().version,
+      restrictions: state.storage.sql
+        .exec<{ count: number }>(
+          "SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'table' AND name = 'subject_restrictions'",
+        )
+        .one().count,
+      preservedSessions: state.storage.sql
+        .exec<{ count: number }>(
+          "SELECT COUNT(*) AS count FROM sessions WHERE token_hash = 'preserved-token'",
+        )
+        .one().count,
+    }));
+    expect(migrated).toEqual({ version: 4, restrictions: 1, preservedSessions: 1 });
+
+    await expect(
+      runInDurableObject(stub, (_instance, state) => {
+        state.storage.sql.exec(
+          `INSERT INTO subject_restrictions
+            (restriction_id, subject, kind, created_at, expires_at, lifted_at)
+           VALUES ('invalid-hold', ?, 'hold', 100, NULL, NULL)`,
+          `nx1_${'H'.repeat(43)}`,
+        );
+      }),
+    ).rejects.toThrow();
+    await expect(
+      runInDurableObject(stub, (_instance, state) => {
+        state.storage.sql.exec(
+          `INSERT INTO subject_restrictions
+            (restriction_id, subject, kind, created_at, expires_at, lifted_at)
+           VALUES ('invalid-ban', ?, 'ban', 100, 200, NULL)`,
+          `nx1_${'B'.repeat(43)}`,
+        );
+      }),
+    ).rejects.toThrow();
+  }, 15_000);
 
   it('keeps private notes creator-only and exposes edit/delete authority only through that session', async () => {
     const owner = await login(await createRegisteredIdentity());
@@ -421,8 +623,25 @@ describe('deployed reference RP Worker', () => {
           "SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'table' AND name = 'profiles'",
         )
         .one().count,
+      restrictionTable: state.storage.sql
+        .exec<{ count: number }>(
+          "SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'table' AND name = 'subject_restrictions'",
+        )
+        .one().count,
+      restrictionIndex: state.storage.sql
+        .exec<{ count: number }>(
+          "SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'index' AND name = 'subject_restrictions_lookup'",
+        )
+        .one().count,
     }));
-    expect(schema).toEqual({ version: 3, replyTable: 1, likesTable: 1, profileTable: 1 });
+    expect(schema).toEqual({
+      version: 4,
+      replyTable: 1,
+      likesTable: 1,
+      profileTable: 1,
+      restrictionTable: 1,
+      restrictionIndex: 1,
+    });
   });
 });
 
@@ -468,18 +687,57 @@ async function issueChallenge(): Promise<IssuedChallenge> {
 }
 
 async function login(identity: TestIdentity): Promise<LoggedInIdentity> {
-  const challenge = await issueChallenge();
-  const response = await postJson('/api/operations', {
-    challengeId: challenge.challengeId,
-    operation: { action: 'session.start' },
-    proof: await createProof(identity, challenge),
-  });
+  const { response } = await startSessionResponse(identity);
   expect(response.status, await response.clone().text()).toBe(200);
   return {
     identity,
     cookie: cookiePair(response.headers.get('Set-Cookie')),
     result: await response.json(),
   };
+}
+
+async function startSessionResponse(
+  identity: TestIdentity,
+): Promise<{ challenge: IssuedChallenge; response: Response }> {
+  const challenge = await issueChallenge();
+  const response = await postJson('/api/operations', {
+    challengeId: challenge.challengeId,
+    operation: { action: 'session.start' },
+    proof: await createProof(identity, challenge),
+  });
+  return { challenge, response };
+}
+
+async function insertRestriction(
+  subject: NexusSubject,
+  kind: 'ban' | 'hold' | 'suspect',
+  createdAt: number,
+  expiresAt: number | null,
+): Promise<string> {
+  const restrictionId = `rst_${crypto.randomUUID()}`;
+  await runInDurableObject(env.RP_STATE.getByName('reference-rp-primary'), (_instance, state) => {
+    state.storage.sql.exec(
+      `INSERT INTO subject_restrictions
+          (restriction_id, subject, kind, created_at, expires_at, lifted_at)
+         VALUES (?, ?, ?, ?, ?, NULL)`,
+      restrictionId,
+      subject,
+      kind,
+      createdAt,
+      expiresAt,
+    );
+  });
+  return restrictionId;
+}
+
+async function liftRestriction(restrictionId: string, liftedAt: number): Promise<void> {
+  await runInDurableObject(env.RP_STATE.getByName('reference-rp-primary'), (_instance, state) => {
+    state.storage.sql.exec(
+      'UPDATE subject_restrictions SET lifted_at = ? WHERE restriction_id = ?',
+      liftedAt,
+      restrictionId,
+    );
+  });
 }
 
 async function createNote(cookie: string, visibility: 'public' | 'private'): Promise<NoteView> {

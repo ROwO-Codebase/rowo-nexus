@@ -78,6 +78,35 @@ describe('ReferenceRpRepository', () => {
     ]);
   });
 
+  it('denies restricted subjects and permanently invalidates an existing local session', async () => {
+    const restricted = new Set<NexusSubject>();
+    const repository = createRepository(
+      undefined,
+      () => NOW,
+      (subject) => restricted.has(subject),
+    );
+    const identity = await createIdentity();
+    restricted.add(identity.subject);
+
+    await expect(login(repository, identity)).rejects.toMatchObject({
+      code: 'SUBJECT_RESTRICTED',
+    });
+    expect(repository.debugSnapshot().sessions).toEqual([]);
+    expect(repository.debugSnapshot().receipts).toEqual([]);
+
+    restricted.delete(identity.subject);
+    const started = await login(repository, identity);
+    restricted.add(identity.subject);
+    await expect(repository.getSession(started.token)).rejects.toMatchObject({
+      code: 'SESSION_INVALID',
+    });
+
+    restricted.delete(identity.subject);
+    await expect(repository.getSession(started.token)).rejects.toMatchObject({
+      code: 'SESSION_INVALID',
+    });
+  });
+
   it('publishes one unique friendly name across existing notes and replies', async () => {
     const repository = createRepository();
     const owner = await login(repository, await createIdentity());
@@ -305,12 +334,14 @@ describe('ReferenceRpRepository', () => {
 function createRepository(
   lifecycle?: LocalLifecycleAuthority,
   now: () => number = () => NOW,
+  isSubjectRestricted?: (subject: NexusSubject, now: number) => boolean,
 ): ReferenceRpRepository {
   return new ReferenceRpRepository({
     audience: AUDIENCE,
     lifecycle: lifecycle ?? new LocalLifecycleAuthority(now),
     now,
     seed: false,
+    ...(isSubjectRestricted === undefined ? {} : { isSubjectRestricted }),
   });
 }
 

@@ -86,6 +86,10 @@ interface SessionRow extends Record<string, SqlStorageValue> {
   proof_hash: string;
 }
 
+interface RestrictionPresenceRow extends Record<string, SqlStorageValue> {
+  present: number;
+}
+
 interface ReplyRow extends Record<string, SqlStorageValue> {
   id: string;
   note_id: string;
@@ -325,6 +329,14 @@ export class ReferenceRpState extends DurableObject<ReferenceRpEnv> {
         );
       }
 
+      if (this.#isSubjectRestricted(prepared.subject, now)) {
+        throw new RpWorkerError(
+          'SUBJECT_RESTRICTED',
+          'This Nexus subject is restricted from starting a Notes session.',
+          403,
+        );
+      }
+
       this.ctx.storage.sql.exec(
         `UPDATE challenges SET consumed_at = ?
           WHERE challenge_id = ? AND consumed_at IS NULL AND expires_at > ?`,
@@ -398,6 +410,10 @@ export class ReferenceRpState extends DurableObject<ReferenceRpEnv> {
     }
     if (lifecycle.state !== 'active') {
       throw new RpWorkerError('SESSION_INVALID', 'The Nexus identity is revoked.', 401);
+    }
+    if (this.#isSubjectRestricted(subject, now)) {
+      this.ctx.storage.sql.exec('DELETE FROM sessions WHERE token_hash = ?', tokenHash);
+      throw new RpWorkerError('SESSION_INVALID', 'The RP session is no longer permitted.', 401);
     }
     return {
       tokenHash,
@@ -780,6 +796,24 @@ export class ReferenceRpState extends DurableObject<ReferenceRpEnv> {
     );
   }
 
+  #isSubjectRestricted(subject: NexusSubject, now: number): boolean {
+    return (
+      this.ctx.storage.sql
+        .exec<RestrictionPresenceRow>(
+          `SELECT EXISTS (
+             SELECT 1
+               FROM subject_restrictions
+              WHERE subject = ?
+                AND lifted_at IS NULL
+                AND (expires_at IS NULL OR expires_at > ?)
+           ) AS present`,
+          subject,
+          now,
+        )
+        .one().present === 1
+    );
+  }
+
   #readChallenge(challengeId: string): ChallengeRow {
     const challenge = this.ctx.storage.sql
       .exec<ChallengeRow>(
@@ -815,7 +849,7 @@ export class ReferenceRpState extends DurableObject<ReferenceRpEnv> {
         version INTEGER NOT NULL,
         seeded INTEGER NOT NULL CHECK (seeded IN (0, 1))
       );
-      INSERT OR IGNORE INTO schema_meta (singleton, version, seeded) VALUES (1, 3, 0);
+      INSERT OR IGNORE INTO schema_meta (singleton, version, seeded) VALUES (1, 4, 0);
       CREATE TABLE IF NOT EXISTS challenges (
         challenge_id TEXT PRIMARY KEY,
         nonce_hash TEXT NOT NULL UNIQUE,
@@ -889,6 +923,22 @@ export class ReferenceRpState extends DurableObject<ReferenceRpEnv> {
         name_key TEXT NOT NULL UNIQUE,
         updated_at INTEGER NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS subject_restrictions (
+        restriction_id TEXT PRIMARY KEY,
+        subject TEXT NOT NULL,
+        kind TEXT NOT NULL CHECK (kind IN ('ban', 'hold', 'suspect')),
+        created_at INTEGER NOT NULL,
+        expires_at INTEGER,
+        lifted_at INTEGER,
+        CHECK (
+          (kind = 'ban' AND expires_at IS NULL) OR
+          (kind IN ('hold', 'suspect') AND expires_at IS NOT NULL)
+        ),
+        CHECK (expires_at IS NULL OR expires_at > created_at),
+        CHECK (lifted_at IS NULL OR lifted_at >= created_at)
+      );
+      CREATE INDEX IF NOT EXISTS subject_restrictions_lookup
+        ON subject_restrictions (subject, lifted_at, expires_at);
     `);
     let version = this.ctx.storage.sql
       .exec<{ version: number }>('SELECT version FROM schema_meta WHERE singleton = 1')
@@ -911,7 +961,11 @@ export class ReferenceRpState extends DurableObject<ReferenceRpEnv> {
       this.ctx.storage.sql.exec('UPDATE schema_meta SET version = 3 WHERE singleton = 1');
       version = 3;
     }
-    if (version !== 3) throw new Error('Reference RP schema version is unsupported.');
+    if (version === 3) {
+      this.ctx.storage.sql.exec('UPDATE schema_meta SET version = 4 WHERE singleton = 1');
+      version = 4;
+    }
+    if (version !== 4) throw new Error('Reference RP schema version is unsupported.');
   }
 
   #seedNotes(): void {

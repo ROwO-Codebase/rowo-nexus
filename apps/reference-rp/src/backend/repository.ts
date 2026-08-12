@@ -5,7 +5,7 @@ import type {
   VerificationExpectation,
 } from '@nexus/protocol';
 import { audienceOriginSchema } from '@nexus/protocol';
-import { verifyRpOperation } from '@nexus/verifier';
+import { verificationError, verifyOwnershipProof } from '@nexus/verifier';
 import type { LifecycleProvider } from '@nexus/verifier';
 
 import type {
@@ -96,6 +96,7 @@ export interface ReferenceRpRepositoryOptions {
   lifecycle: LifecycleProvider;
   now?: () => number;
   seed?: boolean;
+  isSubjectRestricted?: (subject: NexusSubject, now: number) => boolean;
 }
 
 export class ReferenceRpRepository {
@@ -104,6 +105,7 @@ export class ReferenceRpRepository {
 
   readonly #audience: string;
   readonly #now: () => number;
+  readonly #isSubjectRestricted: (subject: NexusSubject, now: number) => boolean;
   readonly #notes = new Map<string, StoredNote>();
   readonly #replies = new Map<string, StoredReply>();
   readonly #likes = new Map<string, Map<NexusSubject, number>>();
@@ -119,6 +121,7 @@ export class ReferenceRpRepository {
     }
     this.#audience = audience.data;
     this.#now = options.now ?? (() => Math.floor(Date.now() / 1000));
+    this.#isSubjectRestricted = options.isSubjectRestricted ?? (() => false);
     this.lifecycle = options.lifecycle;
     if (options.seed !== false) this.#seedNotes();
   }
@@ -235,12 +238,19 @@ export class ReferenceRpRepository {
       now: this.#now(),
       maxClockSkewSeconds: MAX_CLOCK_SKEW_SECONDS,
     };
-    const verified = await verifyRpOperation(
-      input.proof,
-      expected,
-      this.challenges,
-      this.lifecycle,
-    );
+    const verified = await verifyOwnershipProof(input.proof, expected);
+    const lifecycle = await this.lifecycle.getAuthoritativeStatus(verified.subject);
+    if (lifecycle.state === 'not-found') throw verificationError('IDENTITY_NOT_FOUND');
+    if (lifecycle.state !== 'active') throw verificationError('IDENTITY_REVOKED');
+    if (this.#isSubjectRestricted(verified.subject, this.#now())) {
+      throw new RpError(
+        'SUBJECT_RESTRICTED',
+        'This Nexus subject is restricted from starting a Notes session.',
+        403,
+      );
+    }
+    const consumed = await this.challenges.consumeAtomically(payload.nonce);
+    if (!consumed) throw verificationError('NONCE_REPLAY_OR_EXPIRED');
     const proofHash = canonicalSha256(input.proof);
     const token = secureToken(32);
     const stored: StoredSession = {
@@ -250,11 +260,6 @@ export class ReferenceRpRepository {
       proofHash,
     };
     this.#sessions.set(stored.tokenHash, stored);
-    const lifecycle = await this.lifecycle.getAuthoritativeStatus(verified.subject);
-    if (lifecycle.state !== 'active') {
-      this.#sessions.delete(stored.tokenHash);
-      throw new RpError('SESSION_INVALID', 'The identity is no longer active.', 401);
-    }
     const receipt = this.#recordReceipt({
       operation: 'session.start',
       resource: SESSION_RESOURCE,
@@ -291,6 +296,10 @@ export class ReferenceRpRepository {
     const lifecycle = await this.lifecycle.getAuthoritativeStatus(stored.subject);
     if (lifecycle.state !== 'active') {
       throw new RpError('SESSION_INVALID', 'The identity is no longer active.', 401);
+    }
+    if (this.#isSubjectRestricted(stored.subject, now)) {
+      this.#sessions.delete(stored.tokenHash);
+      throw new RpError('SESSION_INVALID', 'The RP session is no longer permitted.', 401);
     }
     return {
       stored,
