@@ -5,6 +5,8 @@ import type {
 } from '@nexus/wallet-core';
 
 export const MAX_DEVICE_TRANSFER_FILE_BYTES = 96 * 1024;
+export const MAX_DEVICE_TRANSFER_QR_BYTES = 2_200;
+export const DEVICE_TRANSFER_QR_PREFIX = 'nexus-device-transfer:v2:';
 
 export interface DeviceManagementCapabilities {
   issueDevice: boolean;
@@ -72,6 +74,35 @@ export function decodeDeviceTransferKey(value: string): Uint8Array {
   return bytes;
 }
 
+function requireCanonicalBase64Url(
+  value: string,
+  label: string,
+  expectedBytes?: number,
+  minimumBytes = 1,
+): void {
+  if (!/^[A-Za-z0-9_-]+$/u.test(value) || value.length % 4 === 1) {
+    throw new Error(`${label} is not valid base64url.`);
+  }
+  let bytes: Uint8Array | undefined;
+  try {
+    const padding = '='.repeat((4 - (value.length % 4)) % 4);
+    const binary = atob(`${value.replaceAll('-', '+').replaceAll('_', '/')}${padding}`);
+    bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+    if (
+      (expectedBytes !== undefined && bytes.byteLength !== expectedBytes) ||
+      bytes.byteLength < minimumBytes ||
+      encodeBase64Url(bytes) !== value
+    ) {
+      throw new Error(`${label} has an invalid length or encoding.`);
+    }
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith(label)) throw error;
+    throw new Error(`${label} is not valid base64url.`, { cause: error });
+  } finally {
+    bytes?.fill(0);
+  }
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -118,6 +149,76 @@ export function serializeDeviceTransferBundle(bundle: DeviceTransferEnvelopeV2):
     throw new Error('Refusing to serialize a bundle that contains its transfer key.');
   }
   return serialized;
+}
+
+export interface DeviceTransferQrV2 {
+  bundle: DeviceTransferEnvelopeV2;
+  /** Canonical base64url. Decode only immediately before import, then wipe the resulting bytes. */
+  transferKey: string;
+}
+
+/**
+ * Produces a compact, offline-only QR payload. Unlike the JSON method, the QR is a complete bearer
+ * credential because it contains both the encrypted envelope and its transfer key.
+ */
+export function serializeDeviceTransferQr(
+  bundle: DeviceTransferEnvelopeV2,
+  transferKey: string,
+): string {
+  const validatedBundle = parseDeviceTransferBundleJson(JSON.stringify(bundle));
+  requireCanonicalBase64Url(validatedBundle.bundleId, 'The QR bundle ID', 32);
+  requireCanonicalBase64Url(validatedBundle.salt, 'The QR salt', 32);
+  requireCanonicalBase64Url(validatedBundle.iv, 'The QR IV', 12);
+  requireCanonicalBase64Url(validatedBundle.ciphertext, 'The QR ciphertext', undefined, 16);
+  const keyBytes = decodeDeviceTransferKey(transferKey);
+  keyBytes.fill(0);
+
+  const payload = `${DEVICE_TRANSFER_QR_PREFIX}${validatedBundle.bundleId}.${validatedBundle.salt}.${validatedBundle.iv}.${validatedBundle.ciphertext}.${transferKey}`;
+  if (new TextEncoder().encode(payload).byteLength > MAX_DEVICE_TRANSFER_QR_BYTES) {
+    throw new Error('This device transfer is too large for one QR code. Use the JSON method.');
+  }
+  return payload;
+}
+
+/** Strictly decodes the complete bearer credential produced by serializeDeviceTransferQr. */
+export function parseDeviceTransferQr(payload: string): DeviceTransferQrV2 {
+  if (new TextEncoder().encode(payload).byteLength > MAX_DEVICE_TRANSFER_QR_BYTES) {
+    throw new Error('The scanned QR code is too large to be a Nexus device transfer.');
+  }
+  if (!payload.startsWith(DEVICE_TRANSFER_QR_PREFIX)) {
+    throw new Error('This is not a Nexus device transfer QR code.');
+  }
+  const components = payload.slice(DEVICE_TRANSFER_QR_PREFIX.length).split('.');
+  if (components.length !== 5) {
+    throw new Error('The Nexus device transfer QR code is malformed.');
+  }
+  const [bundleId, salt, iv, ciphertext, transferKey] = components;
+  if (
+    bundleId === undefined ||
+    salt === undefined ||
+    iv === undefined ||
+    ciphertext === undefined ||
+    transferKey === undefined
+  ) {
+    throw new Error('The Nexus device transfer QR code is incomplete.');
+  }
+  requireCanonicalBase64Url(bundleId, 'The QR bundle ID', 32);
+  requireCanonicalBase64Url(salt, 'The QR salt', 32);
+  requireCanonicalBase64Url(iv, 'The QR IV', 12);
+  requireCanonicalBase64Url(ciphertext, 'The QR ciphertext', undefined, 16);
+  const keyBytes = decodeDeviceTransferKey(transferKey);
+  keyBytes.fill(0);
+  return {
+    bundle: {
+      protocol: 'nexus.device-transfer.v2',
+      suite: 'NX-HKDF-SHA256-AES256GCM-v2',
+      bundleId,
+      salt,
+      iv,
+      ciphertext,
+    },
+    transferKey,
+  };
 }
 
 export interface DeviceInstallOperations {

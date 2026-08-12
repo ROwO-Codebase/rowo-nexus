@@ -62,8 +62,8 @@ Nexus v1 intentionally provides no identity-key backup, portable private-key exp
 recovery service. The additive [v2 root/device profile](./docs/protocol/device-delegation-v2.md)
 preserves the same `nx1_` identity and non-extractable root while allowing that root to authorize
 independently revocable device signing keys. Only a device key may be copied through an encrypted
-offline transfer bundle; the identity/root key is never exported. Existing v1 proofs and endpoints
-remain unchanged.
+offline transfer bundle or a locally rendered direct-scan QR credential; the identity/root key is
+never exported. Existing v1 proofs and endpoints remain unchanged.
 
 ## Prerequisites
 

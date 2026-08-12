@@ -51,9 +51,9 @@ Changes must preserve the normative requirements in `NEXUS_SPEC.md`, especially:
 - no third-party runtime JavaScript on the wallet origin.
 
 The additive v2 profile permits encrypted offline transfer of a newly generated device private key,
-not the identity/root key. Reports involving transfer-envelope plaintext, weak key establishment,
-clone handling, device-status staleness, sibling-device authority, root loss, or v1 downgrade are
-security-sensitive. See
+not the identity/root key. Reports involving transfer-envelope plaintext, weak key establishment, QR
+capture or unintended persistence, clone handling, device-status staleness, sibling-device
+authority, root loss, or v1 downgrade are security-sensitive. See
 [`docs/protocol/device-delegation-v2.md`](./docs/protocol/device-delegation-v2.md).
 
 Nexus provides pseudonymous cryptographic identity, not network anonymity. A report showing

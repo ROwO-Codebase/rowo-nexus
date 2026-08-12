@@ -441,8 +441,30 @@ interface DeviceTransferEnvelopeV2 {
 
 It generates a separate uniformly random 32-byte transfer key, expands the content key with
 HKDF-SHA-256 using `NEXUS-DEVICE-TRANSFER\0v2\0` as `info`, and authenticates the canonical envelope
-header as AES-GCM additional data. The transfer key is delivered over a channel separate from the
-bundle and MUST NOT be embedded in or stored beside it.
+header as AES-GCM additional data.
+
+The reference wallet offers two offline transports:
+
+- **JSON bundle:** the transfer key MUST be delivered over a channel separate from the downloaded
+  bundle and MUST NOT be embedded in or stored beside that file.
+- **Direct-display QR:** the root wallet MAY render one QR that contains both the encrypted envelope
+  and transfer key for a nearby target wallet to scan. The QR is therefore a complete bearer
+  credential: encryption does not protect it from a camera, screenshot, shoulder surfer, or copied
+  display. The wallet MUST generate and decode it locally without a QR web service, URL shortener,
+  analytics request, or network fetch; MUST NOT automatically copy, download, or persist it; and
+  MUST warn that any capture can install an indistinguishable clone. Closing the transfer flow MUST
+  discard the in-memory representation on a best-effort basis.
+
+The compact reference QR payload is ASCII and versioned independently from the encrypted envelope:
+
+```text
+nexus-device-transfer:v2:<bundleId>.<salt>.<iv>.<ciphertext>.<transferKey>
+```
+
+Every component is canonical unpadded base64url; `bundleId`, `salt`, `iv`, and `transferKey` decode
+to 32, 32, 12, and 32 bytes respectively. The reference profile caps the complete payload at 2,200
+bytes so it fits one QR symbol at error-correction level M. A larger transfer MUST fall back to the
+JSON method instead of splitting secrets across unversioned animated or multi-part QR codes.
 
 The destination-generated alternative is safer: the destination creates a non-extractable device key
 and sends only its public enrollment request to the offline root. The root signs an authorization,
