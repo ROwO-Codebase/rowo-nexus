@@ -1,4 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
+import {
+  encodeBase64Url,
+  nexusDeviceAuthorizationIdV2Schema,
+  nexusDeviceIdV2Schema,
+} from '@nexus/protocol';
 import type {
   DeviceTransferEnvelopeV2,
   ImportedDeviceV2,
@@ -9,6 +14,7 @@ import { canCreateProof } from './identity-capabilities';
 import {
   decodeDeviceTransferKey,
   deviceManagementCapabilities,
+  deviceStatusRefreshTargets,
   encodeDeviceTransferKey,
   installAndActivateDevice,
   parseDeviceTransferQr,
@@ -58,6 +64,47 @@ const imported = {
 } as unknown as ImportedDeviceV2;
 
 describe('v2 wallet device management', () => {
+  it('refreshes the installed device or every device issued by a root identity', () => {
+    const installed = identity({
+      device: {
+        deviceId: imported.deviceId,
+        authorizationId: imported.authorizationId,
+        localState: 'active',
+        activationDeadline: 2_000_000_000,
+        expiresAt: 2_100_000_000,
+      },
+    });
+    const secondDeviceId = nexusDeviceIdV2Schema.parse(
+      `nxd2_${encodeBase64Url(new Uint8Array(32).fill(2))}`,
+    );
+    const root = identity({
+      issuedDevices: [
+        {
+          deviceId: imported.deviceId,
+          authorizationId: imported.authorizationId,
+          issuedAt: 1,
+          activationDeadline: 2,
+          expiresAt: 3,
+          localState: 'issued',
+        },
+        {
+          deviceId: secondDeviceId,
+          authorizationId: nexusDeviceAuthorizationIdV2Schema.parse(
+            `nxa2_${encodeBase64Url(new Uint8Array(32).fill(3))}`,
+          ),
+          issuedAt: 4,
+          activationDeadline: 5,
+          expiresAt: 6,
+          localState: 'issued',
+        },
+      ],
+    });
+
+    expect(deviceStatusRefreshTargets(installed)).toEqual([imported.deviceId]);
+    expect(deviceStatusRefreshTargets(root)).toEqual([imported.deviceId, secondDeviceId]);
+    expect(deviceStatusRefreshTargets(identity())).toEqual([]);
+  });
+
   it('strictly role-gates root and delegated-device actions', () => {
     expect(deviceManagementCapabilities(identity())).toEqual({
       issueDevice: true,

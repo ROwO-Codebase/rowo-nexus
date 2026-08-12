@@ -247,6 +247,7 @@ test.describe.serial('Nexus browser security boundary', () => {
         wallet.getByText('Registry device status: active.', { exact: true }),
       ).toBeVisible();
       await expect(wallet.getByText(/Registry checked/u)).toBeVisible();
+      await expect(wallet.getByRole('button', { name: 'Refresh', exact: true })).toHaveCount(0);
       await wallet.getByLabel('Edit identity nickname').click();
       await wallet.getByLabel('Identity nickname').fill('E2E phone');
       await wallet.getByRole('button', { name: 'Save', exact: true }).click();
@@ -257,7 +258,7 @@ test.describe.serial('Nexus browser security boundary', () => {
       await rp.getByRole('button', { name: 'Log in', exact: true }).click();
       const popup = await popupPromise;
       await expect(popup.getByRole('heading', { name: 'Allow a bound proof?' })).toBeVisible();
-      await expect(popup.getByRole('option', { name: /device key \(v2\)/u })).toHaveJSProperty(
+      await expect(popup.getByRole('option', { name: /device key/u })).toHaveJSProperty(
         'selected',
         true,
       );
@@ -598,7 +599,7 @@ async function approveWallet(popup: Page): Promise<void> {
   const button = popup.getByRole('button', { name: /Approve (new scope|and sign)/u });
   await expect(button).toBeVisible();
   const legacyRootConfirmation = popup.getByRole('checkbox', {
-    name: 'Use this root key for this legacy v1 proof.',
+    name: 'Use this root key for this proof.',
   });
   if (!(await button.isEnabled())) {
     await expect(legacyRootConfirmation).toBeVisible();

@@ -42,7 +42,11 @@ import {
   type PendingProofRequest,
   type NexusOwnershipProofProtocol,
 } from './lib/popup-protocol';
-import { installAndActivateDevice, type DeviceInstallResult } from './lib/device-management';
+import {
+  deviceStatusRefreshTargets,
+  installAndActivateDevice,
+  type DeviceInstallResult,
+} from './lib/device-management';
 import {
   walletAdapter,
   type CreateIdentityInput,
@@ -79,7 +83,7 @@ function App() {
   const [retryingRegistrationId, setRetryingRegistrationId] = useState<string>();
   const [clearingHistoryId, setClearingHistoryId] = useState<string>();
   const [deviceActionId, setDeviceActionId] = useState<string>();
-  const [refreshingDeviceId, setRefreshingDeviceId] = useState<string>();
+  const [refreshingIdentityId, setRefreshingIdentityId] = useState<string>();
   const pendingRef = useRef<PendingProofRequest | undefined>(undefined);
 
   const refresh = useCallback(async () => {
@@ -283,28 +287,61 @@ function App() {
     }
   };
 
-  const refreshDeviceStatus = async (
-    identity: LocalIdentitySummary,
-    deviceId?: LocalIdentitySummary['issuedDevices'][number]['deviceId'],
-  ) => {
-    const targetDeviceId = deviceId ?? identity.device?.deviceId;
-    if (targetDeviceId === undefined || refreshingDeviceId !== undefined) return;
-    setRefreshingDeviceId(targetDeviceId);
+  const refreshDeviceStatuses = async (identity: LocalIdentitySummary) => {
+    const targets = deviceStatusRefreshTargets(identity);
+    if (targets.length === 0 || refreshingIdentityId !== undefined) return;
+    setRefreshingIdentityId(identity.localId);
     try {
-      const status = await walletAdapter.refreshDeviceStatus(identity.localId, deviceId);
+      const results: PromiseSettledResult<
+        Awaited<ReturnType<typeof walletAdapter.refreshDeviceStatus>>
+      >[] = [];
+      for (let index = 0; index < targets.length; index += 10) {
+        results.push(
+          ...(await Promise.allSettled(
+            targets
+              .slice(index, index + 10)
+              .map((deviceId) => walletAdapter.refreshDeviceStatus(identity.localId, deviceId)),
+          )),
+        );
+      }
       await refresh();
+      const statuses = results.flatMap((result) =>
+        result.status === 'fulfilled' ? [result.value] : [],
+      );
+      const failed = results.length - statuses.length;
+      if (statuses.length === 0) {
+        const firstFailure = results.find((result) => result.status === 'rejected');
+        if (firstFailure?.status === 'rejected' && firstFailure.reason instanceof Error) {
+          throw firstFailure.reason;
+        }
+        throw new Error('Device statuses could not be refreshed.');
+      }
+      const stateCounts = new Map<string, number>();
+      for (const status of statuses) {
+        stateCounts.set(status.deviceState, (stateCounts.get(status.deviceState) ?? 0) + 1);
+      }
+      const stateSummary = [...stateCounts]
+        .map(([state, count]) => `${String(count)} ${state}`)
+        .join(', ');
       setNotice({
-        kind: status.deviceState === 'active' ? 'success' : 'error',
-        message: `Registry device status: ${status.deviceState}.`,
+        kind:
+          failed === 0 && statuses.every((status) => status.deviceState === 'active')
+            ? 'success'
+            : 'error',
+        message:
+          failed === 0
+            ? statuses.length === 1
+              ? `Registry device status: ${statuses[0]?.deviceState ?? 'unknown'}.`
+              : `Refreshed ${String(statuses.length)} device statuses: ${stateSummary}.`
+            : `Refreshed ${String(statuses.length)} of ${String(results.length)} device statuses; ${String(failed)} could not be checked.`,
       });
     } catch (error) {
       setNotice({
         kind: 'error',
-        message:
-          error instanceof Error ? error.message : 'The device status could not be refreshed.',
+        message: error instanceof Error ? error.message : 'Device statuses could not be refreshed.',
       });
     } finally {
-      setRefreshingDeviceId(undefined);
+      setRefreshingIdentityId(undefined);
     }
   };
 
@@ -532,8 +569,8 @@ function App() {
               onRootRevokeDevice={(device) =>
                 setFlow({ type: 'root-revoke-device', identity: selectedIdentity, device })
               }
-              onRefreshDevice={(deviceId) => refreshDeviceStatus(selectedIdentity, deviceId)}
-              {...(refreshingDeviceId === undefined ? {} : { refreshingDeviceId })}
+              onRefreshDevices={() => refreshDeviceStatuses(selectedIdentity)}
+              refreshingDevices={refreshingIdentityId === selectedIdentity.localId}
               deviceActionBusy={deviceActionId !== undefined}
             />
           </div>

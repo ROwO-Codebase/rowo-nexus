@@ -42,10 +42,8 @@ interface IdentityDetailProps {
   onActivateDevice: () => Promise<void>;
   onSelfRevokeDevice: () => void;
   onRootRevokeDevice: (device: LocalIdentitySummary['issuedDevices'][number]) => void;
-  onRefreshDevice: (
-    deviceId?: LocalIdentitySummary['issuedDevices'][number]['deviceId'],
-  ) => Promise<void>;
-  refreshingDeviceId?: string;
+  onRefreshDevices: () => Promise<void>;
+  refreshingDevices: boolean;
   deviceActionBusy: boolean;
 }
 
@@ -64,8 +62,8 @@ export function IdentityDetail({
   onActivateDevice,
   onSelfRevokeDevice,
   onRootRevokeDevice,
-  onRefreshDevice,
-  refreshingDeviceId,
+  onRefreshDevices,
+  refreshingDevices,
   deviceActionBusy,
 }: IdentityDetailProps) {
   const active = identity.localState === 'active';
@@ -78,6 +76,7 @@ export function IdentityDetail({
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1_000));
   const deviceCapabilities = deviceManagementCapabilities(identity, now);
   const installedRegistryState = identity.device?.registryState;
+  const hasDeviceStatuses = identity.device !== undefined || identity.issuedDevices.length > 0;
 
   useEffect(() => {
     if (identity.device?.localState !== 'pending-activation') return;
@@ -210,14 +209,31 @@ export function IdentityDetail({
               )}
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
-            aria-label="Close identity details"
-          >
-            <X className="h-4 w-4" aria-hidden="true" />
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            {hasDeviceStatuses && (
+              <button
+                type="button"
+                onClick={() => void onRefreshDevices()}
+                disabled={refreshingDevices || deviceActionBusy}
+                className={smallSecondaryButton}
+              >
+                {refreshingDevices ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-3.5 w-3.5" />
+                )}
+                {refreshingDevices ? 'Checking…' : 'Refresh status'}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+              aria-label="Close identity details"
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
         </div>
 
         <dl className="mt-6 grid gap-3 sm:grid-cols-2">
@@ -294,7 +310,12 @@ export function IdentityDetail({
                 </h3>
               </div>
               {deviceCapabilities.issueDevice && (
-                <button type="button" onClick={onAddDevice} className={smallPrimaryButton}>
+                <button
+                  type="button"
+                  onClick={onAddDevice}
+                  disabled={deviceActionBusy || refreshingDevices}
+                  className={smallPrimaryButton}
+                >
                   <Plus className="h-3.5 w-3.5" /> Add device
                 </button>
               )}
@@ -335,21 +356,6 @@ export function IdentityDetail({
                       </p>
                     )}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => void onRefreshDevice()}
-                    disabled={refreshingDeviceId !== undefined || deviceActionBusy}
-                    className={smallSecondaryButton}
-                  >
-                    {refreshingDeviceId === identity.device.deviceId ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <RefreshCw className="h-3.5 w-3.5" />
-                    )}
-                    {refreshingDeviceId === identity.device.deviceId
-                      ? 'Checking…'
-                      : 'Refresh status'}
-                  </button>
                   {deviceCapabilities.activateDevice && (
                     <button
                       type="button"
@@ -442,26 +448,13 @@ export function IdentityDetail({
                         )}
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          onClick={() => void onRefreshDevice(device.deviceId)}
-                          disabled={refreshingDeviceId !== undefined || deviceActionBusy}
-                          className={smallSecondaryButton}
-                        >
-                          {refreshingDeviceId === device.deviceId ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <RefreshCw className="h-3.5 w-3.5" />
-                          )}
-                          {refreshingDeviceId === device.deviceId ? 'Checking…' : 'Refresh'}
-                        </button>
                         {device.localState !== 'revoked' &&
                           device.registryState !== 'revoked' &&
                           deviceCapabilities.rootRevokeDevice && (
                             <button
                               type="button"
                               onClick={() => onRootRevokeDevice(device)}
-                              disabled={deviceActionBusy || refreshingDeviceId !== undefined}
+                              disabled={deviceActionBusy || refreshingDevices}
                               className={smallDangerButton}
                             >
                               <ShieldOff className="h-3.5 w-3.5" /> Remove
