@@ -1,9 +1,12 @@
 import { env } from 'cloudflare:workers';
+import { createExecutionContext } from 'cloudflare:test';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  decodeBase64UrlExact,
   encodeBase64Url,
   registryStatusV1Schema,
+  transparencyInclusionProofV1Schema,
   type NexusSubject,
   type OwnershipProofV1,
   type VerificationExpectation,
@@ -11,6 +14,7 @@ import {
 import {
   verifyOwnershipProof,
   verifyRpOperation,
+  verifyTransparencyInclusionProof,
   type ChallengeRecord,
   type ChallengeStore,
 } from '@nexus/verifier';
@@ -23,13 +27,17 @@ import {
   WALLET_ORIGIN,
   authoritativeStatusThroughEdge,
   createAcceptanceEdge,
+  createAcceptanceDevice,
   createAcceptanceIdentity,
   nexusPost,
   ownershipProof,
   queuedEvents,
+  queuedDeviceEvents,
   resetAcceptanceState,
+  rootRevokeAcceptanceDevice,
   secretRevocation,
 } from './helpers';
+import { createAcceptanceTransparency } from './transparency-harness';
 
 const NOW = Math.floor(Date.now() / 1_000);
 
@@ -81,6 +89,15 @@ function queueMessage(body: unknown) {
 function batch(...messages: Message<unknown>[]): MessageBatch<unknown> {
   return {
     queue: 'nexus-registry-events',
+    messages,
+    ackAll: vi.fn(),
+    retryAll: vi.fn(),
+  } as unknown as MessageBatch<unknown>;
+}
+
+function deviceBatch(...messages: Message<unknown>[]): MessageBatch<unknown> {
+  return {
+    queue: 'nexus-registry-device-events',
     messages,
     ackAll: vi.fn(),
     retryAll: vi.fn(),
@@ -234,7 +251,10 @@ describe('registry, edge, verifier, and projection acceptance', () => {
     if (registered === undefined || revoked === undefined)
       throw new Error('Missing event fixture.');
 
-    const transparency = { append: vi.fn(() => Promise.resolve()) };
+    const transparency = {
+      append: vi.fn(() => Promise.resolve()),
+      appendDevice: vi.fn(() => Promise.resolve()),
+    };
     const early = queueMessage(revoked);
     const earlyDuplicate = queueMessage(revoked);
     await projector.queue(batch(early.value, earlyDuplicate.value), {
@@ -314,5 +334,146 @@ describe('registry, edge, verifier, and projection acceptance', () => {
     );
     expect(successfulSubjects).toEqual([third.subject, first.subject]);
     expect(JSON.stringify(payload.results[1])).not.toContain(missing.subject);
+  });
+
+  it('projects and transparently proves v2 activation and root revocation from the distinct Queue', async () => {
+    const identity = await createAcceptanceIdentity();
+    const device = await createAcceptanceDevice(identity, NOW);
+    const { app, edgeEnv } = createAcceptanceEdge(NOW);
+
+    const registration = await app.fetch(
+      nexusPost(
+        '/v1/identity/register',
+        { subject: identity.subject, genesis: identity.genesis },
+        WALLET_ORIGIN,
+      ),
+      edgeEnv,
+    );
+    expect(registration.status).toBe(200);
+
+    const activation = await app.fetch(
+      nexusPost('/v2/device/activate', device.activation, WALLET_ORIGIN),
+      edgeEnv,
+    );
+    expect(activation.status).toBe(200);
+
+    const rootRevocation = await rootRevokeAcceptanceDevice(
+      identity,
+      device.authorization.payload.deviceId,
+      NOW,
+    );
+    const revocation = await app.fetch(
+      nexusPost('/v2/device/revoke-root', rootRevocation, WALLET_ORIGIN),
+      edgeEnv,
+    );
+    expect(revocation.status).toBe(200);
+
+    const [v1Events, deviceEvents] = await Promise.all([queuedEvents(1), queuedDeviceEvents(2)]);
+    expect(v1Events).toHaveLength(1);
+    expect(deviceEvents.map((event) => event.eventType)).toEqual(['activated', 'revoked']);
+    const activated = deviceEvents[0];
+    const revoked = deviceEvents[1];
+    if (activated === undefined || revoked === undefined) {
+      throw new Error('The v2 registry Queue did not contain both device lifecycle events.');
+    }
+
+    const transparencyService = createAcceptanceTransparency(createExecutionContext());
+    const appendDeviceResults: Awaited<ReturnType<typeof transparencyService.appendDevice>>[] = [];
+    const transparency = {
+      append: (event: (typeof v1Events)[number]) => transparencyService.append(event),
+      appendDevice: async (event: (typeof deviceEvents)[number]) => {
+        const result = await transparencyService.appendDevice(event);
+        appendDeviceResults.push(result);
+        return result;
+      },
+    };
+
+    const rootMessage = queueMessage(v1Events[0]);
+    await projector.queue(batch(rootMessage.value), {
+      INDEX_DB: env.INDEX_DB,
+      TRANSPARENCY_SERVICE: transparency,
+    });
+    expect(rootMessage.ack).toHaveBeenCalledOnce();
+
+    const deviceMessages = [
+      queueMessage(activated),
+      queueMessage(activated),
+      queueMessage(revoked),
+      queueMessage(revoked),
+    ];
+    await projector.queue(deviceBatch(...deviceMessages.map((message) => message.value)), {
+      INDEX_DB: env.INDEX_DB,
+      TRANSPARENCY_SERVICE: transparency,
+    });
+    expect(deviceMessages.every((message) => message.ack.mock.calls.length === 1)).toBe(true);
+    expect(deviceMessages.every((message) => message.retry.mock.calls.length === 0)).toBe(true);
+    expect(appendDeviceResults.map((result) => result.duplicate)).toEqual([
+      false,
+      true,
+      false,
+      true,
+    ]);
+
+    const projectedIdentity = await env.INDEX_DB.prepare(
+      `SELECT state, sequence FROM identities WHERE subject = ?`,
+    )
+      .bind(identity.subject)
+      .first<{ state: string; sequence: number }>();
+    expect(projectedIdentity).toEqual({ state: 'active', sequence: 0 });
+    expect(await count('registry_events')).toBe(1);
+    expect(await count('device_registry_events')).toBe(2);
+
+    const projectedDevice = await env.INDEX_DB.prepare(
+      `SELECT authorization_id, state, event_sequence, activated_at, revoked_at,
+              revoked_by, latest_event_id
+       FROM device_states WHERE subject = ? AND device_id = ?`,
+    )
+      .bind(identity.subject, device.authorization.payload.deviceId)
+      .first<{
+        authorization_id: string | null;
+        state: string;
+        event_sequence: number;
+        activated_at: number | null;
+        revoked_at: number | null;
+        revoked_by: string | null;
+        latest_event_id: string;
+      }>();
+    expect(projectedDevice).toEqual({
+      authorization_id: activated.authorizationId,
+      state: 'revoked',
+      event_sequence: 2,
+      activated_at: activated.acceptedAt,
+      revoked_at: revoked.acceptedAt,
+      revoked_by: 'root',
+      latest_event_id: revoked.eventId,
+    });
+    const head = await env.INDEX_DB.prepare(
+      `SELECT max_device_ledger_sequence FROM device_projection_heads WHERE subject = ?`,
+    )
+      .bind(identity.subject)
+      .first<{ max_device_ledger_sequence: number }>();
+    expect(head).toEqual({ max_device_ledger_sequence: 2 });
+
+    const eventHash = decodeBase64UrlExact(revoked.eventId.slice('nxde2_'.length), 32);
+    const eventHashBase64Url = encodeBase64Url(eventHash);
+    const inclusionResponse = await transparencyService.fetch(
+      new Request('https://transparency.test/v1/transparency/inclusion', {
+        method: 'POST',
+        headers: { 'content-type': 'application/nexus+json' },
+        body: JSON.stringify({ eventHash: eventHashBase64Url }),
+      }),
+    );
+    expect(inclusionResponse.status).toBe(200);
+    const inclusion = transparencyInclusionProofV1Schema.parse(await inclusionResponse.json());
+    expect(inclusion.eventHash).toBe(eventHashBase64Url);
+    await expect(
+      verifyTransparencyInclusionProof({
+        eventHash,
+        leafIndex: inclusion.leafIndex,
+        treeSize: inclusion.treeSize,
+        auditPath: inclusion.auditPath.map((hash) => decodeBase64UrlExact(hash, 32)),
+        expectedRoot: decodeBase64UrlExact(inclusion.checkpoint.payload.rootHash, 32),
+      }),
+    ).resolves.toBe(true);
   });
 });

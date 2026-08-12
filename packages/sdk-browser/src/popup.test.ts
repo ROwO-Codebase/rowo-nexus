@@ -1,6 +1,7 @@
 import { proofRequestSchema, type ProofRequest } from '@nexus/protocol';
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
-import { NexusClient, NexusClientError } from './popup.js';
+import type { WalletProofErrorCode } from './messages.js';
+import { NexusClient, NexusClientError, NexusClientErrorV2 } from './popup.js';
 
 const WALLET_ORIGIN = 'https://wallet.nexus.test';
 const RP_ORIGIN = 'https://rp-a.test';
@@ -77,6 +78,15 @@ function validRequest(): ProofRequest {
 
 function ready(): unknown {
   return { channel: 'nexus.popup.v1', type: 'NEXUS_READY' };
+}
+
+function readyV2(
+  supportedProofProtocols: readonly string[] = [
+    'nexus.ownership-proof.v2',
+    'nexus.ownership-proof.v1',
+  ],
+): unknown {
+  return { channel: 'nexus.popup.v2', type: 'NEXUS_READY', supportedProofProtocols };
 }
 
 function sentRequest(popup: FakePopup): {
@@ -299,5 +309,146 @@ describe('NexusClient popup transport', () => {
 
     await vi.advanceTimersByTimeAsync(500);
     await rejection;
+  });
+
+  it('negotiates the first RP-preferred protocol supported by the wallet', async () => {
+    const popup = makePopup();
+    const browser = installBrowser(popup);
+    const client = new NexusClient({ walletUrl: WALLET_ORIGIN });
+    const resultPromise = client.requestProofV2(validRequest(), {
+      acceptedProofProtocols: ['nexus.ownership-proof.v2', 'nexus.ownership-proof.v1'],
+    });
+
+    // Legacy READY is intentionally ignored by the v2 request.
+    browser.emit(ready());
+    expect(popup.postMessage).not.toHaveBeenCalled();
+    browser.emit(readyV2());
+
+    expect(sentRequest(popup).request).not.toHaveProperty('aud');
+    expect(popup.postMessage.mock.calls[0]?.[0]).toMatchObject({
+      channel: 'nexus.popup.v2',
+      acceptedProofProtocols: ['nexus.ownership-proof.v2', 'nexus.ownership-proof.v1'],
+    });
+
+    const requestId = sentRequest(popup).requestId;
+    const proof = {
+      payload: { protocol: 'nexus.ownership-proof.v2' },
+      deviceSignature: 'fixture',
+    };
+    browser.emit({
+      channel: 'nexus.popup.v2',
+      type: 'NEXUS_PROOF_RESULT',
+      requestId,
+      proofProtocol: 'nexus.ownership-proof.v2',
+      proof,
+    });
+    await expect(resultPromise).resolves.toEqual({
+      proofProtocol: 'nexus.ownership-proof.v2',
+      proof,
+    });
+  });
+
+  it('supports an explicitly allowed v1 proof only inside the v2 envelope', async () => {
+    const popup = makePopup();
+    const browser = installBrowser(popup);
+    const client = new NexusClient({ walletUrl: WALLET_ORIGIN });
+    const resultPromise = client.requestProofV2(validRequest(), {
+      acceptedProofProtocols: ['nexus.ownership-proof.v1'],
+    });
+    browser.emit(readyV2());
+    const requestId = sentRequest(popup).requestId;
+    const proof = { payload: { protocol: 'nexus.ownership-proof.v1' }, signature: 'fixture' };
+
+    // A v1-channel response cannot downgrade or complete this v2 negotiation.
+    browser.emit({
+      channel: 'nexus.popup.v1',
+      type: 'NEXUS_PROOF_RESULT',
+      requestId,
+      proof,
+    });
+    expect(popup.close).not.toHaveBeenCalled();
+    browser.emit({
+      channel: 'nexus.popup.v2',
+      type: 'NEXUS_PROOF_RESULT',
+      requestId,
+      proofProtocol: 'nexus.ownership-proof.v1',
+      proof,
+    });
+    await expect(resultPromise).resolves.toEqual({
+      proofProtocol: 'nexus.ownership-proof.v1',
+      proof,
+    });
+  });
+
+  it('rejects a wallet-selected protocol outside the challenge allow-list', async () => {
+    const popup = makePopup();
+    const browser = installBrowser(popup);
+    const client = new NexusClient({ walletUrl: WALLET_ORIGIN });
+    const resultPromise = client.requestProofV2(validRequest(), {
+      acceptedProofProtocols: ['nexus.ownership-proof.v2'],
+    });
+    browser.emit(readyV2());
+    const requestId = sentRequest(popup).requestId;
+    browser.emit({
+      channel: 'nexus.popup.v2',
+      type: 'NEXUS_PROOF_RESULT',
+      requestId,
+      proofProtocol: 'nexus.ownership-proof.v1',
+      proof: { payload: { protocol: 'nexus.ownership-proof.v1' }, signature: 'fixture' },
+    });
+
+    await expect(resultPromise).rejects.toMatchObject({
+      codeV2: 'UNSUPPORTED_PROOF_PROTOCOL',
+    });
+  });
+
+  it('rejects malformed RP protocol policies before opening the popup', async () => {
+    const popup = makePopup();
+    const browser = installBrowser(popup);
+    const client = new NexusClient({ walletUrl: WALLET_ORIGIN });
+    await expect(
+      client.requestProofV2(validRequest(), {
+        acceptedProofProtocols: ['nexus.ownership-proof.v2', 'nexus.ownership-proof.v2'],
+      }),
+    ).rejects.toMatchObject({ code: 'INVALID_REQUEST' });
+    expect(browser.open).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when wallet and challenge have no common proof protocol', async () => {
+    const popup = makePopup();
+    const browser = installBrowser(popup);
+    const client = new NexusClient({ walletUrl: WALLET_ORIGIN });
+    const resultPromise = client.requestProofV2(validRequest(), {
+      acceptedProofProtocols: ['nexus.ownership-proof.v2'],
+    });
+    browser.emit(readyV2(['nexus.ownership-proof.v1']));
+    await expect(resultPromise).rejects.toMatchObject({
+      codeV2: 'UNSUPPORTED_PROOF_PROTOCOL',
+    });
+    expect(popup.postMessage).not.toHaveBeenCalled();
+  });
+
+  it('keeps the legacy error surface narrow and exposes v2-only error details additively', () => {
+    const legacy = new NexusClientError('WALLET_ERROR', 'legacy', {
+      walletCode: 'INTERNAL_ERROR',
+    });
+    const legacyWalletCode: WalletProofErrorCode | undefined = legacy.walletCode;
+    expect(legacyWalletCode).toBe('INTERNAL_ERROR');
+
+    new NexusClientError('WALLET_ERROR', 'legacy', {
+      // @ts-expect-error v2-only wallet codes must not widen the legacy constructor.
+      walletCode: 'UNSUPPORTED_PROOF_PROTOCOL',
+    });
+
+    const negotiated = new NexusClientErrorV2('UNSUPPORTED_PROOF_PROTOCOL', 'negotiated', {
+      walletCodeV2: 'UNSUPPORTED_PROOF_PROTOCOL',
+    });
+    expect(negotiated).toBeInstanceOf(NexusClientError);
+    expect(negotiated).toMatchObject({
+      code: 'WALLET_ERROR',
+      codeV2: 'UNSUPPORTED_PROOF_PROTOCOL',
+      walletCodeV2: 'UNSUPPORTED_PROOF_PROTOCOL',
+    });
+    expect(negotiated.walletCode).toBeUndefined();
   });
 });

@@ -36,6 +36,10 @@ Changes must preserve the normative requirements in `NEXUS_SPEC.md`, especially:
 - no global controller/user identifier and no civil-identity mapping;
 - independent CSPRNG-generated identity keys, not deterministic children of a recoverable master
   seed;
+- non-extractable per-identity roots and independently generated v2 device keys, with no root-key
+  export or device-key derivation from the root;
+- root-signed device authorization, possession-proven activation, exact per-device status checks,
+  irreversible device tombstones, and terminal identity revocation dominating all device state;
 - no user private keys, revocation secrets, or plaintext vault contents on Cloudflare;
 - exact audience, action, resource, nonce, and time binding for proofs;
 - audience derived from `MessageEvent.origin`, with exact-origin proof responses;
@@ -45,6 +49,12 @@ Changes must preserve the normative requirements in `NEXUS_SPEC.md`, especially:
   version/suite handling;
 - no sensitive values or stable identity/network dimensions in application logs;
 - no third-party runtime JavaScript on the wallet origin.
+
+The additive v2 profile permits encrypted offline transfer of a newly generated device private key,
+not the identity/root key. Reports involving transfer-envelope plaintext, weak key establishment,
+clone handling, device-status staleness, sibling-device authority, root loss, or v1 downgrade are
+security-sensitive. See
+[`docs/protocol/device-delegation-v2.md`](./docs/protocol/device-delegation-v2.md).
 
 Nexus provides pseudonymous cryptographic identity, not network anonymity. A report showing
 correlation through network or timing metadata may still be valuable, but the protocol alone cannot

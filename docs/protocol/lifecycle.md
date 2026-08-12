@@ -9,6 +9,10 @@ NONE --register--> ACTIVE --revoke/dispose--> REVOKED
 There is no `REVOKED -> ACTIVE` transition, ownership transfer, recovery into a new key, or
 server-side identity claim in v1.
 
+The additive [v2 root/device profile](./device-delegation-v2.md) adds a separate per-device ledger
+under an active v1 subject. It does not change this identity lifecycle or its sequence. Device
+revocation is independently terminal, and terminal identity revocation dominates every device.
+
 ## Authority and sequence
 
 One SQLite-backed `IdentityState` Durable Object is addressed deterministically from each

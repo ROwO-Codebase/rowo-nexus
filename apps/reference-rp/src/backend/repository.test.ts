@@ -9,6 +9,7 @@ import {
   IDENTITY_PROTOCOL_V1,
   NEXUS_SUITE_V1,
   OWNERSHIP_PROOF_PROTOCOL_V1,
+  OWNERSHIP_PROOF_PROTOCOL_V2,
   encodeBase64Url,
 } from '@nexus/protocol';
 import type {
@@ -21,6 +22,7 @@ import type {
 import { describe, expect, it } from 'vitest';
 
 import type { IssuedChallenge } from '../shared/contracts.js';
+import { canonicalSha256 } from './digests.js';
 import { LocalLifecycleAuthority } from './lifecycle.js';
 import { ReferenceRpRepository } from './repository.js';
 
@@ -76,6 +78,33 @@ describe('ReferenceRpRepository', () => {
       'profiles',
       'challenges',
     ]);
+  });
+
+  it('rejects a valid v1 proof when the stored challenge policy is v2-only', async () => {
+    const repository = createRepository();
+    const identity = await createIdentity();
+    const issued = repository.issueChallenge({ action: 'session.start' });
+    const contextHash = v2OnlyContextHash();
+    const stored = repository.challenges.getById(issued.challengeId);
+    if (stored === null) throw new Error('Expected the stored challenge.');
+    Object.assign(stored, {
+      acceptedProofProtocols: [OWNERSHIP_PROOF_PROTOCOL_V2],
+      contextHash,
+    });
+    const challenge: IssuedChallenge = {
+      ...issued,
+      contextHash: contextHash as Base64Url32,
+      acceptedProofProtocols: [OWNERSHIP_PROOF_PROTOCOL_V2],
+    };
+
+    await expect(
+      repository.startSession({
+        challengeId: challenge.challengeId,
+        operation: { action: 'session.start' },
+        proofProtocol: OWNERSHIP_PROOF_PROTOCOL_V1,
+        proof: await createProof(identity, challenge),
+      }),
+    ).rejects.toMatchObject({ code: 'UNSUPPORTED_PROOF_PROTOCOL' });
   });
 
   it('publishes one unique friendly name across existing notes and replies', async () => {
@@ -306,9 +335,11 @@ function createRepository(
   lifecycle?: LocalLifecycleAuthority,
   now: () => number = () => NOW,
 ): ReferenceRpRepository {
+  const authority = lifecycle ?? new LocalLifecycleAuthority(now);
   return new ReferenceRpRepository({
     audience: AUDIENCE,
-    lifecycle: lifecycle ?? new LocalLifecycleAuthority(now),
+    lifecycle: authority,
+    deviceLifecycle: authority,
     now,
     seed: false,
   });
@@ -381,4 +412,25 @@ async function createProof(
     payload,
     signature: (await signProtocolPayload(payload, identity.privateKey, provider)) as Base64Url64,
   };
+}
+
+function v2OnlyContextHash(): string {
+  return canonicalSha256({
+    action: 'session.start',
+    policy: {
+      actions: [
+        'note.create',
+        'note.edit',
+        'note.delete',
+        'reply.create',
+        'reply.delete',
+        'note.like',
+        'note.unlike',
+        'profile.set-name',
+      ],
+      resourcePolicy: 'public-notes-and-private-notes-owned-by-session-subject',
+      ttlSeconds: 300,
+    },
+    acceptedProofProtocols: [OWNERSHIP_PROOF_PROTOCOL_V2],
+  });
 }

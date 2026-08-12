@@ -1,4 +1,11 @@
-import type { NexusSubject, OwnershipProofV1, ProofRequest } from '@nexus/protocol';
+import type {
+  NexusDeviceAuthorizationIdV2,
+  NexusDeviceIdV2,
+  NexusSubject,
+  OwnershipProofV1,
+  OwnershipProofV2,
+  ProofRequest,
+} from '@nexus/protocol';
 
 export type NoteVisibility = 'public' | 'private';
 export type AuthorizationMethod = 'wallet-proof' | 'rp-session';
@@ -14,6 +21,8 @@ export type SessionAction =
   | 'note.unlike'
   | 'profile.set-name';
 export type NotesAction = ProofAction | SessionAction;
+export type AcceptedProofProtocol = 'nexus.ownership-proof.v2' | 'nexus.ownership-proof.v1';
+export type AcceptedProofProtocols = readonly [AcceptedProofProtocol, ...AcceptedProofProtocol[]];
 
 export interface NoteDraft {
   title: string;
@@ -55,13 +64,24 @@ export interface StartSessionOperation {
 export interface IssuedChallenge extends ProofRequest {
   challengeId: string;
   expiresAt: number;
+  /** Backend-authoritative proof negotiation, ordered by RP preference. */
+  acceptedProofProtocols: AcceptedProofProtocols;
 }
 
-export interface SubmitProofInput {
+interface SubmitProofInputBase {
   challengeId: string;
-  proof: OwnershipProofV1;
   operation: StartSessionOperation;
 }
+
+export type SubmitProofInput =
+  | (SubmitProofInputBase & {
+      proofProtocol: 'nexus.ownership-proof.v1';
+      proof: OwnershipProofV1;
+    })
+  | (SubmitProofInputBase & {
+      proofProtocol: 'nexus.ownership-proof.v2';
+      proof: OwnershipProofV2;
+    });
 
 export type SessionOperationInput =
   | { action: 'note.create'; draft: NoteDraft }
@@ -91,6 +111,9 @@ export interface SessionStatus {
   sequence: number;
   expiresAt: number;
   checkedAt: number;
+  proofProtocol?: AcceptedProofProtocol | undefined;
+  deviceId?: NexusDeviceIdV2 | undefined;
+  authorizationId?: NexusDeviceAuthorizationIdV2 | undefined;
 }
 
 export interface SessionStartResult {

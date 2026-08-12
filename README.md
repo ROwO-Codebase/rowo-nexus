@@ -56,10 +56,14 @@ Worker memory, and transparency data cannot authorize current control.
 8. [ADR-0008: Default rotation is unlinkable](./docs/adr/0008-default-rotation-unlinkable.md)
 9. [ADR-0009: Historical timestamps require trusted receipts](./docs/adr/0009-trusted-historical-timestamps.md)
 10. [ADR-0010: Hash-only transparency](./docs/adr/0010-hash-only-transparency.md)
+11. [ADR-0011: Root-authorized device keys](./docs/adr/0011-root-authorized-device-keys.md)
 
 Nexus v1 intentionally provides no identity-key backup, portable private-key export/import, or cloud
-recovery service. Identity keys remain local to the wallet; losing local key material is permanent,
-and a disposed identity cannot be recovered or reactivated.
+recovery service. The additive [v2 root/device profile](./docs/protocol/device-delegation-v2.md)
+preserves the same `nx1_` identity and non-extractable root while allowing that root to authorize
+independently revocable device signing keys. Only a device key may be copied through an encrypted
+offline transfer bundle; the identity/root key is never exported. Existing v1 proofs and endpoints
+remain unchanged.
 
 ## Prerequisites
 

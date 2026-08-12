@@ -1,4 +1,8 @@
 import {
+  DEVICE_AUTHORIZATION_HASH_DOMAIN_V2,
+  DEVICE_ID_HASH_DOMAIN_V2,
+  DEVICE_OPERATION_HASH_DOMAIN_V2,
+  DEVICE_REGISTRY_EVENT_HASH_DOMAIN_V2,
   GENESIS_HASH_DOMAIN,
   REGISTRY_EVENT_HASH_DOMAIN,
   REVOCATION_COMMITMENT_DOMAIN,
@@ -7,6 +11,10 @@ import {
 } from './constants.js';
 import { canonicalizeToBytes } from './canonical.js';
 import type {
+  DeviceAuthorizationPayloadV2,
+  DeviceIdInputV2,
+  DeviceOperationPayloadV2,
+  DeviceRegistryEventWithoutEventIdV2,
   GlobalTransparencyCheckpointPayloadV1,
   IdentityGenesisV1,
   RegistryEventWithoutEventIdV1,
@@ -59,6 +67,37 @@ export function createRegistryEventHashPreimage(
 ): Uint8Array {
   return concatenate(
     textEncoder.encode(REGISTRY_EVENT_HASH_DOMAIN),
+    canonicalizeToBytes(eventWithoutEventId),
+  );
+}
+
+export function createDeviceIdHashPreimageV2(input: DeviceIdInputV2): Uint8Array {
+  return concatenate(textEncoder.encode(DEVICE_ID_HASH_DOMAIN_V2), canonicalizeToBytes(input));
+}
+
+export function createDeviceAuthorizationHashPreimageV2(
+  payload: DeviceAuthorizationPayloadV2,
+): Uint8Array {
+  return concatenate(
+    textEncoder.encode(DEVICE_AUTHORIZATION_HASH_DOMAIN_V2),
+    canonicalizeToBytes(payload),
+  );
+}
+
+export function createDeviceOperationHashPreimageV2(
+  signedPayload: DeviceOperationPayloadV2,
+): Uint8Array {
+  return concatenate(
+    textEncoder.encode(DEVICE_OPERATION_HASH_DOMAIN_V2),
+    canonicalizeToBytes(signedPayload),
+  );
+}
+
+export function createDeviceRegistryEventHashPreimageV2(
+  eventWithoutEventId: DeviceRegistryEventWithoutEventIdV2,
+): Uint8Array {
+  return concatenate(
+    textEncoder.encode(DEVICE_REGISTRY_EVENT_HASH_DOMAIN_V2),
     canonicalizeToBytes(eventWithoutEventId),
   );
 }

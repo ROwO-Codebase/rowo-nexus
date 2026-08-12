@@ -2,6 +2,7 @@ import { WorkerEntrypoint } from 'cloudflare:workers';
 import {
   decodeBase64Url,
   decodeBase64UrlExact,
+  deviceRegistryEventV2Schema,
   encodeBase64Url,
   globalTransparencyCheckpointPayloadV1Schema,
   registryEventV1Schema,
@@ -13,12 +14,18 @@ import {
   transparencyCheckpointPayloadV1Schema,
   transparencyInclusionProofV1Schema,
   type RegistryEventV1,
+  type DeviceRegistryEventV2,
   type ServiceKeySet,
   type SignedGlobalTransparencyCheckpointV1,
   type SignedTransparencyCheckpointV1,
   type TransparencyInclusionProofV1,
 } from '@nexus/protocol';
-import { deriveRegistryEventId, signProtocolPayload, WebCryptoProvider } from '@nexus/crypto';
+import {
+  deriveDeviceRegistryEventIdV2,
+  deriveRegistryEventId,
+  signProtocolPayload,
+  WebCryptoProvider,
+} from '@nexus/crypto';
 
 import { badRequest, TransparencyError } from './errors.js';
 import {
@@ -76,6 +83,28 @@ export default class TransparencyService extends WorkerEntrypoint<Env> {
       throw new TransparencyError(
         'INVALID_EVENT_ID',
         'The registry event ID does not match its canonical payload.',
+        400,
+      );
+    }
+
+    const eventHash = encodeBase64Url(derived.eventHash);
+    const shardId = resolveShardId(derived.eventHash);
+    return this.callShard<AppendResult>(shardId, '/internal/v1/append', {
+      eventId,
+      eventHash,
+      shardId,
+    });
+  }
+
+  /** Additive v2 append; the public log still retains hashes only. */
+  async appendDevice(event: DeviceRegistryEventV2): Promise<AppendResult> {
+    const parsed = deviceRegistryEventV2Schema.parse(event);
+    const { eventId, ...eventWithoutEventId } = parsed;
+    const derived = await deriveDeviceRegistryEventIdV2(eventWithoutEventId, this.provider);
+    if (derived.eventId !== eventId) {
+      throw new TransparencyError(
+        'INVALID_EVENT_ID',
+        'The device registry event ID does not match its canonical payload.',
         400,
       );
     }

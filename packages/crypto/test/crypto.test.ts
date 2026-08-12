@@ -4,11 +4,22 @@ import {
   concatBytes,
   constantTimeEqual,
   createProtocolSignaturePreimage,
+  deriveDeviceAuthorizationIdV2,
+  deriveDeviceIdV2,
+  deriveDeviceOperationIdV2,
   signProtocolPayload,
   utf8Encode,
   verifyProtocolPayload,
   WebCryptoProvider,
 } from '../src/index.js';
+import {
+  DEVICE_ACTIVATION_PROTOCOL_V2,
+  DEVICE_AUTHORIZATION_PROTOCOL_V2,
+  ED25519_ALGORITHM,
+  encodeBase64Url,
+  formatSubject,
+} from '@nexus/protocol';
+import type { Base64Url32, DeviceAuthorizationPayloadV2 } from '@nexus/protocol';
 
 const provider = new WebCryptoProvider();
 
@@ -69,6 +80,45 @@ describe('WebCryptoProvider', () => {
         nested: { a: 1, z: 2 },
       }),
     ).toEqual(createProtocolSignaturePreimage(payload));
+  });
+
+  it('derives deterministic and domain-separated v2 device identifiers', async () => {
+    const subject = formatSubject(new Uint8Array(32).fill(0x11));
+    const publicKey = encodeBase64Url(new Uint8Array(32).fill(0x22)) as Base64Url32;
+    const deviceInput = {
+      subject,
+      signingKey: { alg: ED25519_ALGORITHM, publicKey },
+    } as const;
+    const deviceId = await deriveDeviceIdV2(deviceInput, provider);
+    const authorization: DeviceAuthorizationPayloadV2 = {
+      protocol: DEVICE_AUTHORIZATION_PROTOCOL_V2,
+      ...deviceInput,
+      genesisHash: publicKey,
+      deviceId,
+      authorizationNonce: publicKey,
+      validFrom: 1,
+      activationDeadline: 2,
+      expiresAt: 3,
+    };
+
+    await expect(deriveDeviceIdV2(deviceInput, provider)).resolves.toBe(deviceId);
+    await expect(deriveDeviceAuthorizationIdV2(authorization, provider)).resolves.toMatch(
+      /^nxa2_[A-Za-z0-9_-]{43}$/u,
+    );
+    await expect(
+      deriveDeviceOperationIdV2(
+        {
+          protocol: DEVICE_ACTIVATION_PROTOCOL_V2,
+          subject,
+          deviceId,
+          authorizationId: await deriveDeviceAuthorizationIdV2(authorization, provider),
+          requestId: publicKey,
+          iat: 1,
+          exp: 2,
+        },
+        provider,
+      ),
+    ).resolves.toMatch(/^nxo2_[A-Za-z0-9_-]{43}$/u);
   });
 
   it('derives HKDF-SHA-256 output deterministically', async () => {

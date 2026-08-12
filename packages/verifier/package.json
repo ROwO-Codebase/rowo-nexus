@@ -21,7 +21,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run --root ../.. packages/verifier/src/verifier.test.ts packages/verifier/src/transparency.test.ts packages/verifier/src/transparency-auth.test.ts"
+    "test": "vitest run --root ../.. packages/verifier/src/verifier.test.ts packages/verifier/src/ownership-v2.test.ts packages/verifier/src/transparency.test.ts packages/verifier/src/transparency-auth.test.ts"
   },
   "dependencies": {
     "@nexus/crypto": "workspace:*",

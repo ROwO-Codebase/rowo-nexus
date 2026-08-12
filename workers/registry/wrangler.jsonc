@@ -13,7 +13,10 @@
     },
   },
   "queues": {
-    "producers": [{ "binding": "REGISTRY_EVENTS", "queue": "nexus-registry-events" }],
+    "producers": [
+      { "binding": "REGISTRY_EVENTS", "queue": "nexus-registry-events" },
+      { "binding": "REGISTRY_DEVICE_EVENTS", "queue": "nexus-registry-device-events" },
+    ],
   },
   "analytics_engine_datasets": [{ "binding": "METRICS", "dataset": "nexus_metrics" }],
   "observability": {

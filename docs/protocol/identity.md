@@ -61,6 +61,11 @@ an RP or Cloudflare service.
 Nexus v1 provides no private-key export, import, backup, recovery, or server-side wallet storage
 path. Identity keys remain local and non-extractable in the wallet.
 
+The additive [v2 root/device profile](./device-delegation-v2.md) does not change that rule for the
+identity key. It treats the unchanged v1 signing key as a non-extractable per-identity root and lets
+it authorize independently generated device signing keys. An existing active v1 identity can adopt
+that workflow without changing its genesis or `nx1_` subject.
+
 ## Privacy properties and limits
 
 - A wallet may manage many identities, but exposes no stable public controller.

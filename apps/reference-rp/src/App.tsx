@@ -211,17 +211,30 @@ export function App(): React.ReactElement {
         title: 'Approve Notes session',
         message: 'Review session.start and the Nexus Notes session resource in your wallet.',
       });
-      const result = await nexus.requestProof(request, { signal: controller.signal });
+      const result = await nexus.requestProofV2(request, {
+        signal: controller.signal,
+        acceptedProofProtocols: challenge.acceptedProofProtocols,
+      });
       setProof({
         stage: 'verifying',
         title: 'Starting secure session',
         message: 'Checking the proof and authoritative identity lifecycle.',
       });
-      const started = await startSession({
-        challengeId: challenge.challengeId,
-        proof: result.proof,
-        operation,
-      });
+      const started = await startSession(
+        result.proofProtocol === 'nexus.ownership-proof.v2'
+          ? {
+              challengeId: challenge.challengeId,
+              proofProtocol: result.proofProtocol,
+              proof: result.proof,
+              operation,
+            }
+          : {
+              challengeId: challenge.challengeId,
+              proofProtocol: result.proofProtocol,
+              proof: result.proof,
+              operation,
+            },
+      );
       setSession(started.session);
       setReceipts((current) => [started.receipt, ...current].slice(0, 6));
       setProof({

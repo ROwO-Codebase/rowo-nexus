@@ -1,4 +1,8 @@
 import {
+  createDeviceAuthorizationHashPreimageV2,
+  createDeviceIdHashPreimageV2,
+  createDeviceOperationHashPreimageV2,
+  createDeviceRegistryEventHashPreimageV2,
   createGenesisHashPreimage as createCanonicalGenesisHashPreimage,
   createRegistryEventHashPreimage as createCanonicalRegistryEventHashPreimage,
   createRevocationCommitmentPreimage as createCanonicalRevocationCommitmentPreimage,
@@ -7,12 +11,24 @@ import {
   ED25519_SIGNATURE_BYTE_LENGTH,
   encodeBase64Url,
   formatRegistryEventId,
+  formatDeviceAuthorizationIdV2,
+  formatDeviceIdV2,
+  formatDeviceOperationIdV2,
+  formatDeviceRegistryEventIdV2,
   formatSubject,
   SHA256_BYTE_LENGTH,
 } from '@nexus/protocol';
 import type {
+  DeviceAuthorizationPayloadV2,
+  DeviceIdInputV2,
+  DeviceOperationPayloadV2,
+  DeviceRegistryEventWithoutEventIdV2,
   IdentityGenesisV1,
   NexusEventId,
+  NexusDeviceAuthorizationIdV2,
+  NexusDeviceEventIdV2,
+  NexusDeviceIdV2,
+  NexusDeviceOperationIdV2,
   NexusSubject,
   RegistryEventWithoutEventIdV1,
 } from '@nexus/protocol';
@@ -122,4 +138,45 @@ export async function deriveRegistryEventId(
     eventHash,
     eventId: formatRegistryEventId(eventHash),
   };
+}
+
+export async function deriveDeviceIdV2(
+  input: DeviceIdInputV2,
+  provider: CryptoProvider = getDefaultCryptoProvider(),
+): Promise<NexusDeviceIdV2> {
+  const hash = await provider.sha256(createDeviceIdHashPreimageV2(input));
+  requireExactLength(hash, SHA256_BYTE_LENGTH, 'Device ID hash');
+  return formatDeviceIdV2(hash);
+}
+
+export async function deriveDeviceAuthorizationIdV2(
+  payload: DeviceAuthorizationPayloadV2,
+  provider: CryptoProvider = getDefaultCryptoProvider(),
+): Promise<NexusDeviceAuthorizationIdV2> {
+  const hash = await provider.sha256(createDeviceAuthorizationHashPreimageV2(payload));
+  requireExactLength(hash, SHA256_BYTE_LENGTH, 'Device authorization hash');
+  return formatDeviceAuthorizationIdV2(hash);
+}
+
+export async function deriveDeviceOperationIdV2(
+  signedPayload: DeviceOperationPayloadV2,
+  provider: CryptoProvider = getDefaultCryptoProvider(),
+): Promise<NexusDeviceOperationIdV2> {
+  const hash = await provider.sha256(createDeviceOperationHashPreimageV2(signedPayload));
+  requireExactLength(hash, SHA256_BYTE_LENGTH, 'Device operation hash');
+  return formatDeviceOperationIdV2(hash);
+}
+
+export async function deriveDeviceRegistryEventIdV2(
+  eventWithoutEventId: DeviceRegistryEventWithoutEventIdV2,
+  provider: CryptoProvider = getDefaultCryptoProvider(),
+): Promise<{
+  readonly eventHash: Uint8Array;
+  readonly eventId: NexusDeviceEventIdV2;
+}> {
+  const eventHash = await provider.sha256(
+    createDeviceRegistryEventHashPreimageV2(eventWithoutEventId),
+  );
+  requireExactLength(eventHash, SHA256_BYTE_LENGTH, 'Device registry event hash');
+  return { eventHash, eventId: formatDeviceRegistryEventIdV2(eventHash) };
 }

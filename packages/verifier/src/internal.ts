@@ -140,7 +140,11 @@ export function validateIssuedAt(
 }
 
 export async function importIdentitySigningKey(genesis: IdentityGenesisV1): Promise<CryptoKey> {
-  const raw = decodeBase64UrlExact(genesis.signingKey.publicKey, 32);
+  return importEd25519PublicKey(genesis.signingKey.publicKey);
+}
+
+export async function importEd25519PublicKey(encodedPublicKey: string): Promise<CryptoKey> {
+  const raw = decodeBase64UrlExact(encodedPublicKey, 32);
 
   try {
     return await getDefaultCryptoProvider().importEd25519PublicKey(raw);

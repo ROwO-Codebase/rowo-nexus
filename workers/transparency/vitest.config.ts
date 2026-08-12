@@ -2,7 +2,7 @@ import { cloudflareTest } from '@cloudflare/vitest-pool-workers';
 import { defineConfig } from 'vitest/config';
 
 const TEST_SIGNING_KID = 'transparency-test-2026-08';
-const TEST_PRIVATE_KEY_PKCS8 = 'MC4CAQAwBQYDK2VwBCIEIMWqjfQ_n4N77bdELzHct7Fm04U1B28JS4XOOi4LRFj3';
+const TEST_PRIVATE_KEY_PKCS8 = 'MC4CAQAwBQYDK2VwBCIEIMWqjfQ_n4N77bdELzHct7Fm04U1B28JS4XOOi4LRFj3'; // gitleaks:allow -- fixed test-only Ed25519 fixture
 const TEST_PUBLIC_KEY = '_FHNjmIYoaONpH7QAjDwWAgW7RO6MwOsXeuRFUiQgCU';
 
 export default defineConfig({

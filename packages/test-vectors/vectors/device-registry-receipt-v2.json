@@ -1,0 +1,72 @@
+{
+  "schema": "nexus.test-vectors.v2",
+  "warning": "NON-PRODUCTION TEST FIXTURE: public RFC 8032 key material; never use for real identities or services.",
+  "signingKeyId": "service-registry",
+  "keyset": {
+    "keys": [
+      {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "alg": "EdDSA",
+        "kid": "registry-fixture-2026-01",
+        "x": "_FHNjmIYoaONpH7QAjDwWAgW7RO6MwOsXeuRFUiQgCU",
+        "use": "sig"
+      }
+    ]
+  },
+  "payload": {
+    "protocol": "nexus.device-registry-receipt.v2",
+    "eventId": "nxde2_CvnGCiBdEN6EcRUlCMld3kFYb9g-00bxw5bK0F4xtZc",
+    "operationId": "nxo2_5isHkiO1sXhqbBr-V-DTSGPpCqp5Zc5E1QdvjvNkKoc",
+    "eventType": "activated",
+    "subject": "nx1_NZxiwvOxD3WCQ66ho5k9hF2vvDnhtZ7DsH9w4HnUWeo",
+    "genesisHash": "NZxiwvOxD3WCQ66ho5k9hF2vvDnhtZ7DsH9w4HnUWeo",
+    "identitySequence": 0,
+    "identityState": "active",
+    "deviceLedgerSequence": 1,
+    "deviceId": "nxd2_oc8fH_zsmrNfsyuqQxSrCb8IN7YrHLYMIBVju6uCr1c",
+    "authorizationId": "nxa2_O6_PZa8kB14rRNe3ePy3HC19qmyUHq9ahsG513Vcml4",
+    "deviceState": "active",
+    "authorizationExpiresAt": 1786486400,
+    "acceptedAt": 1786400015,
+    "signerKid": "registry-fixture-2026-01"
+  },
+  "canonicalPayloadJcs": "{\"acceptedAt\":1786400015,\"authorizationExpiresAt\":1786486400,\"authorizationId\":\"nxa2_O6_PZa8kB14rRNe3ePy3HC19qmyUHq9ahsG513Vcml4\",\"deviceId\":\"nxd2_oc8fH_zsmrNfsyuqQxSrCb8IN7YrHLYMIBVju6uCr1c\",\"deviceLedgerSequence\":1,\"deviceState\":\"active\",\"eventId\":\"nxde2_CvnGCiBdEN6EcRUlCMld3kFYb9g-00bxw5bK0F4xtZc\",\"eventType\":\"activated\",\"genesisHash\":\"NZxiwvOxD3WCQ66ho5k9hF2vvDnhtZ7DsH9w4HnUWeo\",\"identitySequence\":0,\"identityState\":\"active\",\"operationId\":\"nxo2_5isHkiO1sXhqbBr-V-DTSGPpCqp5Zc5E1QdvjvNkKoc\",\"protocol\":\"nexus.device-registry-receipt.v2\",\"signerKid\":\"registry-fixture-2026-01\",\"subject\":\"nx1_NZxiwvOxD3WCQ66ho5k9hF2vvDnhtZ7DsH9w4HnUWeo\"}",
+  "signaturePreimageHex": "4e455855532d5349474e4154555245006e657875732e6465766963652d72656769737472792d726563656970742e7632007b2261636365707465644174223a313738363430303031352c22617574686f72697a6174696f6e457870697265734174223a313738363438363430302c22617574686f72697a6174696f6e4964223a226e7861325f4f365f505a61386b42313472524e65336550793348433139716d79554871396168734735313356636d6c34222c226465766963654964223a226e7864325f6f633866485f7a736d724e667379757151785372436238494e375972484c594d4942566a75367543723163222c226465766963654c656467657253657175656e6365223a312c226465766963655374617465223a22616374697665222c226576656e744964223a226e786465325f43766e4743694264454e36456352556c434d6c64336b46596239672d303062787735624b30463478745a63222c226576656e7454797065223a22616374697661746564222c2267656e6573697348617368223a224e5a786977764f7844335743513636686f356b396846327676446e68745a37447348397734486e5557656f222c226964656e7469747953657175656e6365223a302c226964656e746974795374617465223a22616374697665222c226f7065726174696f6e4964223a226e786f325f356973486b694f31735868716242722d562d445453475070437170355a633545315164766a764e6b4b6f63222c2270726f746f636f6c223a226e657875732e6465766963652d72656769737472792d726563656970742e7632222c227369676e65724b6964223a2272656769737472792d666978747572652d323032362d3031222c227375626a656374223a226e78315f4e5a786977764f7844335743513636686f356b396846327676446e68745a37447348397734486e5557656f227d",
+  "signatureBase64Url": "WoK-JZ86_ehGE2_5DfOZSkwVapc3BHBNawlW43r9grlfFrSzDuiJ2BkHsWhtZ7CaFS9UtvF7plluJ5l6Cb8vBg",
+  "receipt": {
+    "payload": {
+      "protocol": "nexus.device-registry-receipt.v2",
+      "eventId": "nxde2_CvnGCiBdEN6EcRUlCMld3kFYb9g-00bxw5bK0F4xtZc",
+      "operationId": "nxo2_5isHkiO1sXhqbBr-V-DTSGPpCqp5Zc5E1QdvjvNkKoc",
+      "eventType": "activated",
+      "subject": "nx1_NZxiwvOxD3WCQ66ho5k9hF2vvDnhtZ7DsH9w4HnUWeo",
+      "genesisHash": "NZxiwvOxD3WCQ66ho5k9hF2vvDnhtZ7DsH9w4HnUWeo",
+      "identitySequence": 0,
+      "identityState": "active",
+      "deviceLedgerSequence": 1,
+      "deviceId": "nxd2_oc8fH_zsmrNfsyuqQxSrCb8IN7YrHLYMIBVju6uCr1c",
+      "authorizationId": "nxa2_O6_PZa8kB14rRNe3ePy3HC19qmyUHq9ahsG513Vcml4",
+      "deviceState": "active",
+      "authorizationExpiresAt": 1786486400,
+      "acceptedAt": 1786400015,
+      "signerKid": "registry-fixture-2026-01"
+    },
+    "signature": "WoK-JZ86_ehGE2_5DfOZSkwVapc3BHBNawlW43r9grlfFrSzDuiJ2BkHsWhtZ7CaFS9UtvF7plluJ5l6Cb8vBg"
+  },
+  "verification": {
+    "eventId": "nxde2_CvnGCiBdEN6EcRUlCMld3kFYb9g-00bxw5bK0F4xtZc",
+    "operationId": "nxo2_5isHkiO1sXhqbBr-V-DTSGPpCqp5Zc5E1QdvjvNkKoc",
+    "subject": "nx1_NZxiwvOxD3WCQ66ho5k9hF2vvDnhtZ7DsH9w4HnUWeo",
+    "genesisHash": "NZxiwvOxD3WCQ66ho5k9hF2vvDnhtZ7DsH9w4HnUWeo",
+    "eventType": "activated",
+    "identityState": "active",
+    "identitySequence": 0,
+    "deviceLedgerSequence": 1,
+    "deviceId": "nxd2_oc8fH_zsmrNfsyuqQxSrCb8IN7YrHLYMIBVju6uCr1c",
+    "authorizationId": "nxa2_O6_PZa8kB14rRNe3ePy3HC19qmyUHq9ahsG513Vcml4",
+    "deviceState": "active",
+    "authorizationExpiresAt": 1786486400,
+    "acceptedAt": 1786400015
+  }
+}

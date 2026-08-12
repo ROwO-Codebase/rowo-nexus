@@ -10,6 +10,8 @@ export type RpErrorCode =
   | 'NAME_TAKEN'
   | 'VERSION_CONFLICT'
   | 'SESSION_INVALID'
+  | 'UNSUPPORTED_PROOF_PROTOCOL'
+  | 'SERVICE_UNAVAILABLE'
   | 'INTERNAL_ERROR';
 
 export class RpError extends Error {

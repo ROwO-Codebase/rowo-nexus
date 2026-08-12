@@ -52,11 +52,18 @@ export default defineConfig(async () => {
           d1Databases: { INDEX_DB: 'nexus-index-acceptance' },
           serviceBindings: {
             REGISTRY_EVENTS: 'acceptance-registry-queue',
+            REGISTRY_DEVICE_EVENTS: 'acceptance-registry-device-queue',
             TEST_QUEUE_CONTROL: 'acceptance-registry-queue',
+            TEST_DEVICE_QUEUE_CONTROL: 'acceptance-registry-device-queue',
           },
           workers: [
             {
               name: 'acceptance-registry-queue',
+              modules: true,
+              script: queueScript,
+            },
+            {
+              name: 'acceptance-registry-device-queue',
               modules: true,
               script: queueScript,
             },

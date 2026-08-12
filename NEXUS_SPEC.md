@@ -2,7 +2,7 @@
 
 **Status:** Implementation Specification / Codex Build Plan  
 **Version:** `0.1.0-draft`  
-**Last validated:** 2026-08-11  
+**Last validated:** 2026-08-12
 **Primary runtime:** Cloudflare Workers  
 **Primary language:** TypeScript  
 **Repository:** `nexus` (standalone from any consuming anonymous platform)
@@ -27,6 +27,8 @@ The central privacy invariant is:
 
 This document specifies the protocol, cryptographic objects, Cloudflare deployment, data models, repository architecture, browser wallet, relying-party integration, lifecycle semantics, threat model, implementation phases, and acceptance criteria.
 
+The additive [root/device delegation v2 profile](./docs/protocol/device-delegation-v2.md) is incorporated by reference and is normative for v2 objects and operations. It keeps the `nexus.identity.v1` genesis, `nx1_` subject, v1 endpoints, and v1 terminal lifecycle unchanged. Where the profile grants a narrowly scoped v2 exception (for example, a subject-bound device-key identifier in a v2 proof), that exception applies only to the explicitly versioned v2 object and MUST NOT broaden a v1 schema or behavior.
+
 ---
 
 ## 1. Normative language
@@ -34,6 +36,8 @@ This document specifies the protocol, cryptographic objects, Cloudflare deployme
 The words **MUST**, **MUST NOT**, **SHOULD**, **SHOULD NOT**, and **MAY** are normative requirements.
 
 When implementation convenience conflicts with a privacy or cryptographic invariant in this document, the invariant wins.
+
+V1 consumers MUST continue to reject unknown v2 protocols. Supporting v2 never silently changes the interpretation of a v1 object.
 
 ---
 
@@ -99,6 +103,8 @@ Version 1 does NOT attempt to provide:
 - A custom cryptographic primitive.
 - End-to-end chat encryption itself. Chat protocols such as MLS belong to consuming applications; Nexus supplies identity/control primitives.
 - Perfect physical secure deletion from browser/OS storage. Nexus enforces disposal through irreversible revocation even if old key material survives elsewhere.
+
+The v2 profile does not add identity/root-key backup or recovery. It permits only an independently generated device key to enter an authenticated encrypted offline transfer bundle; see the normative v2 profile for its cloning and root-loss limitations.
 
 ---
 
@@ -166,11 +172,15 @@ The implementation MUST enforce all of the following.
 
 The wallet MUST NOT send a stable controller ID, vault ID, installation ID, device ID, account ID, or master public key to relying parties.
 
+The only v2 exception is the `nxd2_` identifier required to verify an explicitly negotiated `nexus.ownership-proof.v2`. It is derived from one subject and one device public key, MUST NOT be reused across subjects, and MUST NOT encode or be treated as a physical-device, installation, wallet, controller, or account identifier. V1 objects remain unchanged.
+
 ### P2 — Independent identities
 
 Each disposable identity MUST use independently generated random private key material. Disposable identities MUST NOT be deterministically derived from a surviving master seed.
 
 Reason: if identity `A` can be regenerated from a master seed, deleting `A` is not meaningful cryptographic disposal.
+
+V2 device keys are not new identities. They MUST nevertheless be independently CSPRNG-generated and MUST NOT be derived from the identity root or a sibling device key.
 
 ### P3 — Scope relationships are local
 
@@ -199,6 +209,7 @@ The wallet SDK MUST default to one or more identities selected for the requestin
 Application logs MUST NOT contain:
 
 - private keys;
+- device private keys or decrypted device-transfer contents;
 - revocation secrets;
 - raw signed proof bodies;
 - identity Genesis Documents unless explicitly running a local debug build;
@@ -870,10 +881,11 @@ If D1 disagrees with the subject Durable Object, the Durable Object wins.
 
 ### 19.5 Cloudflare Queues — asynchronous event distribution
 
-Use a queue such as:
+Use separate queues such as:
 
 ```text
 nexus-registry-events
+nexus-registry-device-events
 ```
 
 for:
@@ -886,6 +898,19 @@ for:
 Consumers MUST be idempotent because delivery can be retried.
 
 Every event has a deterministic `eventId`.
+
+V1 identity events and v2 device events MUST use separate producer bindings, queues, dead-letter
+queues, strict event schemas, and projector dispatch paths:
+
+```text
+REGISTRY_EVENTS        -> nexus-registry-events        -> nexus-registry-events-dlq
+REGISTRY_DEVICE_EVENTS -> nexus-registry-device-events -> nexus-registry-device-events-dlq
+```
+
+The queues are independently at-least-once and unordered relative to each other. A v2 device event
+may reach the projector before its v1 registration event. The projector therefore persists and
+deduplicates the signed event but materializes device state only after the matching v1 subject and
+genesis anchor exist. Neither queue is an authorization source.
 
 ### 19.6 R2 — audit and operational artifacts
 
@@ -1170,10 +1195,11 @@ D1 data is operational data, not a user directory. Admin APIs to search it SHOUL
 
 ## 25. API conventions
 
-Base:
+Versioned bases:
 
 ```text
-https://api.nexus.example/v1
+https://api.nexus.example/v1        # identity lifecycle
+https://api.nexus.example/v2/device # root-authorized device lifecycle
 ```
 
 Content type:
@@ -1198,7 +1224,7 @@ Rules:
 
 ### `GET /.well-known/nexus.json`
 
-Returns:
+This is the immutable v1 discovery contract. It returns exactly:
 
 ```json
 {
@@ -1209,6 +1235,38 @@ Returns:
   "wallet": "https://wallet.nexus.example"
 }
 ```
+
+V2 support MUST NOT add fields or protocols to this response. Existing v1 clients may use strict
+object validation and must continue to receive the exact v1 shape.
+
+### `GET /.well-known/nexus-v2.json`
+
+This additive versioned endpoint advertises the root/device profile and links back to v1 discovery:
+
+```json
+{
+  "protocols": [
+    "nexus.identity.v1",
+    "nexus.ownership-proof.v1",
+    "nexus.device-authorization.v2",
+    "nexus.ownership-proof.v2"
+  ],
+  "suites": ["NX-25519-SHA256-JCS-v1"],
+  "registry": "https://api.nexus.example/v1",
+  "deviceRegistry": "https://api.nexus.example/v2/device",
+  "popupChannels": ["nexus.popup.v2", "nexus.popup.v1"],
+  "v1Discovery": "https://api.nexus.example/.well-known/nexus.json",
+  "jwks": "https://api.nexus.example/.well-known/jwks.json",
+  "wallet": "https://wallet.nexus.example"
+}
+```
+
+The `protocols` array names signed identity/ownership primitives relevant to capability discovery;
+the device-operation protocol identifiers and exact endpoints are defined by the v2 profile under
+`deviceRegistry`. Array order expresses the deployment's preference only. It never authorizes a
+proof protocol: popup negotiation and the RP's backend-bound challenge policy remain authoritative.
+A v2-aware client fetches the versioned document directly and MAY follow `v1Discovery`; a v1 client
+need not parse, fetch, or know about the v2 document.
 
 ### `GET /.well-known/jwks.json`
 
@@ -1405,6 +1463,31 @@ BODY_TOO_LARGE
 INTERNAL_ERROR
 ```
 
+That closed set remains the v1 `NEXUS_ERROR_CODES` contract. V2 device endpoints use the additive
+`NEXUS_DEVICE_ERROR_CODES` set: all v1 codes plus:
+
+```text
+METHOD_NOT_ALLOWED
+UNSUPPORTED_MEDIA_TYPE
+ORIGIN_NOT_ALLOWED
+HTTPS_REQUIRED
+SERVICE_UNAVAILABLE
+DEVICE_NOT_FOUND
+DEVICE_REVOKED
+DEVICE_AUTHORIZATION_CONFLICT
+```
+
+None of these additive codes are added to the v1 protocol union or accepted by the strict v1
+`NexusError` schema. `METHOD_NOT_ALLOWED`, `UNSUPPORTED_MEDIA_TYPE`, `ORIGIN_NOT_ALLOWED`,
+`HTTPS_REQUIRED`, and `SERVICE_UNAVAILABLE` are HTTP/Edge transport faults; the Edge emitted them
+before v2 outside the strict v1 protocol-domain schema. Their inclusion in `NexusDeviceError` makes
+the v2 device transport contract complete and does not reinterpret or widen a v1 protocol object.
+
+The v2 `NexusDeviceError` type/schema is used only by `/v2/device` endpoints and device batch
+entries. Library-local verification errors such as `DEVICE_EXPIRED`, `WRONG_DEVICE`,
+`WRONG_AUTHORIZATION`, and `WRONG_CONTEXT` describe verifier outcomes and are not registry wire
+error codes.
+
 Error messages MUST NOT reveal whether a guessed revocation secret was close/correct in any partial sense.
 
 ---
@@ -1553,6 +1636,12 @@ No consumer outside wallet internals gets a raw key by default.
 Prefer non-extractable `CryptoKey` objects for normal local operation where browser support/IndexedDB persistence is verified by test.
 
 Private identity keys remain non-extractable in v1.
+
+The v2 identity root is that same non-extractable key. A v2 root MAY create a temporarily
+extractable, independently generated device key solely for immediate authenticated encrypted
+offline transfer. It MUST NOT export the root, and the destination MUST import the device key as
+non-extractable. The complete requirements and residual cloning risk are defined in
+[`docs/protocol/device-delegation-v2.md`](./docs/protocol/device-delegation-v2.md).
 
 ### 37.4 XSS statement
 
@@ -2078,7 +2167,11 @@ Conceptually:
   },
   "queues": {
     "producers": [
-      { "binding": "REGISTRY_EVENTS", "queue": "nexus-registry-events" }
+      { "binding": "REGISTRY_EVENTS", "queue": "nexus-registry-events" },
+      {
+        "binding": "REGISTRY_DEVICE_EVENTS",
+        "queue": "nexus-registry-device-events"
+      }
     ]
   },
   "migrations": [
@@ -2107,7 +2200,8 @@ Conceptually:
   ],
   "queues": {
     "consumers": [
-      { "queue": "nexus-registry-events", "max_batch_size": 100 }
+      { "queue": "nexus-registry-events", "max_batch_size": 100 },
+      { "queue": "nexus-registry-device-events", "max_batch_size": 100 }
     ]
   },
   "services": [
@@ -2115,6 +2209,12 @@ Conceptually:
   ]
 }
 ```
+
+Production configuration assigns distinct dead-letter queues to both consumers. Apply the
+version-controlled additive D1 device projection migration before enabling the device consumer. It
+creates device-event, device-state, and per-subject device-ledger-head projection tables without
+changing the v1 identity/event tables. Because cross-queue delivery is unordered, migration and
+projector rollout MUST support deferred reconciliation when a device event precedes its v1 anchor.
 
 ---
 
@@ -2794,6 +2894,11 @@ Self-signed `iat` cannot establish historical time after key leakage.
 
 Avoid creating a public chronological pseudonym directory.
 
+### ADR-0011: Root-authorized device keys
+
+The unchanged v1 signing key may authorize independent v2 device keys; each device is separately
+revocable, the identity root remains non-extractable, and v1 wire behavior remains unchanged.
+
 ---
 
 # Part XXI — Definition of Done
@@ -3012,5 +3117,10 @@ The reviewer must answer at least:
 16. Can a Queue retry duplicate a transparency leaf or D1 logical event?
 17. Do public transparency artifacts avoid exposing a chronological subject directory or plaintext identity inventory?
 18. Does the product clearly distinguish pseudonymity from network anonymity?
+19. Can any v2 device authorize or revoke a sibling, replace the root, or bypass terminal subject revocation? The answer must be no.
+20. Does every v2 proof check the exact active device authorization as well as subject status, rather than relying on v1 status alone?
+21. Can the root private key, revocation secret, RP scopes, or another identity enter a device-transfer envelope? The answer must be no.
+22. Does product language acknowledge that exported device bundles can be cloned and that physical copies cannot be individually distinguished?
+23. Can an existing v1 identity adopt v2 without changing genesis, subject, v1 proofs, receipts, or terminal lifecycle semantics?
 
 If any answer is uncertain, production release is blocked pending review.

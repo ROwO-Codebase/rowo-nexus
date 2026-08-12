@@ -1,5 +1,6 @@
 import {
   NEXUS_BODY_LIMITS,
+  NexusDeviceFault,
   NexusFault,
   assertExactRequestOrigin,
   assertHttps,
@@ -9,12 +10,15 @@ import {
   createCorsHeaders,
   createJsonConsoleSink,
   createNexusErrorBody,
+  createNexusDeviceErrorBody,
   createRequestId,
   createWellKnownHeaders,
+  deviceFaultCode,
   emitAggregateMetric,
   faultCode,
   handleExactOriginPreflight,
   isNexusErrorCode,
+  isNexusDeviceErrorCode,
   latencyBucket,
   parseExactOrigin,
   readBodyBytes,
@@ -22,21 +26,47 @@ import {
   signStatusStatement,
   sizeBucket,
   toNexusErrorResponse,
+  toNexusDeviceErrorResponse,
   type AggregateMetricSink,
   type AggregateOperation,
+  type NexusDeviceErrorCode,
   type ServiceSigningConfig,
 } from '@nexus/cloudflare-common';
-import { deriveGenesisHash, deriveSubject } from '@nexus/crypto';
 import {
+  deriveGenesisHash,
+  deriveSubject,
+  getDefaultCryptoProvider,
+  signProtocolPayload,
+} from '@nexus/crypto';
+import {
+  DEVICE_REGISTRY_RECEIPT_PROTOCOL_V2,
+  DEVICE_STATUS_STATEMENT_PROTOCOL_V2,
   IDENTITY_PROTOCOL_V1,
   NEXUS_SUITE_V1,
+  OWNERSHIP_PROOF_PROTOCOL_V2,
   REGISTRY_RECEIPT_PROTOCOL_V1,
   REVOKE_PROTOCOL_V1,
   REVOKE_SECRET_PROTOCOL_V1,
   STATUS_STATEMENT_PROTOCOL_V1,
+  base64Url32Schema,
+  decodeBase64Url,
+  deviceActivationRequestV2Schema,
+  deviceRegistryEventV2Schema,
+  deviceRegistryReceiptV2Schema,
+  deviceRegistryStatusV2Schema,
+  deviceRootRevokeRequestV2Schema,
+  deviceSelfRevokeRequestV2Schema,
+  deviceStatusBatchResponseV2Schema,
+  deviceStatusBatchRequestV2Schema,
+  deviceStatusRequestV2Schema,
+  deviceStatusStatementV2Schema,
   encodeBase64Url,
   identityGenesisV1Schema,
   nexusEventIdSchema,
+  nexusDeviceAuthorizationIdV2Schema,
+  nexusDeviceEventIdV2Schema,
+  nexusDeviceIdV2Schema,
+  nexusDeviceOperationIdV2Schema,
   nexusSubjectSchema,
   registerIdentityRequestV1Schema,
   registryEventV1Schema,
@@ -48,6 +78,16 @@ import {
   statusBatchRequestV1Schema,
   statusRequestV1Schema,
   statusStatementV1Schema,
+  type DeviceActivationRequestV2,
+  type DeviceRegistryEventV2,
+  type DeviceRegistryReceiptPayloadV2,
+  type DeviceRegistryReceiptV2,
+  type DeviceRegistryStatusV2,
+  type DeviceRootRevokeRequestV2,
+  type DeviceSelfRevokeRequestV2,
+  type DeviceStatusRequestV2,
+  type DeviceStatusStatementPayloadV2,
+  type DeviceStatusStatementV2,
   type IdentityGenesisV1,
   type NexusErrorCode,
   type NexusSubject,
@@ -72,6 +112,9 @@ type RegistryErrorCode =
   | 'IDENTITY_REVOKED'
   | 'SEQUENCE_CONFLICT'
   | 'SUBJECT_GENESIS_CONFLICT'
+  | 'DEVICE_NOT_FOUND'
+  | 'DEVICE_REVOKED'
+  | 'DEVICE_AUTHORIZATION_CONFLICT'
   | 'INTERNAL_ERROR';
 
 interface RegistryFault {
@@ -100,6 +143,39 @@ interface RegistryMutation extends AuthoritativeStatus {
   readonly event: RegistryEventV1;
 }
 
+export interface AuthoritativeDeviceStatusV2 {
+  readonly subject: string;
+  readonly genesisHash: string;
+  readonly identityState: 'active' | 'revoked';
+  readonly identitySequence: number;
+  readonly deviceLedgerSequence: number;
+  readonly deviceId: string;
+  readonly authorizationId: string;
+  readonly deviceState: 'active' | 'revoked' | 'expired' | 'unknown';
+  readonly activatedAt: number | null;
+  readonly revokedAt: number | null;
+  readonly authorizationExpiresAt: number | null;
+}
+
+export interface DeviceRegistryMutationV2 {
+  readonly subject: string;
+  readonly genesisHash: string;
+  readonly identityState: 'active' | 'revoked';
+  readonly identitySequence: number;
+  readonly deviceLedgerSequence: number;
+  readonly deviceId: string;
+  readonly authorizationId: string | null;
+  readonly deviceState: 'active' | 'revoked';
+  readonly activatedAt: number | null;
+  readonly revokedAt: number | null;
+  readonly authorizationExpiresAt: number | null;
+  readonly operationId: string;
+  readonly eventId: string;
+  readonly eventType: 'activated' | 'revoked';
+  readonly acceptedAt: number;
+  readonly event: DeviceRegistryEventV2;
+}
+
 /** Structural RPC contract. The edge Worker never imports the registry implementation. */
 export interface RegistryService {
   register(input: {
@@ -113,6 +189,19 @@ export interface RegistryService {
     readonly signature: string;
   }): Promise<RegistryResult<RegistryMutation>>;
   revokeBySecret(payload: RevokeBySecretV1): Promise<RegistryResult<RegistryMutation>>;
+  activateDevice(
+    input: DeviceActivationRequestV2,
+  ): Promise<RegistryResult<DeviceRegistryMutationV2>>;
+  deviceStatus(input: DeviceStatusRequestV2): Promise<RegistryResult<AuthoritativeDeviceStatusV2>>;
+  deviceStatusBatch(
+    inputs: DeviceStatusRequestV2[],
+  ): Promise<Array<RegistryResult<AuthoritativeDeviceStatusV2>>>;
+  revokeDeviceSelf(
+    input: DeviceSelfRevokeRequestV2,
+  ): Promise<RegistryResult<DeviceRegistryMutationV2>>;
+  revokeDeviceRoot(
+    input: DeviceRootRevokeRequestV2,
+  ): Promise<RegistryResult<DeviceRegistryMutationV2>>;
 }
 
 export interface PublicApiRateLimiter {
@@ -152,6 +241,14 @@ export interface EdgeDependencies {
     payload: StatusStatementPayloadV1,
     config: ServiceSigningConfig,
   ) => Promise<StatusStatementV1>;
+  readonly signDeviceReceipt?: (
+    payload: DeviceRegistryReceiptPayloadV2,
+    config: ServiceSigningConfig,
+  ) => Promise<DeviceRegistryReceiptV2>;
+  readonly signDeviceStatus?: (
+    payload: DeviceStatusStatementPayloadV2,
+    config: ServiceSigningConfig,
+  ) => Promise<DeviceStatusStatementV2>;
 }
 
 interface ResolvedDependencies {
@@ -162,6 +259,8 @@ interface ResolvedDependencies {
   readonly rateLimitKey: NonNullable<EdgeDependencies['rateLimitKey']>;
   readonly signReceipt: NonNullable<EdgeDependencies['signReceipt']>;
   readonly signStatus: NonNullable<EdgeDependencies['signStatus']>;
+  readonly signDeviceReceipt: NonNullable<EdgeDependencies['signDeviceReceipt']>;
+  readonly signDeviceStatus: NonNullable<EdgeDependencies['signDeviceStatus']>;
 }
 
 interface EdgeApi {
@@ -179,6 +278,11 @@ interface Route {
 
 const ROUTES: Readonly<Record<string, Route>> = Object.freeze({
   '/.well-known/nexus.json': {
+    operation: 'discovery',
+    kind: 'well-known',
+    method: 'GET',
+  },
+  '/.well-known/nexus-v2.json': {
     operation: 'discovery',
     kind: 'well-known',
     method: 'GET',
@@ -208,6 +312,36 @@ const ROUTES: Readonly<Record<string, Route>> = Object.freeze({
     method: 'POST',
     bodyLimit: NEXUS_BODY_LIMITS.revoke,
   },
+  '/v2/device/activate': {
+    operation: 'register',
+    kind: 'mutation',
+    method: 'POST',
+    bodyLimit: 16 * 1_024,
+  },
+  '/v2/device/status': {
+    operation: 'status',
+    kind: 'public-read',
+    method: 'POST',
+    bodyLimit: 2 * 1_024,
+  },
+  '/v2/device/status-batch': {
+    operation: 'status_batch',
+    kind: 'public-read',
+    method: 'POST',
+    bodyLimit: 32 * 1_024,
+  },
+  '/v2/device/revoke-self': {
+    operation: 'revoke',
+    kind: 'mutation',
+    method: 'POST',
+    bodyLimit: 16 * 1_024,
+  },
+  '/v2/device/revoke-root': {
+    operation: 'revoke',
+    kind: 'mutation',
+    method: 'POST',
+    bodyLimit: 8 * 1_024,
+  },
 });
 
 const configsByEnvironment = new WeakMap<
@@ -221,6 +355,69 @@ const configsByEnvironment = new WeakMap<
 const RATE_LIMIT_PERIOD_SECONDS = 60;
 const RATE_LIMIT_KEY_DOMAIN = 'NEXUS-EDGE-RATE-LIMIT\0v1\0';
 let ephemeralRateLimitSalt: { bucket: number; value: Uint8Array } | undefined;
+const v2ImportedKeyPromises = new WeakMap<ServiceSigningConfig, Promise<CryptoKey>>();
+
+function decodePemPrivateKey(value: string): Uint8Array {
+  const match = /^\s*-----BEGIN PRIVATE KEY-----([\s\S]+)-----END PRIVATE KEY-----\s*$/u.exec(
+    value,
+  );
+  const body = match?.[1]?.replaceAll(/\s/gu, '') ?? '';
+  if (body.length === 0 || !/^[A-Za-z0-9+/]+={0,2}$/u.test(body)) {
+    throw new NexusFault('INTERNAL_ERROR');
+  }
+  try {
+    return Uint8Array.from(atob(body), (character) => character.charCodeAt(0));
+  } catch {
+    throw new NexusFault('INTERNAL_ERROR');
+  }
+}
+
+function decodeV2SigningKey(value: string | Uint8Array): Uint8Array {
+  if (value instanceof Uint8Array) return value.slice();
+  if (value.includes('-----BEGIN')) return decodePemPrivateKey(value);
+  try {
+    return decodeBase64Url(value);
+  } catch {
+    throw new NexusFault('INTERNAL_ERROR');
+  }
+}
+
+async function importV2SigningKey(config: ServiceSigningConfig): Promise<CryptoKey> {
+  const existing = v2ImportedKeyPromises.get(config);
+  if (existing !== undefined) return existing;
+  const provider = config.provider ?? getDefaultCryptoProvider();
+  const pkcs8 = decodeV2SigningKey(config.privateKeyPkcs8);
+  const pending = provider.importEd25519PrivateKey(pkcs8, { extractable: false }).finally(() => {
+    pkcs8.fill(0);
+  });
+  v2ImportedKeyPromises.set(config, pending);
+  try {
+    return await pending;
+  } catch {
+    v2ImportedKeyPromises.delete(config);
+    throw new NexusFault('INTERNAL_ERROR');
+  }
+}
+
+async function signDeviceReceipt(
+  payload: DeviceRegistryReceiptPayloadV2,
+  config: ServiceSigningConfig,
+): Promise<DeviceRegistryReceiptV2> {
+  if (payload.signerKid !== config.signerKid) throw new NexusFault('INTERNAL_ERROR');
+  const provider = config.provider ?? getDefaultCryptoProvider();
+  const signature = await signProtocolPayload(payload, await importV2SigningKey(config), provider);
+  return deviceRegistryReceiptV2Schema.parse({ payload, signature });
+}
+
+async function signDeviceStatus(
+  payload: DeviceStatusStatementPayloadV2,
+  config: ServiceSigningConfig,
+): Promise<DeviceStatusStatementV2> {
+  if (payload.signerKid !== config.signerKid) throw new NexusFault('INTERNAL_ERROR');
+  const provider = config.provider ?? getDefaultCryptoProvider();
+  const signature = await signProtocolPayload(payload, await importV2SigningKey(config), provider);
+  return deviceStatusStatementV2Schema.parse({ payload, signature });
+}
 
 function saltForRateLimitBucket(bucket: number): Uint8Array {
   if (ephemeralRateLimitSalt?.bucket === bucket) return ephemeralRateLimitSalt.value;
@@ -520,12 +717,91 @@ function parseRevoke(value: unknown): ReturnType<typeof revokeRequestV1Schema.pa
   return result.data;
 }
 
+function throwV2ProtocolHint(value: unknown, expectedProtocol: string): void {
+  if (!isRecord(value)) return;
+  const payload = isRecord(value.payload) ? value.payload : null;
+  if (
+    payload !== null &&
+    typeof payload.protocol === 'string' &&
+    payload.protocol !== expectedProtocol
+  ) {
+    throw new NexusFault('UNSUPPORTED_PROTOCOL');
+  }
+  const authorization = isRecord(value.authorization) ? value.authorization : null;
+  const authorizationPayload =
+    authorization !== null && isRecord(authorization.payload) ? authorization.payload : null;
+  if (
+    authorizationPayload !== null &&
+    typeof authorizationPayload.protocol === 'string' &&
+    authorizationPayload.protocol !== 'nexus.device-authorization.v2'
+  ) {
+    throw new NexusFault('UNSUPPORTED_PROTOCOL');
+  }
+}
+
+function parseDeviceActivation(
+  value: unknown,
+): ReturnType<typeof deviceActivationRequestV2Schema.parse> {
+  throwV2ProtocolHint(value, 'nexus.device-activation.v2');
+  throwInvalidSubjectHint(value);
+  const result = deviceActivationRequestV2Schema.safeParse(value);
+  if (!result.success) throw new NexusFault('BAD_REQUEST');
+  return result.data;
+}
+
+function parseDeviceStatus(value: unknown): ReturnType<typeof deviceStatusRequestV2Schema.parse> {
+  throwInvalidSubjectHint(value);
+  const result = deviceStatusRequestV2Schema.safeParse(value);
+  if (!result.success) throw new NexusFault('BAD_REQUEST');
+  return result.data;
+}
+
+function parseDeviceStatusBatch(
+  value: unknown,
+): ReturnType<typeof deviceStatusBatchRequestV2Schema.parse> {
+  if (isRecord(value) && Array.isArray(value.devices)) {
+    for (const device of value.devices) throwInvalidSubjectHint(device);
+  }
+  const result = deviceStatusBatchRequestV2Schema.safeParse(value);
+  if (!result.success) throw new NexusFault('BAD_REQUEST');
+  return result.data;
+}
+
+function parseDeviceSelfRevoke(
+  value: unknown,
+): ReturnType<typeof deviceSelfRevokeRequestV2Schema.parse> {
+  throwV2ProtocolHint(value, 'nexus.device-self-revoke.v2');
+  throwInvalidSubjectHint(value);
+  const result = deviceSelfRevokeRequestV2Schema.safeParse(value);
+  if (!result.success) throw new NexusFault('BAD_REQUEST');
+  return result.data;
+}
+
+function parseDeviceRootRevoke(
+  value: unknown,
+): ReturnType<typeof deviceRootRevokeRequestV2Schema.parse> {
+  throwV2ProtocolHint(value, 'nexus.device-root-revoke.v2');
+  throwInvalidSubjectHint(value);
+  const result = deviceRootRevokeRequestV2Schema.safeParse(value);
+  if (!result.success) throw new NexusFault('BAD_REQUEST');
+  return result.data;
+}
+
 function registryError(error: RegistryFault): NexusFault {
   return new NexusFault(isNexusErrorCode(error.code) ? error.code : 'INTERNAL_ERROR');
 }
 
+function deviceRegistryError(error: RegistryFault): NexusDeviceFault {
+  return new NexusDeviceFault(isNexusDeviceErrorCode(error.code) ? error.code : 'INTERNAL_ERROR');
+}
+
 function unwrapRegistry<T>(result: RegistryResult<T>): T {
   if (!result.ok) throw registryError(result.error);
+  return result.value;
+}
+
+function unwrapDeviceRegistry<T>(result: RegistryResult<T>): T {
+  if (!result.ok) throw deviceRegistryError(result.error);
   return result.value;
 }
 
@@ -621,6 +897,124 @@ async function validateMutation(
   return value;
 }
 
+function isSafeEpoch(value: unknown): value is number {
+  return Number.isSafeInteger(value) && Number(value) >= 0;
+}
+
+function validateDeviceStatus(
+  value: AuthoritativeDeviceStatusV2,
+  expected: DeviceStatusRequestV2,
+): AuthoritativeDeviceStatusV2 {
+  if (
+    value.subject !== expected.subject ||
+    value.deviceId !== expected.deviceId ||
+    value.authorizationId !== expected.authorizationId ||
+    !nexusSubjectSchema.safeParse(value.subject).success ||
+    !base64Url32Schema.safeParse(value.genesisHash).success ||
+    !nexusDeviceIdV2Schema.safeParse(value.deviceId).success ||
+    !nexusDeviceAuthorizationIdV2Schema.safeParse(value.authorizationId).success ||
+    (value.identityState !== 'active' && value.identityState !== 'revoked') ||
+    !isSafeEpoch(value.identitySequence) ||
+    (value.identityState === 'active' && value.identitySequence !== 0) ||
+    (value.identityState === 'revoked' && value.identitySequence !== 1) ||
+    !isSafeEpoch(value.deviceLedgerSequence) ||
+    !['active', 'revoked', 'expired', 'unknown'].includes(value.deviceState) ||
+    (value.activatedAt !== null && !isSafeEpoch(value.activatedAt)) ||
+    (value.revokedAt !== null && !isSafeEpoch(value.revokedAt)) ||
+    (value.authorizationExpiresAt !== null && !isSafeEpoch(value.authorizationExpiresAt)) ||
+    (value.deviceState === 'active' &&
+      (value.identityState !== 'active' ||
+        value.activatedAt === null ||
+        value.revokedAt !== null ||
+        value.authorizationExpiresAt === null)) ||
+    (value.deviceState === 'expired' &&
+      (value.identityState !== 'active' ||
+        value.activatedAt === null ||
+        value.revokedAt !== null ||
+        value.authorizationExpiresAt === null)) ||
+    (value.deviceState === 'revoked' && value.revokedAt === null) ||
+    (value.deviceState === 'unknown' &&
+      (value.activatedAt !== null ||
+        value.revokedAt !== null ||
+        value.authorizationExpiresAt !== null)) ||
+    (value.activatedAt !== null &&
+      value.revokedAt !== null &&
+      value.revokedAt < value.activatedAt) ||
+    (value.activatedAt !== null &&
+      value.authorizationExpiresAt !== null &&
+      value.authorizationExpiresAt < value.activatedAt)
+  ) {
+    throw new NexusFault('INTERNAL_ERROR');
+  }
+  return value;
+}
+
+function validateDeviceMutation(
+  value: DeviceRegistryMutationV2,
+  expectedSubject: NexusSubject,
+  expectedDeviceId: string,
+  expectedAuthorizationId?: string,
+): DeviceRegistryMutationV2 {
+  const event = deviceRegistryEventV2Schema.safeParse(value.event);
+  if (
+    value.subject !== expectedSubject ||
+    value.deviceId !== expectedDeviceId ||
+    (expectedAuthorizationId !== undefined && value.authorizationId !== expectedAuthorizationId) ||
+    !nexusSubjectSchema.safeParse(value.subject).success ||
+    !base64Url32Schema.safeParse(value.genesisHash).success ||
+    !nexusDeviceIdV2Schema.safeParse(value.deviceId).success ||
+    (value.authorizationId !== null &&
+      !nexusDeviceAuthorizationIdV2Schema.safeParse(value.authorizationId).success) ||
+    !nexusDeviceOperationIdV2Schema.safeParse(value.operationId).success ||
+    !nexusDeviceEventIdV2Schema.safeParse(value.eventId).success ||
+    (value.identityState !== 'active' && value.identityState !== 'revoked') ||
+    !isSafeEpoch(value.identitySequence) ||
+    (value.identityState === 'active' && value.identitySequence !== 0) ||
+    (value.identityState === 'revoked' && value.identitySequence !== 1) ||
+    !isSafeEpoch(value.deviceLedgerSequence) ||
+    (value.eventType !== 'activated' && value.eventType !== 'revoked') ||
+    (value.deviceState !== 'active' && value.deviceState !== 'revoked') ||
+    (value.activatedAt !== null && !isSafeEpoch(value.activatedAt)) ||
+    (value.revokedAt !== null && !isSafeEpoch(value.revokedAt)) ||
+    (value.authorizationExpiresAt !== null && !isSafeEpoch(value.authorizationExpiresAt)) ||
+    (value.eventType === 'activated' &&
+      (value.deviceState !== 'active' ||
+        value.activatedAt === null ||
+        value.revokedAt !== null ||
+        value.authorizationId === null ||
+        value.authorizationExpiresAt === null)) ||
+    (value.eventType === 'revoked' &&
+      (value.deviceState !== 'revoked' || value.revokedAt === null)) ||
+    (value.activatedAt !== null &&
+      value.revokedAt !== null &&
+      value.revokedAt < value.activatedAt) ||
+    !isSafeEpoch(value.acceptedAt) ||
+    !event.success
+  ) {
+    throw new NexusFault('INTERNAL_ERROR');
+  }
+
+  const parsedEvent = event.data;
+  if (
+    parsedEvent.eventId !== value.eventId ||
+    parsedEvent.operationId !== value.operationId ||
+    parsedEvent.eventType !== value.eventType ||
+    parsedEvent.subject !== value.subject ||
+    parsedEvent.genesisHash !== value.genesisHash ||
+    parsedEvent.identitySequence !== value.identitySequence ||
+    parsedEvent.identityState !== value.identityState ||
+    parsedEvent.deviceLedgerSequence !== value.deviceLedgerSequence ||
+    parsedEvent.deviceId !== value.deviceId ||
+    (parsedEvent.authorizationId ?? null) !== value.authorizationId ||
+    parsedEvent.deviceState !== value.deviceState ||
+    (parsedEvent.authorizationExpiresAt ?? null) !== value.authorizationExpiresAt ||
+    parsedEvent.acceptedAt !== value.acceptedAt
+  ) {
+    throw new NexusFault('INTERNAL_ERROR');
+  }
+  return value;
+}
+
 async function signedStatus(
   status: AuthoritativeStatus,
   env: Env,
@@ -680,6 +1074,97 @@ async function signedMutation(
     throw new NexusFault('INTERNAL_ERROR');
   }
   return { receipt, status };
+}
+
+async function signedDeviceStatus(
+  status: AuthoritativeDeviceStatusV2,
+  env: Env,
+  dependencies: ResolvedDependencies,
+): Promise<DeviceRegistryStatusV2> {
+  const issuedAt = epochSeconds(dependencies);
+  const effectiveStatus: AuthoritativeDeviceStatusV2 =
+    status.deviceState === 'active' &&
+    status.authorizationExpiresAt !== null &&
+    issuedAt >= status.authorizationExpiresAt
+      ? { ...status, deviceState: 'expired' }
+      : status;
+  const expiresAt =
+    effectiveStatus.deviceState === 'active' && effectiveStatus.authorizationExpiresAt !== null
+      ? Math.min(issuedAt + statusTtl(env), effectiveStatus.authorizationExpiresAt)
+      : issuedAt + statusTtl(env);
+  const payload: DeviceStatusStatementPayloadV2 = {
+    protocol: DEVICE_STATUS_STATEMENT_PROTOCOL_V2,
+    subject: effectiveStatus.subject as NexusSubject,
+    genesisHash: effectiveStatus.genesisHash as DeviceStatusStatementPayloadV2['genesisHash'],
+    identityState: effectiveStatus.identityState,
+    identitySequence: effectiveStatus.identitySequence,
+    deviceLedgerSequence: effectiveStatus.deviceLedgerSequence,
+    deviceId: effectiveStatus.deviceId as DeviceStatusStatementPayloadV2['deviceId'],
+    authorizationId:
+      effectiveStatus.authorizationId as DeviceStatusStatementPayloadV2['authorizationId'],
+    deviceState: effectiveStatus.deviceState,
+    ...(effectiveStatus.activatedAt === null ? {} : { activatedAt: effectiveStatus.activatedAt }),
+    ...(effectiveStatus.revokedAt === null ? {} : { revokedAt: effectiveStatus.revokedAt }),
+    ...(effectiveStatus.authorizationExpiresAt === null
+      ? {}
+      : { authorizationExpiresAt: effectiveStatus.authorizationExpiresAt }),
+    iat: issuedAt,
+    exp: expiresAt,
+    signerKid: env.STATUS_SIGNING_KID,
+  };
+  if (!Number.isSafeInteger(payload.exp)) throw new NexusFault('INTERNAL_ERROR');
+  const statement = await dependencies.signDeviceStatus(payload, signingConfigs(env).status);
+  if (!deviceStatusStatementV2Schema.safeParse(statement).success) {
+    throw new NexusFault('INTERNAL_ERROR');
+  }
+  const response = deviceRegistryStatusV2Schema.safeParse({
+    ...effectiveStatus,
+    statusStatement: statement,
+  });
+  if (!response.success) throw new NexusFault('INTERNAL_ERROR');
+  return response.data;
+}
+
+async function signedDeviceMutation(
+  mutation: DeviceRegistryMutationV2,
+  env: Env,
+  dependencies: ResolvedDependencies,
+): Promise<DeviceRegistryReceiptV2> {
+  const receiptPayload: DeviceRegistryReceiptPayloadV2 = {
+    protocol: DEVICE_REGISTRY_RECEIPT_PROTOCOL_V2,
+    eventId: mutation.event.eventId,
+    operationId: mutation.event.operationId,
+    eventType: mutation.event.eventType,
+    subject: mutation.event.subject,
+    genesisHash: mutation.event.genesisHash,
+    identitySequence: mutation.event.identitySequence,
+    identityState: mutation.event.identityState,
+    deviceLedgerSequence: mutation.event.deviceLedgerSequence,
+    deviceId: mutation.event.deviceId,
+    ...(mutation.event.authorizationId === undefined
+      ? {}
+      : { authorizationId: mutation.event.authorizationId }),
+    deviceState: mutation.event.deviceState,
+    ...(mutation.event.authorizationExpiresAt === undefined
+      ? {}
+      : { authorizationExpiresAt: mutation.event.authorizationExpiresAt }),
+    acceptedAt: mutation.event.acceptedAt,
+    ...(mutation.event.revokedBy === undefined ? {} : { revokedBy: mutation.event.revokedBy }),
+    signerKid: env.RECEIPT_SIGNING_KID,
+  };
+  const receipt = await dependencies.signDeviceReceipt(receiptPayload, signingConfigs(env).receipt);
+  if (!deviceRegistryReceiptV2Schema.safeParse(receipt).success) {
+    throw new NexusFault('INTERNAL_ERROR');
+  }
+  return receipt;
+}
+
+async function deviceMutationResponse(
+  mutation: DeviceRegistryMutationV2,
+  env: Env,
+  dependencies: ResolvedDependencies,
+): Promise<{ readonly receipt: DeviceRegistryReceiptV2 }> {
+  return { receipt: await signedDeviceMutation(mutation, env, dependencies) };
 }
 
 function publicPreflight(request: Request): Response {
@@ -746,6 +1231,30 @@ async function routeRequest(
           protocols: [IDENTITY_PROTOCOL_V1, 'nexus.ownership-proof.v1'],
           suites: [NEXUS_SUITE_V1],
           registry: `${apiOrigin}/v1`,
+          jwks: `${apiOrigin}/.well-known/jwks.json`,
+          wallet: requireHttpsOrigin(env.WALLET_ORIGIN),
+        }),
+        { status: 200, headers: createWellKnownHeaders() },
+      ),
+    };
+  }
+
+  if (url.pathname === '/.well-known/nexus-v2.json') {
+    const apiOrigin = requireHttpsOrigin(env.PUBLIC_API_ORIGIN);
+    return {
+      response: new Response(
+        JSON.stringify({
+          protocols: [
+            IDENTITY_PROTOCOL_V1,
+            'nexus.ownership-proof.v1',
+            'nexus.device-authorization.v2',
+            OWNERSHIP_PROOF_PROTOCOL_V2,
+          ],
+          suites: [NEXUS_SUITE_V1],
+          registry: `${apiOrigin}/v1`,
+          deviceRegistry: `${apiOrigin}/v2/device`,
+          popupChannels: ['nexus.popup.v2', 'nexus.popup.v1'],
+          v1Discovery: `${apiOrigin}/.well-known/nexus.json`,
           jwks: `${apiOrigin}/.well-known/jwks.json`,
           wallet: requireHttpsOrigin(env.WALLET_ORIGIN),
         }),
@@ -856,6 +1365,108 @@ async function routeRequest(
     };
   }
 
+  if (url.pathname === '/v2/device/activate') {
+    const parsed = parseDeviceActivation(body);
+    const result = await callRegistry(() => env.REGISTRY_SERVICE.activateDevice(parsed));
+    const mutation = validateDeviceMutation(
+      unwrapDeviceRegistry(result),
+      parsed.payload.subject,
+      parsed.payload.deviceId,
+      parsed.payload.authorizationId,
+    );
+    return {
+      response: jsonResponse(
+        await deviceMutationResponse(mutation, env, dependencies),
+        200,
+        corsHeaders(route, request, env),
+      ),
+    };
+  }
+
+  if (url.pathname === '/v2/device/status') {
+    const parsed = parseDeviceStatus(body);
+    const result = await callRegistry(() => env.REGISTRY_SERVICE.deviceStatus(parsed));
+    const status = validateDeviceStatus(unwrapDeviceRegistry(result), parsed);
+    return {
+      response: jsonResponse(
+        await signedDeviceStatus(status, env, dependencies),
+        200,
+        corsHeaders(route, request, env),
+      ),
+    };
+  }
+
+  if (url.pathname === '/v2/device/status-batch') {
+    const parsed = parseDeviceStatusBatch(body);
+    const results = await callRegistry(() =>
+      env.REGISTRY_SERVICE.deviceStatusBatch(parsed.devices),
+    );
+    if (results.length !== parsed.devices.length) throw new NexusFault('INTERNAL_ERROR');
+    const publicResults = await Promise.all(
+      results.map(async (result, index) => {
+        if (!result.ok) {
+          const code: NexusDeviceErrorCode = isNexusDeviceErrorCode(result.error.code)
+            ? result.error.code
+            : 'INTERNAL_ERROR';
+          const expected = parsed.devices[index];
+          if (expected === undefined) throw new NexusFault('INTERNAL_ERROR');
+          return {
+            ok: false as const,
+            subject: expected.subject,
+            deviceId: expected.deviceId,
+            authorizationId: expected.authorizationId,
+            error: createNexusDeviceErrorBody(code).error,
+          };
+        }
+        const expected = parsed.devices[index];
+        if (expected === undefined) throw new NexusFault('INTERNAL_ERROR');
+        const status = validateDeviceStatus(result.value, expected);
+        return { ok: true as const, status: await signedDeviceStatus(status, env, dependencies) };
+      }),
+    );
+    const responseBody = deviceStatusBatchResponseV2Schema.safeParse({ results: publicResults });
+    if (!responseBody.success) throw new NexusFault('INTERNAL_ERROR');
+    return {
+      response: jsonResponse(responseBody.data, 200, corsHeaders(route, request, env)),
+      batchSize: parsed.devices.length,
+    };
+  }
+
+  if (url.pathname === '/v2/device/revoke-self') {
+    const parsed = parseDeviceSelfRevoke(body);
+    const result = await callRegistry(() => env.REGISTRY_SERVICE.revokeDeviceSelf(parsed));
+    const mutation = validateDeviceMutation(
+      unwrapDeviceRegistry(result),
+      parsed.payload.subject,
+      parsed.payload.deviceId,
+      parsed.payload.authorizationId,
+    );
+    return {
+      response: jsonResponse(
+        await deviceMutationResponse(mutation, env, dependencies),
+        200,
+        corsHeaders(route, request, env),
+      ),
+    };
+  }
+
+  if (url.pathname === '/v2/device/revoke-root') {
+    const parsed = parseDeviceRootRevoke(body);
+    const result = await callRegistry(() => env.REGISTRY_SERVICE.revokeDeviceRoot(parsed));
+    const mutation = validateDeviceMutation(
+      unwrapDeviceRegistry(result),
+      parsed.payload.subject,
+      parsed.payload.deviceId,
+    );
+    return {
+      response: jsonResponse(
+        await deviceMutationResponse(mutation, env, dependencies),
+        200,
+        corsHeaders(route, request, env),
+      ),
+    };
+  }
+
   throw new NexusFault('BAD_REQUEST');
 }
 
@@ -869,6 +1480,8 @@ function resolveDependencies(overrides: EdgeDependencies): ResolvedDependencies 
     rateLimitKey: overrides.rateLimitKey ?? createEphemeralRateLimitKey,
     signReceipt: overrides.signReceipt ?? signRegistryReceipt,
     signStatus: overrides.signStatus ?? signStatusStatement,
+    signDeviceReceipt: overrides.signDeviceReceipt ?? signDeviceReceipt,
+    signDeviceStatus: overrides.signDeviceStatus ?? signDeviceStatus,
   };
 }
 
@@ -897,14 +1510,16 @@ export function createEdgeApi(overrides: EdgeDependencies = {}): EdgeApi {
         }
         return routed.response;
       } catch (error) {
-        const code = faultCode(error);
+        const isDeviceRoute =
+          route !== undefined && new URL(request.url).pathname.startsWith('/v2/device/');
+        const code = isDeviceRoute ? deviceFaultCode(error) : faultCode(error);
         if (route !== undefined && dependencies.metricSink !== null) {
           emitAggregateMetric(dependencies.metricSink, {
             operation: route.operation,
             result:
               code === 'INTERNAL_ERROR' || code === 'SERVICE_UNAVAILABLE' ? 'error' : 'rejected',
             latencyBucket: latencyBucket(dependencies.monotonicNow() - startedAt),
-            errorCode: code,
+            ...(isNexusErrorCode(code) ? { errorCode: code } : {}),
           });
         }
         const headers = corsHeaders(route, request, env);
@@ -914,10 +1529,9 @@ export function createEdgeApi(overrides: EdgeDependencies = {}): EdgeApi {
         if (code === 'RATE_LIMITED') {
           headers.set('Retry-After', String(RATE_LIMIT_PERIOD_SECONDS));
         }
-        return toNexusErrorResponse(error, {
-          requestId,
-          headers,
-        });
+        return isDeviceRoute
+          ? toNexusDeviceErrorResponse(error, { requestId, headers })
+          : toNexusErrorResponse(error, { requestId, headers });
       }
     },
   };

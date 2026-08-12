@@ -3,12 +3,21 @@ import type { ZodType } from 'zod';
 
 import {
   CONTINUITY_LINK_PROTOCOL_V1,
+  DEVICE_ACTIVATION_PROTOCOL_V2,
+  DEVICE_AUTHORIZATION_PROTOCOL_V2,
+  DEVICE_REGISTRY_EVENT_PROTOCOL_V2,
+  DEVICE_REGISTRY_RECEIPT_PROTOCOL_V2,
+  DEVICE_ROOT_REVOKE_PROTOCOL_V2,
+  DEVICE_SELF_REVOKE_PROTOCOL_V2,
+  DEVICE_STATUS_STATEMENT_PROTOCOL_V2,
   ED25519_ALGORITHM,
   ED25519_SIGNATURE_BYTE_LENGTH,
   EDDSA_JWK_ALGORITHM,
   IDENTITY_PROTOCOL_V1,
   MAX_ACTION_LENGTH,
   MAX_AUDIENCE_LENGTH,
+  MAX_DEVICE_ACTIVATION_WINDOW_SECONDS,
+  MAX_DEVICE_AUTHORIZATION_LIFETIME_SECONDS,
   MAX_NONCE_BYTE_LENGTH,
   MAX_RESOURCE_LENGTH,
   MAX_SCOPE_LENGTH,
@@ -18,10 +27,16 @@ import {
   MAX_TURNSTILE_TOKEN_LENGTH,
   MIN_NONCE_BYTE_LENGTH,
   NEXUS_ERROR_CODES,
+  NEXUS_DEVICE_ERROR_CODES,
+  NEXUS_DEVICE_AUTHORIZATION_ID_PREFIX_V2,
+  NEXUS_DEVICE_EVENT_ID_PREFIX_V2,
+  NEXUS_DEVICE_ID_PREFIX_V2,
+  NEXUS_DEVICE_OPERATION_ID_PREFIX_V2,
   NEXUS_EVENT_ID_PREFIX,
   NEXUS_SUBJECT_PREFIX,
   NEXUS_SUITE_V1,
   OWNERSHIP_PROOF_PROTOCOL_V1,
+  OWNERSHIP_PROOF_PROTOCOL_V2,
   REGISTRY_EVENT_PROTOCOL_V1,
   REGISTRY_RECEIPT_PROTOCOL_V1,
   REVOKE_PROTOCOL_V1,
@@ -42,15 +57,40 @@ import type {
   ContinuityLinkPayloadV1,
   ContinuityLinkV1,
   CreateIdentityResult,
+  DeviceActivationPayloadV2,
+  DeviceActivationRequestV2,
+  DeviceAuthorizationPayloadV2,
+  DeviceAuthorizationV2,
+  DeviceRegistryEventV2,
+  DeviceRegistryEventWithoutEventIdV2,
+  DeviceRegistryReceiptPayloadV2,
+  DeviceRegistryReceiptV2,
+  DeviceRootRevokePayloadV2,
+  DeviceRootRevokeRequestV2,
+  DeviceSelfRevokePayloadV2,
+  DeviceSelfRevokeRequestV2,
+  DeviceStatusStatementPayloadV2,
+  DeviceStatusStatementV2,
+  DeviceStatusBatchRequestV2,
+  DeviceStatusBatchResponseV2,
+  DeviceStatusRequestV2,
+  DeviceRegistryStatusV2,
   Ed25519PublicJwk,
   GlobalCheckpointShardV1,
   GlobalTransparencyCheckpointPayloadV1,
   IdentityGenesisV1,
   NexusError,
+  NexusDeviceError,
+  NexusDeviceAuthorizationIdV2,
+  NexusDeviceEventIdV2,
+  NexusDeviceIdV2,
+  NexusDeviceOperationIdV2,
   NexusEventId,
   NexusSubject,
   OwnershipProofPayloadV1,
   OwnershipProofV1,
+  OwnershipProofPayloadV2,
+  OwnershipProofV2,
   ProofRequest,
   RegisterIdentityRequestV1,
   RegistryEventV1,
@@ -73,6 +113,7 @@ import type {
   TransparencyCheckpointPayloadV1,
   TransparencyInclusionProofV1,
   VerificationExpectation,
+  VerificationExpectationV2,
 } from './types.js';
 
 const PRINTABLE_ASCII_PATTERN = /^[\x20-\x7e]+$/u;
@@ -110,6 +151,17 @@ function isEventId(value: unknown): value is NexusEventId {
     typeof value === 'string' &&
     value.startsWith(NEXUS_EVENT_ID_PREFIX) &&
     isExactBase64Url(value.slice(NEXUS_EVENT_ID_PREFIX.length), SHA256_BYTE_LENGTH)
+  );
+}
+
+function isPrefixedHash<Prefix extends string>(
+  value: unknown,
+  prefix: Prefix,
+): value is `${Prefix}${string}` {
+  return (
+    typeof value === 'string' &&
+    value.startsWith(prefix) &&
+    isExactBase64Url(value.slice(prefix.length), SHA256_BYTE_LENGTH)
   );
 }
 
@@ -163,6 +215,29 @@ export const nexusEventIdSchema: ZodType<NexusEventId> = z.custom<NexusEventId>(
   'Expected a canonical nxe1_ event ID containing a 32-byte hash.',
 );
 
+export const nexusDeviceIdV2Schema: ZodType<NexusDeviceIdV2> = z.custom<NexusDeviceIdV2>(
+  (value) => isPrefixedHash(value, NEXUS_DEVICE_ID_PREFIX_V2),
+  'Expected a canonical nxd2_ device ID containing a 32-byte hash.',
+);
+
+export const nexusDeviceAuthorizationIdV2Schema: ZodType<NexusDeviceAuthorizationIdV2> =
+  z.custom<NexusDeviceAuthorizationIdV2>(
+    (value) => isPrefixedHash(value, NEXUS_DEVICE_AUTHORIZATION_ID_PREFIX_V2),
+    'Expected a canonical nxa2_ device authorization ID containing a 32-byte hash.',
+  );
+
+export const nexusDeviceOperationIdV2Schema: ZodType<NexusDeviceOperationIdV2> =
+  z.custom<NexusDeviceOperationIdV2>(
+    (value) => isPrefixedHash(value, NEXUS_DEVICE_OPERATION_ID_PREFIX_V2),
+    'Expected a canonical nxo2_ device operation ID containing a 32-byte hash.',
+  );
+
+export const nexusDeviceEventIdV2Schema: ZodType<NexusDeviceEventIdV2> =
+  z.custom<NexusDeviceEventIdV2>(
+    (value) => isPrefixedHash(value, NEXUS_DEVICE_EVENT_ID_PREFIX_V2),
+    'Expected a canonical nxde2_ device event ID containing a 32-byte hash.',
+  );
+
 export const audienceOriginSchema: ZodType<string> = printableAscii(MAX_AUDIENCE_LENGTH).refine(
   isHttpsOrigin,
   'Audience must be a canonical HTTPS origin without path, query, fragment, credentials, or wildcard.',
@@ -211,6 +286,197 @@ export const ownershipProofV1Schema: ZodType<OwnershipProofV1> = z.strictObject(
   payload: ownershipProofPayloadV1Schema,
   signature: base64Url64Schema,
 }) satisfies z.ZodType<OwnershipProofV1>;
+
+export const deviceSigningKeyV2Schema = z.strictObject({
+  alg: z.literal(ED25519_ALGORITHM),
+  publicKey: base64Url32Schema,
+});
+
+export const deviceIdInputV2Schema = z.strictObject({
+  subject: nexusSubjectSchema,
+  signingKey: deviceSigningKeyV2Schema,
+});
+
+export const deviceAuthorizationPayloadV2Schema: ZodType<DeviceAuthorizationPayloadV2> = z
+  .strictObject({
+    protocol: z.literal(DEVICE_AUTHORIZATION_PROTOCOL_V2),
+    subject: nexusSubjectSchema,
+    genesisHash: base64Url32Schema,
+    deviceId: nexusDeviceIdV2Schema,
+    signingKey: deviceSigningKeyV2Schema,
+    authorizationNonce: base64Url32Schema,
+    validFrom: safeNonNegativeIntegerSchema,
+    activationDeadline: safeNonNegativeIntegerSchema,
+    expiresAt: safeNonNegativeIntegerSchema,
+  })
+  .superRefine((payload, context) => {
+    if (payload.validFrom > payload.activationDeadline) {
+      context.addIssue({
+        code: 'custom',
+        message: 'validFrom must not exceed activationDeadline.',
+        path: ['activationDeadline'],
+      });
+    }
+    if (payload.activationDeadline > payload.expiresAt) {
+      context.addIssue({
+        code: 'custom',
+        message: 'activationDeadline must not exceed expiresAt.',
+        path: ['expiresAt'],
+      });
+    }
+    if (payload.activationDeadline - payload.validFrom > MAX_DEVICE_ACTIVATION_WINDOW_SECONDS) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Device activation window must not exceed 30 days.',
+        path: ['activationDeadline'],
+      });
+    }
+    if (payload.expiresAt - payload.validFrom > MAX_DEVICE_AUTHORIZATION_LIFETIME_SECONDS) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Device authorization lifetime must not exceed 366 days.',
+        path: ['expiresAt'],
+      });
+    }
+  }) satisfies z.ZodType<DeviceAuthorizationPayloadV2>;
+
+export const deviceAuthorizationV2Schema: ZodType<DeviceAuthorizationV2> = z.strictObject({
+  payload: deviceAuthorizationPayloadV2Schema,
+  rootSignature: base64Url64Schema,
+}) satisfies z.ZodType<DeviceAuthorizationV2>;
+
+export const deviceActivationPayloadV2Schema: ZodType<DeviceActivationPayloadV2> = z
+  .strictObject({
+    protocol: z.literal(DEVICE_ACTIVATION_PROTOCOL_V2),
+    subject: nexusSubjectSchema,
+    deviceId: nexusDeviceIdV2Schema,
+    authorizationId: nexusDeviceAuthorizationIdV2Schema,
+    requestId: base64Url32Schema,
+    iat: safeNonNegativeIntegerSchema,
+    exp: safeNonNegativeIntegerSchema,
+  })
+  .refine((payload) => payload.iat <= payload.exp, {
+    message: 'iat must be less than or equal to exp.',
+    path: ['exp'],
+  }) satisfies z.ZodType<DeviceActivationPayloadV2>;
+
+export const deviceActivationRequestV2Schema: ZodType<DeviceActivationRequestV2> = z
+  .strictObject({
+    authorization: deviceAuthorizationV2Schema,
+    payload: deviceActivationPayloadV2Schema,
+    deviceSignature: base64Url64Schema,
+  })
+  .superRefine((request, context) => {
+    const authorization = request.authorization.payload;
+    if (request.payload.subject !== authorization.subject) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Activation subject must match the authorization subject.',
+        path: ['payload', 'subject'],
+      });
+    }
+    if (request.payload.deviceId !== authorization.deviceId) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Activation deviceId must match the authorization deviceId.',
+        path: ['payload', 'deviceId'],
+      });
+    }
+  }) satisfies z.ZodType<DeviceActivationRequestV2>;
+export const deviceActivationV2Schema = deviceActivationRequestV2Schema;
+
+export const deviceSelfRevokePayloadV2Schema: ZodType<DeviceSelfRevokePayloadV2> = z.strictObject({
+  protocol: z.literal(DEVICE_SELF_REVOKE_PROTOCOL_V2),
+  subject: nexusSubjectSchema,
+  genesisHash: base64Url32Schema,
+  deviceId: nexusDeviceIdV2Schema,
+  authorizationId: nexusDeviceAuthorizationIdV2Schema,
+  requestId: base64Url32Schema,
+  issuedAt: safeNonNegativeIntegerSchema,
+  reasonCode: z.enum(['dispose', 'key-compromise', 'lost-device', 'replaced']).optional(),
+}) satisfies z.ZodType<DeviceSelfRevokePayloadV2>;
+
+export const deviceSelfRevokeRequestV2Schema: ZodType<DeviceSelfRevokeRequestV2> = z
+  .strictObject({
+    authorization: deviceAuthorizationV2Schema,
+    payload: deviceSelfRevokePayloadV2Schema,
+    deviceSignature: base64Url64Schema,
+  })
+  .superRefine((request, context) => {
+    const authorization = request.authorization.payload;
+    for (const key of ['subject', 'genesisHash', 'deviceId'] as const) {
+      if (request.payload[key] !== authorization[key]) {
+        context.addIssue({
+          code: 'custom',
+          message: `Self-revocation ${key} must match the authorization.`,
+          path: ['payload', key],
+        });
+      }
+    }
+  }) satisfies z.ZodType<DeviceSelfRevokeRequestV2>;
+export const deviceSelfRevokeV2Schema = deviceSelfRevokeRequestV2Schema;
+
+export const deviceRootRevokePayloadV2Schema: ZodType<DeviceRootRevokePayloadV2> = z.strictObject({
+  protocol: z.literal(DEVICE_ROOT_REVOKE_PROTOCOL_V2),
+  subject: nexusSubjectSchema,
+  genesisHash: base64Url32Schema,
+  deviceId: nexusDeviceIdV2Schema,
+  requestId: base64Url32Schema,
+  issuedAt: safeNonNegativeIntegerSchema,
+  reasonCode: z.enum(['dispose', 'key-compromise', 'lost-device', 'replaced']).optional(),
+}) satisfies z.ZodType<DeviceRootRevokePayloadV2>;
+
+export const deviceRootRevokeRequestV2Schema: ZodType<DeviceRootRevokeRequestV2> = z.strictObject({
+  payload: deviceRootRevokePayloadV2Schema,
+  rootSignature: base64Url64Schema,
+}) satisfies z.ZodType<DeviceRootRevokeRequestV2>;
+export const deviceRootRevokeV2Schema = deviceRootRevokeRequestV2Schema;
+
+export const ownershipProofPayloadV2Schema: ZodType<OwnershipProofPayloadV2> = z
+  .strictObject({
+    protocol: z.literal(OWNERSHIP_PROOF_PROTOCOL_V2),
+    subject: nexusSubjectSchema,
+    genesis: identityGenesisV1Schema,
+    deviceId: nexusDeviceIdV2Schema,
+    authorizationId: nexusDeviceAuthorizationIdV2Schema,
+    authorization: deviceAuthorizationV2Schema,
+    aud: audienceOriginSchema,
+    act: actionSchema,
+    resource: resourceSchema,
+    nonce: base64UrlAtLeast16Schema,
+    iat: safeNonNegativeIntegerSchema,
+    exp: safeNonNegativeIntegerSchema,
+    contextHash: base64Url32Schema.optional(),
+  })
+  .superRefine((proof, context) => {
+    if (proof.iat > proof.exp) {
+      context.addIssue({
+        code: 'custom',
+        message: 'iat must be less than or equal to exp.',
+        path: ['exp'],
+      });
+    }
+    const authorization = proof.authorization.payload;
+    if (proof.subject !== authorization.subject) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Proof subject must match the authorization subject.',
+        path: ['subject'],
+      });
+    }
+    if (proof.deviceId !== authorization.deviceId) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Proof deviceId must match the authorization deviceId.',
+        path: ['deviceId'],
+      });
+    }
+  }) satisfies z.ZodType<OwnershipProofPayloadV2>;
+
+export const ownershipProofV2Schema: ZodType<OwnershipProofV2> = z.strictObject({
+  payload: ownershipProofPayloadV2Schema,
+  deviceSignature: base64Url64Schema,
+}) satisfies z.ZodType<OwnershipProofV2>;
 
 export const revokeBySignaturePayloadV1Schema: ZodType<RevokeBySignaturePayloadV1> = z.strictObject(
   {
@@ -345,6 +611,118 @@ export const registryReceiptV1Schema: ZodType<RegistryReceiptV1> = z.strictObjec
   signature: base64Url64Schema,
 }) satisfies z.ZodType<RegistryReceiptV1>;
 
+const deviceRegistryEventWithoutIdBaseV2Schema = z.strictObject({
+  protocol: z.literal(DEVICE_REGISTRY_EVENT_PROTOCOL_V2),
+  operationId: nexusDeviceOperationIdV2Schema,
+  eventType: z.enum(['activated', 'revoked']),
+  subject: nexusSubjectSchema,
+  genesisHash: base64Url32Schema,
+  identitySequence: safeNonNegativeIntegerSchema,
+  identityState: z.enum(['active', 'revoked']),
+  deviceLedgerSequence: safeNonNegativeIntegerSchema,
+  deviceId: nexusDeviceIdV2Schema,
+  authorizationId: nexusDeviceAuthorizationIdV2Schema.optional(),
+  deviceState: z.enum(['active', 'revoked']),
+  authorizationExpiresAt: safeNonNegativeIntegerSchema.optional(),
+  acceptedAt: safeNonNegativeIntegerSchema,
+  actionHash: base64Url32Schema,
+  revokedBy: z.enum(['root', 'device']).optional(),
+});
+
+function addDeviceRegistryTransitionIssues(
+  value: {
+    eventType: 'activated' | 'revoked';
+    identitySequence: number;
+    identityState: 'active' | 'revoked';
+    deviceState: 'active' | 'revoked';
+    authorizationId?: NexusDeviceAuthorizationIdV2 | undefined;
+    authorizationExpiresAt?: number | undefined;
+    revokedBy?: 'root' | 'device' | undefined;
+  },
+  context: z.RefinementCtx,
+): void {
+  if (
+    (value.identityState === 'active' && value.identitySequence !== 0) ||
+    (value.identityState === 'revoked' && value.identitySequence !== 1)
+  ) {
+    context.addIssue({
+      code: 'custom',
+      message: 'identitySequence must match the v1 identity state.',
+      path: ['identitySequence'],
+    });
+  }
+  if (value.eventType === 'activated') {
+    if (value.identityState !== 'active' || value.deviceState !== 'active') {
+      context.addIssue({
+        code: 'custom',
+        message: 'An activation event requires active identity and device state.',
+        path: ['eventType'],
+      });
+    }
+    if (value.authorizationId === undefined || value.authorizationExpiresAt === undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'An activation event requires authorizationId and authorizationExpiresAt.',
+        path: ['authorizationId'],
+      });
+    }
+    if (value.revokedBy !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'An activation event must omit revokedBy.',
+        path: ['revokedBy'],
+      });
+    }
+  } else {
+    if (value.deviceState !== 'revoked' || value.revokedBy === undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'A revocation event requires revoked device state and revokedBy.',
+        path: ['eventType'],
+      });
+    }
+  }
+}
+
+export const deviceRegistryEventWithoutEventIdV2Schema: ZodType<DeviceRegistryEventWithoutEventIdV2> =
+  deviceRegistryEventWithoutIdBaseV2Schema.superRefine(
+    addDeviceRegistryTransitionIssues,
+  ) satisfies z.ZodType<DeviceRegistryEventWithoutEventIdV2>;
+
+export const deviceRegistryEventV2Schema: ZodType<DeviceRegistryEventV2> =
+  deviceRegistryEventWithoutIdBaseV2Schema
+    .extend({ eventId: nexusDeviceEventIdV2Schema })
+    .superRefine(addDeviceRegistryTransitionIssues) satisfies z.ZodType<DeviceRegistryEventV2>;
+
+const deviceRegistryReceiptPayloadBaseV2Schema = z.strictObject({
+  protocol: z.literal(DEVICE_REGISTRY_RECEIPT_PROTOCOL_V2),
+  eventId: nexusDeviceEventIdV2Schema,
+  operationId: nexusDeviceOperationIdV2Schema,
+  eventType: z.enum(['activated', 'revoked']),
+  subject: nexusSubjectSchema,
+  genesisHash: base64Url32Schema,
+  identitySequence: safeNonNegativeIntegerSchema,
+  identityState: z.enum(['active', 'revoked']),
+  deviceLedgerSequence: safeNonNegativeIntegerSchema,
+  deviceId: nexusDeviceIdV2Schema,
+  authorizationId: nexusDeviceAuthorizationIdV2Schema.optional(),
+  deviceState: z.enum(['active', 'revoked']),
+  authorizationExpiresAt: safeNonNegativeIntegerSchema.optional(),
+  acceptedAt: safeNonNegativeIntegerSchema,
+  revokedBy: z.enum(['root', 'device']).optional(),
+  signerKid: signerKidSchema,
+});
+
+export const deviceRegistryReceiptPayloadV2Schema: ZodType<DeviceRegistryReceiptPayloadV2> =
+  deviceRegistryReceiptPayloadBaseV2Schema.superRefine(
+    addDeviceRegistryTransitionIssues,
+  ) satisfies z.ZodType<DeviceRegistryReceiptPayloadV2>;
+
+export const deviceRegistryReceiptV2Schema: ZodType<DeviceRegistryReceiptV2> = z.strictObject({
+  payload: deviceRegistryReceiptPayloadV2Schema,
+  signature: base64Url64Schema,
+}) satisfies z.ZodType<DeviceRegistryReceiptV2>;
+
 export const statusStatementPayloadV1Schema: ZodType<StatusStatementPayloadV1> = z
   .strictObject({
     protocol: z.literal(STATUS_STATEMENT_PROTOCOL_V1),
@@ -405,6 +783,205 @@ export const statusStatementV1Schema: ZodType<StatusStatementV1> = z.strictObjec
   signature: base64Url64Schema,
 }) satisfies z.ZodType<StatusStatementV1>;
 
+export const deviceStatusStatementPayloadV2Schema: ZodType<DeviceStatusStatementPayloadV2> = z
+  .strictObject({
+    protocol: z.literal(DEVICE_STATUS_STATEMENT_PROTOCOL_V2),
+    subject: nexusSubjectSchema,
+    genesisHash: base64Url32Schema,
+    identityState: z.enum(['active', 'revoked']),
+    identitySequence: safeNonNegativeIntegerSchema,
+    deviceLedgerSequence: safeNonNegativeIntegerSchema,
+    deviceId: nexusDeviceIdV2Schema,
+    authorizationId: nexusDeviceAuthorizationIdV2Schema,
+    deviceState: z.enum(['active', 'revoked', 'expired', 'unknown']),
+    activatedAt: safeNonNegativeIntegerSchema.optional(),
+    revokedAt: safeNonNegativeIntegerSchema.optional(),
+    authorizationExpiresAt: safeNonNegativeIntegerSchema.optional(),
+    iat: safeNonNegativeIntegerSchema,
+    exp: safeNonNegativeIntegerSchema,
+    signerKid: signerKidSchema,
+  })
+  .superRefine((status, context) => {
+    if (status.iat > status.exp) {
+      context.addIssue({ code: 'custom', message: 'iat must not exceed exp.', path: ['exp'] });
+    }
+    if (
+      (status.identityState === 'active' && status.identitySequence !== 0) ||
+      (status.identityState === 'revoked' && status.identitySequence !== 1)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'identitySequence must match the v1 identity state.',
+        path: ['identitySequence'],
+      });
+    }
+    if (status.deviceState === 'active') {
+      if (
+        status.identityState !== 'active' ||
+        status.activatedAt === undefined ||
+        status.authorizationExpiresAt === undefined ||
+        status.revokedAt !== undefined
+      ) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Active device status requires an active identity, activation and expiry only.',
+          path: ['deviceState'],
+        });
+      }
+    } else if (status.deviceState === 'expired') {
+      if (
+        status.identityState !== 'active' ||
+        status.activatedAt === undefined ||
+        status.authorizationExpiresAt === undefined ||
+        status.revokedAt !== undefined
+      ) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Expired device status requires an active identity, activation and expiry only.',
+          path: ['deviceState'],
+        });
+      }
+    } else if (status.deviceState === 'revoked') {
+      if (status.revokedAt === undefined) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Revoked device status requires revokedAt.',
+          path: ['revokedAt'],
+        });
+      }
+    } else if (
+      status.activatedAt !== undefined ||
+      status.revokedAt !== undefined ||
+      status.authorizationExpiresAt !== undefined
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Unknown device status must omit lifecycle timestamps.',
+        path: ['deviceState'],
+      });
+    }
+    if (
+      status.activatedAt !== undefined &&
+      status.authorizationExpiresAt !== undefined &&
+      status.activatedAt > status.authorizationExpiresAt
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'activatedAt must not exceed authorizationExpiresAt.',
+        path: ['authorizationExpiresAt'],
+      });
+    }
+    if (
+      status.activatedAt !== undefined &&
+      status.revokedAt !== undefined &&
+      status.activatedAt > status.revokedAt
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'activatedAt must not exceed revokedAt.',
+        path: ['revokedAt'],
+      });
+    }
+  }) satisfies z.ZodType<DeviceStatusStatementPayloadV2>;
+
+export const deviceStatusStatementV2Schema: ZodType<DeviceStatusStatementV2> = z.strictObject({
+  payload: deviceStatusStatementPayloadV2Schema,
+  signature: base64Url64Schema,
+}) satisfies z.ZodType<DeviceStatusStatementV2>;
+
+export const deviceStatusRequestV2Schema: ZodType<DeviceStatusRequestV2> = z.strictObject({
+  subject: nexusSubjectSchema,
+  deviceId: nexusDeviceIdV2Schema,
+  authorizationId: nexusDeviceAuthorizationIdV2Schema,
+}) satisfies z.ZodType<DeviceStatusRequestV2>;
+
+export const deviceStatusBatchRequestV2Schema: ZodType<DeviceStatusBatchRequestV2> = z
+  .strictObject({
+    devices: z.array(deviceStatusRequestV2Schema).min(1).max(MAX_STATUS_BATCH_SUBJECTS),
+  })
+  .superRefine((request, context) => {
+    const seen = new Set<string>();
+    request.devices.forEach((device, index) => {
+      const tuple = `${device.subject}\0${device.deviceId}\0${device.authorizationId}`;
+      if (seen.has(tuple)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Device status requests must be unique.',
+          path: ['devices', index],
+        });
+      }
+      seen.add(tuple);
+    });
+  }) satisfies z.ZodType<DeviceStatusBatchRequestV2>;
+
+export const deviceRegistryStatusV2Schema: ZodType<DeviceRegistryStatusV2> = z
+  .strictObject({
+    subject: nexusSubjectSchema,
+    genesisHash: base64Url32Schema,
+    identityState: z.enum(['active', 'revoked']),
+    identitySequence: safeNonNegativeIntegerSchema,
+    deviceLedgerSequence: safeNonNegativeIntegerSchema,
+    deviceId: nexusDeviceIdV2Schema,
+    authorizationId: nexusDeviceAuthorizationIdV2Schema,
+    deviceState: z.enum(['active', 'revoked', 'expired', 'unknown']),
+    activatedAt: safeNonNegativeIntegerSchema.nullable(),
+    revokedAt: safeNonNegativeIntegerSchema.nullable(),
+    authorizationExpiresAt: safeNonNegativeIntegerSchema.nullable(),
+    statusStatement: deviceStatusStatementV2Schema,
+  })
+  .superRefine((status, context) => {
+    const statement = status.statusStatement.payload;
+    if (
+      statement.subject !== status.subject ||
+      statement.genesisHash !== status.genesisHash ||
+      statement.identityState !== status.identityState ||
+      statement.identitySequence !== status.identitySequence ||
+      statement.deviceLedgerSequence !== status.deviceLedgerSequence ||
+      statement.deviceId !== status.deviceId ||
+      statement.authorizationId !== status.authorizationId ||
+      statement.deviceState !== status.deviceState ||
+      (statement.activatedAt ?? null) !== status.activatedAt ||
+      (statement.revokedAt ?? null) !== status.revokedAt ||
+      (statement.authorizationExpiresAt ?? null) !== status.authorizationExpiresAt
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Status statement does not describe the enclosing device registry status.',
+        path: ['statusStatement'],
+      });
+    }
+  }) satisfies z.ZodType<DeviceRegistryStatusV2>;
+
+export const nexusDeviceErrorBodySchema = z.strictObject({
+  code: z.enum(NEXUS_DEVICE_ERROR_CODES),
+  message: z.string().min(1).max(1024),
+  requestId: printableAscii(128).optional(),
+});
+
+export const nexusDeviceErrorSchema: ZodType<NexusDeviceError> = z.strictObject({
+  error: nexusDeviceErrorBodySchema,
+}) satisfies z.ZodType<NexusDeviceError>;
+
+const deviceStatusBatchErrorV2Schema = z.strictObject({
+  ok: z.literal(false),
+  subject: nexusSubjectSchema,
+  deviceId: nexusDeviceIdV2Schema,
+  authorizationId: nexusDeviceAuthorizationIdV2Schema,
+  error: nexusDeviceErrorBodySchema,
+});
+
+export const deviceStatusBatchResponseV2Schema: ZodType<DeviceStatusBatchResponseV2> =
+  z.strictObject({
+    results: z
+      .array(
+        z.union([
+          z.strictObject({ ok: z.literal(true), status: deviceRegistryStatusV2Schema }),
+          deviceStatusBatchErrorV2Schema,
+        ]),
+      )
+      .max(MAX_STATUS_BATCH_SUBJECTS),
+  }) satisfies z.ZodType<DeviceStatusBatchResponseV2>;
+
 export const proofRequestSchema: ZodType<ProofRequest> = z.strictObject({
   action: actionSchema,
   resource: resourceSchema,
@@ -421,6 +998,16 @@ export const verificationExpectationSchema: ZodType<VerificationExpectation> = z
   now: safeNonNegativeIntegerSchema,
   maxClockSkewSeconds: safeNonNegativeIntegerSchema,
 }) satisfies z.ZodType<VerificationExpectation>;
+
+export const verificationExpectationV2Schema: ZodType<VerificationExpectationV2> = z.strictObject({
+  audience: audienceOriginSchema,
+  action: actionSchema,
+  resource: resourceSchema,
+  nonce: base64UrlAtLeast16Schema,
+  now: safeNonNegativeIntegerSchema,
+  maxClockSkewSeconds: safeNonNegativeIntegerSchema,
+  contextHash: base64Url32Schema.nullable(),
+}) satisfies z.ZodType<VerificationExpectationV2>;
 
 export const ed25519PublicJwkSchema: ZodType<Ed25519PublicJwk> = z.strictObject({
   kty: z.literal('OKP'),

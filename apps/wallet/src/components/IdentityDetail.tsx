@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   AlertTriangle,
   ArrowRightLeft,
@@ -9,7 +9,11 @@ import {
   KeySquare,
   Link2,
   Loader2,
+  Plus,
+  RefreshCw,
   ShieldCheck,
+  ShieldOff,
+  Smartphone,
   Trash2,
   X,
 } from 'lucide-react';
@@ -20,6 +24,7 @@ import {
   canUseRegisteredIdentityActions,
   needsRegistrationRecovery,
 } from '../lib/identity-capabilities';
+import { deviceManagementCapabilities } from '../lib/device-management';
 
 interface IdentityDetailProps {
   identity: LocalIdentitySummary;
@@ -31,6 +36,11 @@ interface IdentityDetailProps {
   onRetryRegistration: () => void;
   clearingHistory: boolean;
   onClearHistory: () => Promise<void>;
+  onAddDevice: () => void;
+  onActivateDevice: () => Promise<void>;
+  onSelfRevokeDevice: () => void;
+  onRootRevokeDevice: (device: LocalIdentitySummary['issuedDevices'][number]) => void;
+  deviceActionBusy: boolean;
 }
 
 export function IdentityDetail({
@@ -43,10 +53,26 @@ export function IdentityDetail({
   onRetryRegistration,
   clearingHistory,
   onClearHistory,
+  onAddDevice,
+  onActivateDevice,
+  onSelfRevokeDevice,
+  onRootRevokeDevice,
+  deviceActionBusy,
 }: IdentityDetailProps) {
   const active = identity.localState === 'active';
   const registeredActions = canUseRegisteredIdentityActions(identity);
   const [confirmClearHistory, setConfirmClearHistory] = useState(false);
+  const [now, setNow] = useState(() => Math.floor(Date.now() / 1_000));
+  const deviceCapabilities = deviceManagementCapabilities(identity, now);
+
+  useEffect(() => {
+    if (identity.device?.localState !== 'pending-activation') return;
+    const cutoff = Math.min(identity.device.activationDeadline, identity.device.expiresAt);
+    if (now >= cutoff) return;
+    const delay = Math.min((cutoff - now) * 1_000 + 25, 2_147_483_647);
+    const handle = window.setTimeout(() => setNow(Math.floor(Date.now() / 1_000)), delay);
+    return () => window.clearTimeout(handle);
+  }, [identity.device, now]);
 
   const clearHistory = async () => {
     if (!confirmClearHistory) {
@@ -106,11 +132,17 @@ export function IdentityDetail({
             </dt>
             <dd className="mt-2 flex items-center gap-2 text-sm font-semibold text-slate-900">
               <ShieldCheck className="h-4 w-4 text-indigo-600" aria-hidden="true" />
-              {active && identity.registered
-                ? 'Active and registered'
-                : active
-                  ? 'Not registered'
-                  : 'Revoked forever'}
+              {identity.device !== undefined
+                ? identity.device.localState === 'active'
+                  ? 'Active delegated device'
+                  : identity.device.localState === 'pending-activation'
+                    ? 'Delegated device pending activation'
+                    : 'Delegated device revoked'
+                : active && identity.registered
+                  ? 'Active and registered'
+                  : active
+                    ? 'Not registered'
+                    : 'Revoked forever'}
             </dd>
           </div>
           <div className="rounded-xl border border-slate-200 p-4">
@@ -148,6 +180,138 @@ export function IdentityDetail({
                 </button>
               </div>
             </div>
+          </div>
+        )}
+
+        {(identity.device !== undefined || registeredActions) && (
+          <div className="mt-6 border-t border-slate-100 pt-6">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Smartphone className="h-4 w-4 text-indigo-600" aria-hidden="true" />
+                <h3 className="text-sm font-semibold text-slate-900">
+                  {identity.device === undefined ? 'Authorized devices' : 'This device'}
+                </h3>
+              </div>
+              {deviceCapabilities.issueDevice && (
+                <button type="button" onClick={onAddDevice} className={smallPrimaryButton}>
+                  <Plus className="h-3.5 w-3.5" /> Add device
+                </button>
+              )}
+            </div>
+
+            {identity.device !== undefined ? (
+              <div className="rounded-xl border border-slate-200 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-slate-900">
+                      {identity.device.localState === 'pending-activation'
+                        ? 'Pending activation'
+                        : identity.device.localState === 'active'
+                          ? 'Active delegated key'
+                          : 'Revoked delegated key'}
+                    </p>
+                    <code
+                      className="mt-1 block truncate text-xs text-slate-400"
+                      title={identity.device.deviceId}
+                    >
+                      {identity.device.deviceId}
+                    </code>
+                    <p className="mt-2 text-xs leading-relaxed text-slate-500">
+                      Authorized until{' '}
+                      {new Date(identity.device.expiresAt * 1_000).toLocaleString()}. This key
+                      cannot add or remove other devices.
+                    </p>
+                  </div>
+                  {deviceCapabilities.activateDevice && (
+                    <button
+                      type="button"
+                      onClick={() => void onActivateDevice()}
+                      disabled={deviceActionBusy}
+                      className={smallPrimaryButton}
+                    >
+                      {deviceActionBusy ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-3.5 w-3.5" />
+                      )}
+                      {deviceActionBusy ? 'Activating…' : 'Retry activation'}
+                    </button>
+                  )}
+                  {deviceCapabilities.selfRevokeDevice && (
+                    <button
+                      type="button"
+                      onClick={onSelfRevokeDevice}
+                      disabled={deviceActionBusy}
+                      className={smallDangerButton}
+                    >
+                      <ShieldOff className="h-3.5 w-3.5" />{' '}
+                      {identity.device.localState === 'pending-activation'
+                        ? 'Cancel installed device'
+                        : 'Remove this device'}
+                    </button>
+                  )}
+                </div>
+                {identity.device.localState === 'pending-activation' && (
+                  <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">
+                    {deviceCapabilities.activateDevice
+                      ? 'The signing key is installed but cannot create proofs yet. Retry activation before the authorization deadline.'
+                      : 'The activation window has closed. This installation cannot create proofs; cancel it to invalidate the device authorization.'}
+                  </div>
+                )}
+              </div>
+            ) : identity.issuedDevices.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">
+                No device keys have been issued by this root identity. Adding one exports only a
+                separately authorized device key—not this identity key.
+              </div>
+            ) : (
+              <ul className="space-y-2">
+                {identity.issuedDevices.map((device) => (
+                  <li
+                    key={device.authorizationId}
+                    className="rounded-xl border border-slate-200 p-4"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-semibold text-slate-900">
+                            {device.label ?? 'Authorized device'}
+                          </p>
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                              device.localState === 'revoked'
+                                ? 'bg-rose-100 text-rose-800'
+                                : 'bg-emerald-100 text-emerald-800'
+                            }`}
+                          >
+                            {device.localState === 'revoked' ? 'Revoked' : 'Issued'}
+                          </span>
+                        </div>
+                        <code
+                          className="mt-1 block truncate text-xs text-slate-400"
+                          title={device.deviceId}
+                        >
+                          {device.deviceId}
+                        </code>
+                        <p className="mt-1 text-xs text-slate-500">
+                          Expires {new Date(device.expiresAt * 1_000).toLocaleString()}
+                        </p>
+                      </div>
+                      {device.localState !== 'revoked' && deviceCapabilities.rootRevokeDevice && (
+                        <button
+                          type="button"
+                          onClick={() => onRootRevokeDevice(device)}
+                          disabled={deviceActionBusy}
+                          className={smallDangerButton}
+                        >
+                          <ShieldOff className="h-3.5 w-3.5" /> Remove
+                        </button>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
 
@@ -301,3 +465,8 @@ export function IdentityDetail({
     </motion.section>
   );
 }
+
+const smallPrimaryButton =
+  'inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-300';
+const smallDangerButton =
+  'inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-rose-200 bg-white px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50';

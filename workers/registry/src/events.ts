@@ -1,7 +1,16 @@
-import { canonicalize, canonicalizeToBytes, encodeBase64Url } from '@nexus/protocol';
+import {
+  canonicalize,
+  canonicalizeToBytes,
+  createDeviceRegistryEventHashPreimageV2,
+  encodeBase64Url,
+  formatDeviceRegistryEventIdV2,
+} from '@nexus/protocol';
 import type {
   Base64Url32,
+  DeviceRegistryEventV2,
+  DeviceRegistryEventWithoutEventIdV2,
   RegistryEventV1,
+  DeviceOperationPayloadV2,
   RevokeBySecretV1,
   RevokeBySignaturePayloadV1,
 } from '@nexus/protocol';
@@ -19,12 +28,38 @@ export interface MaterializedRegistryEvent {
   payloadJcs: string;
 }
 
+export interface MaterializedDeviceRegistryEvent {
+  event: DeviceRegistryEventV2;
+  eventHash: Uint8Array;
+  payloadJcs: string;
+}
+
 export async function materializeRegistryEvent(
   eventWithoutId: RegistryEventWithoutId,
 ): Promise<MaterializedRegistryEvent> {
   const { eventHash, eventId } = await deriveRegistryEventId(eventWithoutId);
   const event: RegistryEventV1 = { ...eventWithoutId, eventId };
   return { event, eventHash, payloadJcs: canonicalize(event) };
+}
+
+export async function materializeDeviceRegistryEvent(
+  eventWithoutId: DeviceRegistryEventWithoutEventIdV2,
+): Promise<MaterializedDeviceRegistryEvent> {
+  const eventHash = await getDefaultCryptoProvider().sha256(
+    createDeviceRegistryEventHashPreimageV2(eventWithoutId),
+  );
+  const event: DeviceRegistryEventV2 = {
+    ...eventWithoutId,
+    eventId: formatDeviceRegistryEventIdV2(eventHash),
+  };
+  return { event, eventHash, payloadJcs: canonicalize(event) };
+}
+
+export async function signedDeviceActionHash(
+  payload: DeviceOperationPayloadV2,
+): Promise<Base64Url32> {
+  const bytes = createProtocolSignaturePreimage(payload);
+  return encodeBase64Url(await getDefaultCryptoProvider().sha256(bytes)) as Base64Url32;
 }
 
 /**

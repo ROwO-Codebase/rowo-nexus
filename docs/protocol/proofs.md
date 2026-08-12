@@ -1,6 +1,8 @@
 # Ownership Proofs and Receipts
 
-This document summarizes the v1 signed-object rules. `NEXUS_SPEC.md` remains normative.
+This document summarizes the v1 signed-object rules. `NEXUS_SPEC.md` remains normative. The
+separately versioned [v2 root/device profile](./device-delegation-v2.md) adds device-authorized
+ownership proofs without changing the v1 proof schema or verifier behavior.
 
 ## Signing format
 
@@ -28,6 +30,11 @@ SDK must not expose arbitrary raw signing.
 - a backend-generated, single-use nonce with at least 128 bits of randomness;
 - `iat` and `exp` integer timestamps;
 - optional `contextHash`, normally SHA-256 over the RP-defined request/body context.
+
+The v1 field remains optional under the existing verifier contract. The v2 verifier instead requires
+an explicit context expectation: a 32-byte expected hash must match exactly, while `null` requires
+the proof to omit `contextHash`. This prevents an integration from accidentally accepting an
+unexamined v2 context value.
 
 Proof lifetime should be at most 120 seconds; 60 seconds is the default target. Wildcard audiences
 are forbidden.

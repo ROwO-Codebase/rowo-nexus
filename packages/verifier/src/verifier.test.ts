@@ -33,7 +33,10 @@ import {
 import { describe, expect, it } from 'vitest';
 
 import {
+  NEXUS_VERIFICATION_ERROR_CODES,
+  NEXUS_VERIFICATION_ERROR_CODES_V2,
   NexusVerificationError,
+  NexusVerificationErrorV2,
   verifyContinuityLink,
   verifyOwnershipProof,
   verifyRegistryReceipt,
@@ -43,7 +46,12 @@ import {
   verifyStatusStatement,
   verifySubject,
 } from './index.js';
-import type { ChallengeStore, LifecycleProvider, NexusVerificationErrorCode } from './index.js';
+import type {
+  ChallengeStore,
+  LifecycleProvider,
+  NexusVerificationErrorCode,
+  NexusVerificationErrorCodeV2,
+} from './index.js';
 
 const NOW = 1_800_000_000;
 
@@ -691,5 +699,56 @@ describe('typed verifier errors', () => {
     expect(error).toBeInstanceOf(Error);
     expect(error.code).toBe('INVALID_REVOCATION_SECRET');
     expect(error.message).not.toContain('secret');
+  });
+
+  it('keeps the legacy error union exact and exposes v2 failures additively', () => {
+    expect(NEXUS_VERIFICATION_ERROR_CODES).toEqual([
+      'BAD_REQUEST',
+      'UNSUPPORTED_PROTOCOL',
+      'UNSUPPORTED_SUITE',
+      'INVALID_SUBJECT',
+      'INVALID_SIGNATURE',
+      'INVALID_REVOCATION_SECRET',
+      'WRONG_AUDIENCE',
+      'WRONG_ACTION',
+      'WRONG_RESOURCE',
+      'WRONG_NONCE',
+      'SEQUENCE_CONFLICT',
+      'PROOF_NOT_YET_VALID',
+      'PROOF_EXPIRED',
+      'PROOF_LIFETIME_EXCEEDED',
+      'NONCE_REPLAY_OR_EXPIRED',
+      'IDENTITY_NOT_FOUND',
+      'IDENTITY_REVOKED',
+      'KEY_NOT_FOUND',
+      'INVALID_KEY',
+      'KEY_PURPOSE_MISMATCH',
+      'WRONG_EVENT_TYPE',
+      'WRONG_STATE',
+      'WRONG_GENESIS_HASH',
+      'WRONG_SCOPE',
+      'WRONG_SHARD',
+      'WRONG_ROOT',
+      'WRONG_TREE_SIZE',
+      'WRONG_MANIFEST',
+      'WRONG_EVENT_HASH',
+      'INVALID_INCLUSION_PROOF',
+    ]);
+    expect(NEXUS_VERIFICATION_ERROR_CODES_V2).toContain('DEVICE_REVOKED');
+
+    const legacyCode: NexusVerificationErrorCode = 'IDENTITY_REVOKED';
+    const v2Code: NexusVerificationErrorCodeV2 = 'DEVICE_REVOKED';
+    expect(legacyCode).toBe('IDENTITY_REVOKED');
+    expect(v2Code).toBe('DEVICE_REVOKED');
+
+    // @ts-expect-error Device-only codes must never widen the stable legacy union.
+    const invalidLegacyCode: NexusVerificationErrorCode = 'DEVICE_REVOKED';
+    expect(invalidLegacyCode).toBe('DEVICE_REVOKED');
+
+    const error = new NexusVerificationErrorV2('DEVICE_REVOKED');
+    expect(error).toBeInstanceOf(NexusVerificationErrorV2);
+    expect(error).toBeInstanceOf(NexusVerificationError);
+    expect(error.codeV2).toBe('DEVICE_REVOKED');
+    expect(error.code).toBe('IDENTITY_REVOKED');
   });
 });

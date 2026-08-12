@@ -2,7 +2,7 @@
   "name": "@nexus/protocol",
   "version": "0.1.0",
   "type": "module",
-  "description": "Canonical Nexus v1 wire types, schemas, encodings, and cryptographic preimages.",
+  "description": "Canonical Nexus v1 and v2 wire types, schemas, encodings, and cryptographic preimages.",
   "license": "MIT",
   "publishConfig": {
     "access": "public",

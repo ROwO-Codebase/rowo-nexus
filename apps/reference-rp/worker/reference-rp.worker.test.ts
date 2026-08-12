@@ -8,23 +8,32 @@ import {
 
 import {
   computeRevocationCommitment,
+  deriveDeviceAuthorizationIdV2,
+  deriveDeviceIdV2,
+  deriveGenesisHash,
   deriveSubject,
   signProtocolPayload,
   WebCryptoProvider,
 } from '@nexus/crypto';
 import {
   ED25519_ALGORITHM,
+  DEVICE_AUTHORIZATION_PROTOCOL_V2,
   IDENTITY_PROTOCOL_V1,
   NEXUS_SUITE_V1,
   OWNERSHIP_PROOF_PROTOCOL_V1,
+  OWNERSHIP_PROOF_PROTOCOL_V2,
   encodeBase64Url,
 } from '@nexus/protocol';
 import type {
   Base64Url32,
   Base64Url64,
   IdentityGenesisV1,
+  DeviceAuthorizationV2,
+  NexusDeviceAuthorizationIdV2,
+  NexusDeviceIdV2,
   NexusSubject,
   OwnershipProofV1,
+  OwnershipProofV2,
 } from '@nexus/protocol';
 import { beforeEach, describe, expect, it } from 'vitest';
 
@@ -35,6 +44,7 @@ import type {
   SessionOperationResult,
   SessionStartResult,
 } from '../src/shared/contracts';
+import { canonicalSha256 } from './crypto';
 import type { ReferenceRpState } from './reference-rp-state';
 
 const AUDIENCE = 'https://notes.example.test';
@@ -51,6 +61,15 @@ interface LoggedInIdentity {
   readonly identity: TestIdentity;
   readonly cookie: string;
   readonly result: SessionStartResult;
+}
+
+interface TestDevice {
+  readonly identity: TestIdentity;
+  readonly privateKey: CryptoKey;
+  readonly deviceId: NexusDeviceIdV2;
+  readonly authorizationId: NexusDeviceAuthorizationIdV2;
+  readonly authorization: DeviceAuthorizationV2;
+  readonly genesisHash: Base64Url32;
 }
 
 interface TestRateLimiter {
@@ -172,6 +191,10 @@ describe('deployed reference RP Worker', () => {
   it('starts one hash-only five-minute session and rejects proof replay', async () => {
     const identity = await createRegisteredIdentity();
     const challenge = await issueChallenge();
+    expect(challenge.acceptedProofProtocols).toEqual([
+      OWNERSHIP_PROOF_PROTOCOL_V2,
+      OWNERSHIP_PROOF_PROTOCOL_V1,
+    ]);
     const input = {
       challengeId: challenge.challengeId,
       operation: { action: 'session.start' as const },
@@ -222,6 +245,140 @@ describe('deployed reference RP Worker', () => {
     expect(current.status).toBe(200);
     await expect(current.json()).resolves.toMatchObject({
       session: { subject: identity.subject, state: 'active' },
+    });
+  });
+
+  it('binds v2 device authority to the session and rejects it after device revocation', async () => {
+    const identity = await createRegisteredIdentity();
+    const device = await createRegisteredDevice(identity);
+    const challenge = await issueChallenge();
+    const proof = await createDeviceProof(device, challenge);
+    const response = await postJson('/api/operations', {
+      challengeId: challenge.challengeId,
+      operation: { action: 'session.start' },
+      proofProtocol: OWNERSHIP_PROOF_PROTOCOL_V2,
+      proof,
+    });
+    expect(response.status, await response.clone().text()).toBe(200);
+    const result: SessionStartResult = await response.clone().json();
+    expect(result.session).toMatchObject({
+      subject: identity.subject,
+      proofProtocol: OWNERSHIP_PROOF_PROTOCOL_V2,
+      deviceId: device.deviceId,
+      authorizationId: device.authorizationId,
+    });
+    const cookie = cookiePair(response.headers.get('Set-Cookie'));
+    const stored = await runInDurableObject(
+      env.RP_STATE.getByName('reference-rp-primary'),
+      (_instance, state) =>
+        state.storage.sql
+          .exec<{ proof_protocol: string; device_id: string; authorization_id: string }>(
+            `SELECT proof_protocol, device_id, authorization_id
+               FROM sessions WHERE subject = ?`,
+            identity.subject,
+          )
+          .one(),
+    );
+    expect(stored).toEqual({
+      proof_protocol: OWNERSHIP_PROOF_PROTOCOL_V2,
+      device_id: device.deviceId,
+      authorization_id: device.authorizationId,
+    });
+
+    await deviceLifecycleControl('/__test/revoke-device', device);
+    const denied = await sessionOperation(cookie, {
+      action: 'profile.set-name',
+      friendlyName: 'revoked_device',
+    });
+    expect(denied.status).toBe(401);
+  });
+
+  it.each(['stale', 'forged', 'wrong-tuple'] as const)(
+    'fails closed when the v2 device status statement is %s',
+    async (mode) => {
+      const identity = await createRegisteredIdentity();
+      const device = await createRegisteredDevice(identity);
+      const { cookie } = await loginDevice(device);
+      await setDeviceStatusMode(mode);
+
+      const denied = await fetchWithCookie('/api/session', cookie);
+      expect(denied.status).toBe(503);
+    },
+  );
+
+  it('rejects a v2 session when its signed device status reports a revoked identity', async () => {
+    const identity = await createRegisteredIdentity();
+    const device = await createRegisteredDevice(identity);
+    const { cookie } = await loginDevice(device);
+    await lifecycleControl('/__test/revoke', identity);
+
+    const denied = await sessionOperation(cookie, {
+      action: 'profile.set-name',
+      friendlyName: 'revoked_identity',
+    });
+    expect(denied.status).toBe(401);
+  });
+
+  it('rejects a v2 session at the exact device authorization expiry second', async () => {
+    const identity = await createRegisteredIdentity();
+    const device = await createRegisteredDevice(identity);
+    const { cookie } = await loginDevice(device);
+    await setDeviceStatusMode('expiry-boundary');
+
+    const denied = await fetchWithCookie('/api/session', cookie);
+    expect(denied.status).toBe(401);
+  });
+
+  it('fails closed on an active device status at the exact authorization expiry second', async () => {
+    const identity = await createRegisteredIdentity();
+    const device = await createRegisteredDevice(identity);
+    const { cookie } = await loginDevice(device);
+    await setDeviceStatusMode('active-expiry-boundary');
+
+    const denied = await fetchWithCookie('/api/session', cookie);
+    expect(denied.status).toBe(503);
+  });
+
+  it('does not accept a protocol label that disagrees with the returned proof', async () => {
+    const identity = await createRegisteredIdentity();
+    const challenge = await issueChallenge();
+    const response = await postJson('/api/operations', {
+      challengeId: challenge.challengeId,
+      operation: { action: 'session.start' },
+      proofProtocol: OWNERSHIP_PROOF_PROTOCOL_V2,
+      proof: await createProof(identity, challenge),
+    });
+    expect(response.status).toBe(400);
+  });
+
+  it('rejects a valid v1 proof when the stored challenge policy is v2-only', async () => {
+    const identity = await createRegisteredIdentity();
+    const issued = await issueChallenge();
+    const contextHash = await v2OnlyContextHash();
+    await runInDurableObject(env.RP_STATE.getByName('reference-rp-primary'), (_instance, state) => {
+      state.storage.sql.exec(
+        `UPDATE challenges
+              SET accepted_proof_protocols = ?, context_hash = ?
+            WHERE challenge_id = ?`,
+        JSON.stringify([OWNERSHIP_PROOF_PROTOCOL_V2]),
+        contextHash,
+        issued.challengeId,
+      );
+    });
+    const challenge: IssuedChallenge = {
+      ...issued,
+      contextHash: contextHash as Base64Url32,
+      acceptedProofProtocols: [OWNERSHIP_PROOF_PROTOCOL_V2],
+    };
+    const response = await postJson('/api/operations', {
+      challengeId: challenge.challengeId,
+      operation: { action: 'session.start' },
+      proofProtocol: OWNERSHIP_PROOF_PROTOCOL_V1,
+      proof: await createProof(identity, challenge),
+    });
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: 'UNSUPPORTED_PROOF_PROTOCOL' },
     });
   });
 
@@ -422,7 +579,7 @@ describe('deployed reference RP Worker', () => {
         )
         .one().count,
     }));
-    expect(schema).toEqual({ version: 3, replyTable: 1, likesTable: 1, profileTable: 1 });
+    expect(schema).toEqual({ version: 4, replyTable: 1, likesTable: 1, profileTable: 1 });
   });
 });
 
@@ -460,6 +617,79 @@ async function lifecycleControl(
   expect(response.ok).toBe(true);
 }
 
+async function createRegisteredDevice(identity: TestIdentity): Promise<TestDevice> {
+  const pair = await provider.generateEd25519KeyPair({ privateKeyExtractable: true });
+  const publicKey = await provider.exportEd25519PublicKey(pair.publicKey);
+  const signingKey = {
+    alg: ED25519_ALGORITHM,
+    publicKey: encodeBase64Url(publicKey) as Base64Url32,
+  };
+  const deviceId = await deriveDeviceIdV2({ subject: identity.subject, signingKey }, provider);
+  const now = Math.floor(Date.now() / 1_000);
+  const genesisHash = encodeBase64Url(
+    await deriveGenesisHash(identity.genesis, provider),
+  ) as Base64Url32;
+  const authorizationPayload: DeviceAuthorizationV2['payload'] = {
+    protocol: DEVICE_AUTHORIZATION_PROTOCOL_V2,
+    subject: identity.subject,
+    genesisHash,
+    deviceId,
+    signingKey,
+    authorizationNonce: encodeBase64Url(provider.randomBytes(32)) as Base64Url32,
+    validFrom: now - 30,
+    activationDeadline: now + 600,
+    expiresAt: now + 3_600,
+  };
+  const authorization: DeviceAuthorizationV2 = {
+    payload: authorizationPayload,
+    rootSignature: (await signProtocolPayload(
+      authorizationPayload,
+      identity.privateKey,
+      provider,
+    )) as Base64Url64,
+  };
+  const device: TestDevice = {
+    identity,
+    privateKey: pair.privateKey,
+    deviceId,
+    authorizationId: await deriveDeviceAuthorizationIdV2(authorizationPayload, provider),
+    authorization,
+    genesisHash,
+  };
+  await deviceLifecycleControl('/__test/device', device);
+  return device;
+}
+
+async function deviceLifecycleControl(path: string, device: TestDevice): Promise<void> {
+  const response = await env.TEST_LIFECYCLE.fetch(`https://lifecycle.test${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      subject: device.identity.subject,
+      genesisHash: device.genesisHash,
+      deviceId: device.deviceId,
+      authorizationId: device.authorizationId,
+      activatedAt: Math.floor(Date.now() / 1_000) - 5,
+      authorizationExpiresAt: device.authorization.payload.expiresAt,
+    }),
+  });
+  expect(response.ok).toBe(true);
+}
+
+async function setDeviceStatusMode(
+  mode: 'stale' | 'forged' | 'wrong-tuple' | 'expiry-boundary' | 'active-expiry-boundary',
+): Promise<void> {
+  const response = await env.TEST_LIFECYCLE.fetch(
+    'https://lifecycle.test/__test/device-status-mode',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode }),
+    },
+  );
+  expect(response.ok).toBe(true);
+}
+
 async function issueChallenge(): Promise<IssuedChallenge> {
   const response = await postJson('/api/challenges', { action: 'session.start' });
   expect(response.status, await response.clone().text()).toBe(201);
@@ -477,6 +707,23 @@ async function login(identity: TestIdentity): Promise<LoggedInIdentity> {
   expect(response.status, await response.clone().text()).toBe(200);
   return {
     identity,
+    cookie: cookiePair(response.headers.get('Set-Cookie')),
+    result: await response.json(),
+  };
+}
+
+async function loginDevice(
+  device: TestDevice,
+): Promise<{ cookie: string; result: SessionStartResult }> {
+  const challenge = await issueChallenge();
+  const response = await postJson('/api/operations', {
+    challengeId: challenge.challengeId,
+    operation: { action: 'session.start' },
+    proofProtocol: OWNERSHIP_PROOF_PROTOCOL_V2,
+    proof: await createDeviceProof(device, challenge),
+  });
+  expect(response.status, await response.clone().text()).toBe(200);
+  return {
     cookie: cookiePair(response.headers.get('Set-Cookie')),
     result: await response.json(),
   };
@@ -556,6 +803,36 @@ async function createProof(
   };
 }
 
+async function createDeviceProof(
+  device: TestDevice,
+  challenge: IssuedChallenge,
+): Promise<OwnershipProofV2> {
+  const now = Math.floor(Date.now() / 1_000);
+  const payload: OwnershipProofV2['payload'] = {
+    protocol: OWNERSHIP_PROOF_PROTOCOL_V2,
+    subject: device.identity.subject,
+    genesis: device.identity.genesis,
+    deviceId: device.deviceId,
+    authorizationId: device.authorizationId,
+    authorization: device.authorization,
+    aud: AUDIENCE,
+    act: challenge.action,
+    resource: challenge.resource,
+    nonce: challenge.nonce,
+    iat: now,
+    exp: challenge.expiresAt,
+    ...(challenge.contextHash === undefined ? {} : { contextHash: challenge.contextHash }),
+  };
+  return {
+    payload,
+    deviceSignature: (await signProtocolPayload(
+      payload,
+      device.privateKey,
+      provider,
+    )) as Base64Url64,
+  };
+}
+
 function cookiePair(setCookie: string | null): string {
   if (setCookie === null) throw new Error('Expected the session cookie.');
   const pair = setCookie.split(';', 1)[0];
@@ -570,5 +847,26 @@ function postJson(path: string, value: unknown): Promise<Response> {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(value),
+  });
+}
+
+async function v2OnlyContextHash(): Promise<string> {
+  return await canonicalSha256({
+    action: 'session.start',
+    policy: {
+      actions: [
+        'note.create',
+        'note.edit',
+        'note.delete',
+        'reply.create',
+        'reply.delete',
+        'note.like',
+        'note.unlike',
+        'profile.set-name',
+      ],
+      resourcePolicy: 'public-notes-and-private-notes-owned-by-session-subject',
+      ttlSeconds: 300,
+    },
+    acceptedProofProtocols: [OWNERSHIP_PROOF_PROTOCOL_V2],
   });
 }

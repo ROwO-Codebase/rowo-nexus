@@ -2,13 +2,19 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { deriveGenesisHash, deriveSubject } from '@nexus/crypto';
 import {
+  DEVICE_REGISTRY_EVENT_PROTOCOL_V2,
   REGISTRY_EVENT_PROTOCOL_V1,
+  deviceRegistryEventV2Schema,
+  deviceRegistryReceiptV2Schema,
+  deviceStatusStatementV2Schema,
   encodeBase64Url,
   identityGenesisV1Schema,
   registryEventV1Schema,
   registryReceiptV1Schema,
   statusStatementV1Schema,
   type RegistryReceiptPayloadV1,
+  type DeviceRegistryReceiptPayloadV2,
+  type DeviceStatusStatementPayloadV2,
   type StatusStatementPayloadV1,
 } from '@nexus/protocol';
 
@@ -91,7 +97,102 @@ async function fixture() {
       actionHash: B64_32_ZERO,
     }),
   };
-  return { subject, active, activeMutation, revoked, revokedMutation };
+  const deviceId = `nxd2_${B64_32_ONE}` as const;
+  const authorizationId = `nxa2_${B64_32_ONE}` as const;
+  const operationId = `nxo2_${B64_32_ONE}` as const;
+  const deviceEventId = `nxde2_${B64_32_ONE}` as const;
+  const deviceStatus = {
+    subject,
+    genesisHash,
+    identityState: 'active' as const,
+    identitySequence: 0,
+    deviceLedgerSequence: 1,
+    deviceId,
+    authorizationId,
+    deviceState: 'active' as const,
+    activatedAt: 1_700_000_010,
+    revokedAt: null,
+    authorizationExpiresAt: 1_730_000_000,
+  };
+  const deviceActivationEvent = deviceRegistryEventV2Schema.parse({
+    protocol: DEVICE_REGISTRY_EVENT_PROTOCOL_V2,
+    eventId: deviceEventId,
+    operationId,
+    eventType: 'activated',
+    subject,
+    genesisHash,
+    identitySequence: 0,
+    identityState: 'active',
+    deviceLedgerSequence: 1,
+    deviceId,
+    authorizationId,
+    deviceState: 'active',
+    authorizationExpiresAt: 1_730_000_000,
+    acceptedAt: 1_700_000_010,
+    actionHash: B64_32_ZERO,
+  });
+  const deviceActivationMutation = {
+    ...deviceStatus,
+    operationId,
+    eventId: deviceEventId,
+    eventType: 'activated' as const,
+    acceptedAt: 1_700_000_010,
+    event: deviceActivationEvent,
+  };
+  const deviceRevocationEvent = deviceRegistryEventV2Schema.parse({
+    protocol: DEVICE_REGISTRY_EVENT_PROTOCOL_V2,
+    eventId: `nxde2_${B64_32_ZERO}`,
+    operationId: `nxo2_${B64_32_ZERO}`,
+    eventType: 'revoked',
+    subject,
+    genesisHash,
+    identitySequence: 0,
+    identityState: 'active',
+    deviceLedgerSequence: 2,
+    deviceId,
+    authorizationId,
+    deviceState: 'revoked',
+    authorizationExpiresAt: 1_730_000_000,
+    acceptedAt: 1_700_000_020,
+    actionHash: B64_32_ONE,
+    revokedBy: 'device',
+  });
+  const deviceRevocationMutation = {
+    ...deviceStatus,
+    deviceLedgerSequence: 2,
+    deviceState: 'revoked' as const,
+    revokedAt: 1_700_000_020,
+    operationId: deviceRevocationEvent.operationId,
+    eventId: deviceRevocationEvent.eventId,
+    eventType: 'revoked' as const,
+    acceptedAt: deviceRevocationEvent.acceptedAt,
+    event: deviceRevocationEvent,
+  };
+  const deviceRootRevocationEvent = deviceRegistryEventV2Schema.parse({
+    ...deviceRevocationEvent,
+    eventId: `nxde2_${B64_32_ONE}`,
+    operationId: `nxo2_${B64_32_ONE}`,
+    revokedBy: 'root',
+  });
+  const deviceRootRevocationMutation = {
+    ...deviceRevocationMutation,
+    operationId: deviceRootRevocationEvent.operationId,
+    eventId: deviceRootRevocationEvent.eventId,
+    event: deviceRootRevocationEvent,
+  };
+  return {
+    subject,
+    active,
+    activeMutation,
+    revoked,
+    revokedMutation,
+    deviceId,
+    authorizationId,
+    deviceStatus,
+    deviceActivationMutation,
+    deviceRevocationMutation,
+    deviceRootRevocationMutation,
+  };
 }
 
 function fakeSignReceipt(payload: RegistryReceiptPayloadV1) {
@@ -102,7 +203,15 @@ function fakeSignStatus(payload: StatusStatementPayloadV1) {
   return Promise.resolve(statusStatementV1Schema.parse({ payload, signature: B64_64_ZERO }));
 }
 
-async function setup(overrides: Pick<EdgeDependencies, 'rateLimitKey'> = {}) {
+function fakeSignDeviceReceipt(payload: DeviceRegistryReceiptPayloadV2) {
+  return Promise.resolve(deviceRegistryReceiptV2Schema.parse({ payload, signature: B64_64_ZERO }));
+}
+
+function fakeSignDeviceStatus(payload: DeviceStatusStatementPayloadV2) {
+  return Promise.resolve(deviceStatusStatementV2Schema.parse({ payload, signature: B64_64_ZERO }));
+}
+
+async function setup(overrides: Pick<EdgeDependencies, 'now' | 'rateLimitKey'> = {}) {
   const data = await fixture();
   const calls = {
     register: vi.fn<RegistryService['register']>(() =>
@@ -123,6 +232,21 @@ async function setup(overrides: Pick<EdgeDependencies, 'rateLimitKey'> = {}) {
     revokeBySecret: vi.fn<RegistryService['revokeBySecret']>(() =>
       Promise.resolve({ ok: true as const, value: data.revokedMutation }),
     ),
+    activateDevice: vi.fn<RegistryService['activateDevice']>(() =>
+      Promise.resolve({ ok: true as const, value: data.deviceActivationMutation }),
+    ),
+    deviceStatus: vi.fn<RegistryService['deviceStatus']>(() =>
+      Promise.resolve({ ok: true as const, value: data.deviceStatus }),
+    ),
+    deviceStatusBatch: vi.fn<RegistryService['deviceStatusBatch']>(() =>
+      Promise.resolve([{ ok: true as const, value: data.deviceStatus }]),
+    ),
+    revokeDeviceSelf: vi.fn<RegistryService['revokeDeviceSelf']>(() =>
+      Promise.resolve({ ok: true as const, value: data.deviceRevocationMutation }),
+    ),
+    revokeDeviceRoot: vi.fn<RegistryService['revokeDeviceRoot']>(() =>
+      Promise.resolve({ ok: true as const, value: data.deviceRootRevocationMutation }),
+    ),
     rateLimit: vi.fn<PublicApiRateLimiter['limit']>(() => Promise.resolve({ success: true })),
   };
   const registry: RegistryService = {
@@ -131,6 +255,11 @@ async function setup(overrides: Pick<EdgeDependencies, 'rateLimitKey'> = {}) {
     statusBatch: calls.statusBatch,
     revokeBySignature: calls.revokeBySignature,
     revokeBySecret: calls.revokeBySecret,
+    activateDevice: calls.activateDevice,
+    deviceStatus: calls.deviceStatus,
+    deviceStatusBatch: calls.deviceStatusBatch,
+    revokeDeviceSelf: calls.revokeDeviceSelf,
+    revokeDeviceRoot: calls.revokeDeviceRoot,
   };
   const env: Env = {
     REGISTRY_SERVICE: registry,
@@ -170,6 +299,8 @@ async function setup(overrides: Pick<EdgeDependencies, 'rateLimitKey'> = {}) {
     metricSink: null,
     signReceipt: fakeSignReceipt,
     signStatus: fakeSignStatus,
+    signDeviceReceipt: fakeSignDeviceReceipt,
+    signDeviceStatus: fakeSignDeviceStatus,
     ...overrides,
   });
   return { ...data, calls, env, app };
@@ -210,10 +341,35 @@ describe('edge API', () => {
     expect(discovery.status).toBe(200);
     expect(discovery.headers.get('Cache-Control')).toBe('public, max-age=300, must-revalidate');
     expect(discovery.headers.get('Access-Control-Allow-Origin')).toBe('*');
-    expect(await discovery.json()).toEqual({
-      protocols: ['nexus.identity.v1', 'nexus.ownership-proof.v1'],
+    expect(await discovery.text()).toBe(
+      JSON.stringify({
+        protocols: ['nexus.identity.v1', 'nexus.ownership-proof.v1'],
+        suites: ['NX-25519-SHA256-JCS-v1'],
+        registry: `${API_ORIGIN}/v1`,
+        jwks: `${API_ORIGIN}/.well-known/jwks.json`,
+        wallet: WALLET_ORIGIN,
+      }),
+    );
+
+    const discoveryV2 = await app.fetch(
+      new Request(`${API_ORIGIN}/.well-known/nexus-v2.json`),
+      env,
+    );
+    expect(discoveryV2.status).toBe(200);
+    expect(discoveryV2.headers.get('Cache-Control')).toBe('public, max-age=300, must-revalidate');
+    expect(discoveryV2.headers.get('Access-Control-Allow-Origin')).toBe('*');
+    expect(await discoveryV2.json()).toEqual({
+      protocols: [
+        'nexus.identity.v1',
+        'nexus.ownership-proof.v1',
+        'nexus.device-authorization.v2',
+        'nexus.ownership-proof.v2',
+      ],
       suites: ['NX-25519-SHA256-JCS-v1'],
       registry: `${API_ORIGIN}/v1`,
+      deviceRegistry: `${API_ORIGIN}/v2/device`,
+      popupChannels: ['nexus.popup.v2', 'nexus.popup.v1'],
+      v1Discovery: `${API_ORIGIN}/.well-known/nexus.json`,
       jwks: `${API_ORIGIN}/.well-known/jwks.json`,
       wallet: WALLET_ORIGIN,
     });
@@ -516,6 +672,268 @@ describe('edge API', () => {
     );
     expect(signed.status).toBe(200);
     expect(calls.revokeBySignature).toHaveBeenCalledOnce();
+  });
+
+  it('activates a v2 device and returns only a service-signed receipt', async () => {
+    const { app, env, calls, subject, active, deviceId, authorizationId } = await setup();
+    const authorization = {
+      payload: {
+        protocol: 'nexus.device-authorization.v2',
+        subject,
+        genesisHash: active.genesisHash,
+        deviceId,
+        signingKey: { alg: 'Ed25519', publicKey: B64_32_ONE },
+        authorizationNonce: B64_32_ZERO,
+        validFrom: 1_700_000_000,
+        activationDeadline: 1_700_000_100,
+        expiresAt: 1_730_000_000,
+      },
+      rootSignature: B64_64_ZERO,
+    };
+    const request = {
+      authorization,
+      payload: {
+        protocol: 'nexus.device-activation.v2',
+        subject,
+        deviceId,
+        authorizationId,
+        requestId: B64_32_ONE,
+        iat: 1_700_000_010,
+        exp: 1_700_000_020,
+      },
+      deviceSignature: B64_64_ZERO,
+    };
+    const response = await app.fetch(post('/v2/device/activate', request, WALLET_ORIGIN), env);
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Access-Control-Allow-Origin')).toBe(WALLET_ORIGIN);
+    expect(calls.activateDevice).toHaveBeenCalledWith(request);
+    const responseBody = await body(response);
+    expect(responseBody).toHaveProperty(
+      'receipt.payload.protocol',
+      'nexus.device-registry-receipt.v2',
+    );
+    expect(responseBody).toHaveProperty('receipt.payload.deviceId', deviceId);
+    expect(responseBody).toHaveProperty('receipt.payload.authorizationId', authorizationId);
+    expect(responseBody).toHaveProperty('receipt.payload.eventType', 'activated');
+    expect(responseBody).toHaveProperty('receipt.signature', B64_64_ZERO);
+  });
+
+  it('refuses to sign a registry mutation for a different device authorization', async () => {
+    const {
+      app,
+      env,
+      calls,
+      subject,
+      active,
+      deviceId,
+      authorizationId,
+      deviceActivationMutation,
+    } = await setup();
+    const otherAuthorizationId = `nxa2_${B64_32_ZERO}` as const;
+    calls.activateDevice.mockResolvedValueOnce({
+      ok: true,
+      value: {
+        ...deviceActivationMutation,
+        authorizationId: otherAuthorizationId,
+        event: deviceRegistryEventV2Schema.parse({
+          ...deviceActivationMutation.event,
+          authorizationId: otherAuthorizationId,
+        }),
+      },
+    });
+    const response = await app.fetch(
+      post(
+        '/v2/device/activate',
+        {
+          authorization: {
+            payload: {
+              protocol: 'nexus.device-authorization.v2',
+              subject,
+              genesisHash: active.genesisHash,
+              deviceId,
+              signingKey: { alg: 'Ed25519', publicKey: B64_32_ONE },
+              authorizationNonce: B64_32_ZERO,
+              validFrom: 1_700_000_000,
+              activationDeadline: 1_700_000_100,
+              expiresAt: 1_730_000_000,
+            },
+            rootSignature: B64_64_ZERO,
+          },
+          payload: {
+            protocol: 'nexus.device-activation.v2',
+            subject,
+            deviceId,
+            authorizationId,
+            requestId: B64_32_ONE,
+            iat: 1_700_000_010,
+            exp: 1_700_000_020,
+          },
+          deviceSignature: B64_64_ZERO,
+        },
+        WALLET_ORIGIN,
+      ),
+      env,
+    );
+    expect(response.status).toBe(500);
+    expect(await body(response)).toHaveProperty('error.code', 'INTERNAL_ERROR');
+  });
+
+  it('returns exact signed v2 device status and neutral ordered batch errors', async () => {
+    const { app, env, calls, subject, deviceId, authorizationId, deviceStatus } = await setup();
+    const query = { subject, deviceId, authorizationId };
+    const response = await app.fetch(post('/v2/device/status', query, 'https://rp.example'), env);
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Access-Control-Allow-Origin')).toBe('*');
+    expect(calls.deviceStatus).toHaveBeenCalledWith(query);
+    expect(await body(response)).toHaveProperty(
+      'statusStatement.payload.protocol',
+      'nexus.device-status-statement.v2',
+    );
+
+    const otherAuthorizationId = `nxa2_${B64_32_ZERO}` as const;
+    calls.deviceStatusBatch.mockResolvedValueOnce([
+      { ok: true, value: deviceStatus },
+      {
+        ok: false,
+        error: { code: 'DEVICE_NOT_FOUND', message: `must not leak ${subject}` },
+      },
+    ]);
+    const batch = await app.fetch(
+      post('/v2/device/status-batch', {
+        devices: [query, { subject, deviceId, authorizationId: otherAuthorizationId }],
+      }),
+      env,
+    );
+    expect(batch.status).toBe(200);
+    const batchText = await batch.text();
+    const batchBody = JSON.parse(batchText) as { results: Array<Record<string, unknown>> };
+    expect(batchBody.results.map((result) => result.ok)).toEqual([true, false]);
+    expect(batchBody.results[1]).toHaveProperty('authorizationId', otherAuthorizationId);
+    expect(batchBody.results[1]).toHaveProperty('error.code', 'DEVICE_NOT_FOUND');
+    expect(batchText).not.toContain('must not leak');
+  });
+
+  it('exposes device errors only on v2 routes', async () => {
+    const { app, env, calls, subject, deviceId, authorizationId } = await setup();
+    calls.deviceStatus.mockResolvedValueOnce({
+      ok: false,
+      error: { code: 'DEVICE_REVOKED', message: `must not leak ${subject}` },
+    });
+    const deviceResponse = await app.fetch(
+      post('/v2/device/status', { subject, deviceId, authorizationId }),
+      env,
+    );
+    expect(deviceResponse.status).toBe(409);
+    const deviceText = await deviceResponse.text();
+    const deviceBody: unknown = JSON.parse(deviceText);
+    expect(deviceBody).toMatchObject({ error: { code: 'DEVICE_REVOKED' } });
+    expect(deviceText).not.toContain('must not leak');
+
+    calls.status.mockResolvedValueOnce({
+      ok: false,
+      error: { code: 'DEVICE_NOT_FOUND', message: `must not leak ${subject}` },
+    });
+    const legacyResponse = await app.fetch(post('/v1/identity/status', { subject }), env);
+    expect(legacyResponse.status).toBe(500);
+    expect(await body(legacyResponse)).toHaveProperty('error.code', 'INTERNAL_ERROR');
+  });
+
+  it('never signs active device status beyond authorization expiry', async () => {
+    const { app, env, calls, subject, deviceId, authorizationId, deviceStatus } = await setup();
+    calls.deviceStatus.mockResolvedValueOnce({
+      ok: true,
+      value: { ...deviceStatus, authorizationExpiresAt: 1_700_000_030 },
+    });
+    const query = { subject, deviceId, authorizationId };
+    const active = await app.fetch(post('/v2/device/status', query), env);
+    expect(active.status).toBe(200);
+    expect(await body(active)).toMatchObject({
+      deviceState: 'active',
+      statusStatement: { payload: { deviceState: 'active', exp: 1_700_000_030 } },
+    });
+
+    const boundary = await setup({ now: () => 1_730_000_000 });
+    const expired = await boundary.app.fetch(
+      post('/v2/device/status', {
+        subject: boundary.subject,
+        deviceId: boundary.deviceId,
+        authorizationId: boundary.authorizationId,
+      }),
+      boundary.env,
+    );
+    expect(expired.status).toBe(200);
+    expect(await body(expired)).toMatchObject({
+      deviceState: 'expired',
+      statusStatement: { payload: { deviceState: 'expired', iat: 1_730_000_000 } },
+    });
+  });
+
+  it('strictly parses and origin-protects both v2 device revocation routes', async () => {
+    const { app, env, calls, subject, active, deviceId, authorizationId } = await setup();
+    const authorization = {
+      payload: {
+        protocol: 'nexus.device-authorization.v2',
+        subject,
+        genesisHash: active.genesisHash,
+        deviceId,
+        signingKey: { alg: 'Ed25519', publicKey: B64_32_ONE },
+        authorizationNonce: B64_32_ZERO,
+        validFrom: 1_700_000_000,
+        activationDeadline: 1_700_000_100,
+        expiresAt: 1_730_000_000,
+      },
+      rootSignature: B64_64_ZERO,
+    };
+    const selfRequest = {
+      authorization,
+      payload: {
+        protocol: 'nexus.device-self-revoke.v2',
+        subject,
+        genesisHash: active.genesisHash,
+        deviceId,
+        authorizationId,
+        requestId: B64_32_ZERO,
+        issuedAt: 1_700_000_010,
+      },
+      deviceSignature: B64_64_ZERO,
+    };
+    const self = await app.fetch(post('/v2/device/revoke-self', selfRequest, WALLET_ORIGIN), env);
+    expect(self.status).toBe(200);
+    expect(calls.revokeDeviceSelf).toHaveBeenCalledWith(selfRequest);
+    expect(await body(self)).toHaveProperty(
+      'receipt.payload.protocol',
+      'nexus.device-registry-receipt.v2',
+    );
+
+    const rootRequest = {
+      payload: {
+        protocol: 'nexus.device-root-revoke.v2',
+        subject,
+        genesisHash: active.genesisHash,
+        deviceId,
+        requestId: B64_32_ONE,
+        issuedAt: 1_700_000_010,
+      },
+      rootSignature: B64_64_ZERO,
+    };
+    const wrongOrigin = await app.fetch(
+      post('/v2/device/revoke-root', rootRequest, 'https://evil.example'),
+      env,
+    );
+    expect(wrongOrigin.status).toBe(403);
+    expect(calls.revokeDeviceRoot).not.toHaveBeenCalled();
+
+    const unknownField = await app.fetch(
+      post('/v2/device/revoke-root', { ...rootRequest, label: 'forbidden' }, WALLET_ORIGIN),
+      env,
+    );
+    expect(unknownField.status).toBe(400);
+    expect(calls.revokeDeviceRoot).not.toHaveBeenCalled();
+
+    const root = await app.fetch(post('/v2/device/revoke-root', rootRequest, WALLET_ORIGIN), env);
+    expect(root.status).toBe(200);
+    expect(calls.revokeDeviceRoot).toHaveBeenCalledWith(rootRequest);
+    expect(await body(root)).toHaveProperty('receipt.payload.revokedBy', 'root');
   });
 
   it('maps thrown RPC failures and logs only aggregate dimensions', async () => {

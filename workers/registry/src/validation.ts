@@ -4,18 +4,30 @@ import {
   base64Url64Schema,
   canonicalize,
   decodeBase64UrlExact,
+  deviceActivationRequestV2Schema,
+  deviceRootRevokeRequestV2Schema,
+  deviceSelfRevokeRequestV2Schema,
   encodeBase64Url,
   identityGenesisV1Schema,
   nexusSubjectSchema,
+  nexusDeviceAuthorizationIdV2Schema,
+  nexusDeviceIdV2Schema,
   revokeBySecretV1Schema,
   revokeBySignaturePayloadV1Schema,
 } from '@nexus/protocol';
-import type { RevokeBySecretV1, RevokeBySignaturePayloadV1 } from '@nexus/protocol';
+import type {
+  DeviceActivationRequestV2,
+  DeviceRootRevokeRequestV2,
+  DeviceSelfRevokeRequestV2,
+  RevokeBySecretV1,
+  RevokeBySignaturePayloadV1,
+} from '@nexus/protocol';
 import { deriveGenesisHash, deriveSubject } from '@nexus/crypto';
 
 import { fail, succeed } from './errors';
 import type {
   PreparedRegistration,
+  DeviceStatusCommand,
   RegisterCommand,
   RegistryResult,
   RevokeBySignatureCommand,
@@ -98,6 +110,44 @@ export function parseSecretCommand(value: unknown): RegistryResult<RevokeBySecre
 export function parseStatusSubject(value: unknown): RegistryResult<string> {
   const result = nexusSubjectSchema.safeParse(value);
   return result.success ? succeed(result.data) : fail('INVALID_SUBJECT');
+}
+
+export function parseDeviceActivationCommand(
+  value: unknown,
+): RegistryResult<DeviceActivationRequestV2> {
+  const result = deviceActivationRequestV2Schema.safeParse(value);
+  return result.success ? succeed(result.data) : fail('BAD_REQUEST');
+}
+
+export function parseDeviceSelfRevokeCommand(
+  value: unknown,
+): RegistryResult<DeviceSelfRevokeRequestV2> {
+  const result = deviceSelfRevokeRequestV2Schema.safeParse(value);
+  return result.success ? succeed(result.data) : fail('BAD_REQUEST');
+}
+
+export function parseDeviceRootRevokeCommand(
+  value: unknown,
+): RegistryResult<DeviceRootRevokeRequestV2> {
+  const result = deviceRootRevokeRequestV2Schema.safeParse(value);
+  return result.success ? succeed(result.data) : fail('BAD_REQUEST');
+}
+
+export function parseDeviceStatusCommand(value: unknown): RegistryResult<DeviceStatusCommand> {
+  if (!isExactRecord(value, ['authorizationId', 'deviceId', 'subject'])) {
+    return fail('BAD_REQUEST');
+  }
+  const subject = nexusSubjectSchema.safeParse(value.subject);
+  const deviceId = nexusDeviceIdV2Schema.safeParse(value.deviceId);
+  const authorizationId = nexusDeviceAuthorizationIdV2Schema.safeParse(value.authorizationId);
+  if (!subject.success || !deviceId.success || !authorizationId.success) {
+    return fail('BAD_REQUEST');
+  }
+  return succeed({
+    subject: subject.data,
+    deviceId: deviceId.data,
+    authorizationId: authorizationId.data,
+  });
 }
 
 export function assertPreparedRegistration(
