@@ -10,6 +10,7 @@ import {
   Link2,
   Loader2,
   ShieldAlert,
+  Smartphone,
   Sparkles,
   Trash2,
 } from 'lucide-react';
@@ -35,6 +36,7 @@ interface CreateIdentityModalProps {
 
 export function CreateIdentityModal({ onClose, onCreate }: CreateIdentityModalProps) {
   const [label, setLabel] = useState('');
+  const [withDeviceKey, setWithDeviceKey] = useState(true);
   const [withAgreementKey, setWithAgreementKey] = useState(false);
   const [state, setState] = useState<AsyncFormState>(idle);
 
@@ -45,6 +47,7 @@ export function CreateIdentityModal({ onClose, onCreate }: CreateIdentityModalPr
       const normalized = label.trim();
       await onCreate({
         ...(normalized === '' ? {} : { label: normalized }),
+        withDeviceKey,
         withAgreementKey,
       });
     } catch (error) {
@@ -78,6 +81,28 @@ export function CreateIdentityModal({ onClose, onCreate }: CreateIdentityModalPr
             Labels stay on this device and are never sent to the registry or an app.
           </p>
         </div>
+
+        <label className="flex items-start gap-3 rounded-xl border border-indigo-200 bg-indigo-50/60 p-4 transition-colors hover:border-indigo-300">
+          <input
+            type="checkbox"
+            checked={withDeviceKey}
+            onChange={(event) => setWithDeviceKey(event.target.checked)}
+            className="mt-1 accent-indigo-600"
+          />
+          <span>
+            <span className="flex items-center gap-2 text-sm font-medium text-slate-900">
+              <Smartphone className="h-4 w-4 text-indigo-600" aria-hidden="true" />
+              Add a device key on this device
+              <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-700">
+                Recommended
+              </span>
+            </span>
+            <span className="mt-1 block text-xs leading-relaxed text-slate-600">
+              Creates and activates a separate key for everyday identity proofs. It represents the
+              same identity and can be revoked without revoking your root key.
+            </span>
+          </span>
+        </label>
 
         <label className="flex items-start gap-3 rounded-xl border border-slate-200 p-4 transition-colors hover:border-indigo-300">
           <input

@@ -92,6 +92,7 @@ test.describe.serial('Nexus browser security boundary', () => {
     ).toBeVisible();
     await wallet.getByRole('button', { name: 'Create first identity' }).click();
     await wallet.getByLabel('Local nickname (optional)').fill(IDENTITY_LABEL);
+    await wallet.getByRole('checkbox', { name: /Add a device key on this device/u }).uncheck();
     await wallet.getByRole('button', { name: 'Create identity' }).click();
     await expect(wallet.getByRole('heading', { name: IDENTITY_LABEL }).first()).toBeVisible();
     await wallet.close();
@@ -178,6 +179,36 @@ test.describe.serial('Nexus browser security boundary', () => {
     await page.close();
   });
 
+  test('creates and activates a separate device key with a new root by default', async () => {
+    const browser = context.browser();
+    if (browser === null) throw new Error('Expected a browser.');
+    const localDeviceContext = await browser.newContext({ ignoreHTTPSErrors: true });
+    try {
+      const wallet = await localDeviceContext.newPage();
+      await wallet.goto(WALLET_ORIGIN);
+      await wallet.getByRole('button', { name: 'Create first identity' }).click();
+      const deviceOption = wallet.getByRole('checkbox', {
+        name: /Add a device key on this device/u,
+      });
+      await expect(deviceOption).toBeChecked();
+      await wallet.getByLabel('Local nickname (optional)').fill('E2E local device root');
+      await wallet.getByRole('button', { name: 'Create identity' }).click();
+
+      await expect(
+        wallet.getByText('Identity created. Its separate device key is active on this device.'),
+      ).toBeVisible();
+      await expect(
+        wallet.getByRole('heading', { name: 'E2E local device root · this device' }).first(),
+      ).toBeVisible();
+      await expect(wallet.getByText('Active device', { exact: true })).toBeVisible();
+      await expect(
+        wallet.getByRole('heading', { name: 'E2E local device root', exact: true }),
+      ).toBeVisible();
+    } finally {
+      await localDeviceContext.close();
+    }
+  });
+
   test('installs a root-authorized device and completes a negotiated v2 RP session', async () => {
     const browser = context.browser();
     if (browser === null) throw new Error('Expected a browser.');
@@ -196,6 +227,7 @@ test.describe.serial('Nexus browser security boundary', () => {
       await wallet.goto(WALLET_ORIGIN);
       await wallet.getByRole('button', { name: 'Create first identity' }).click();
       await wallet.getByLabel('Local nickname (optional)').fill('E2E v2 root');
+      await wallet.getByRole('checkbox', { name: /Add a device key on this device/u }).uncheck();
       await wallet.getByRole('button', { name: 'Create identity' }).click();
       await expect(wallet.getByRole('heading', { name: 'E2E v2 root' }).first()).toBeVisible();
 

@@ -346,6 +346,39 @@ describe('v2 root-authorized devices', () => {
     });
   });
 
+  it('provisions a labeled device in the same wallet without returning transfer secrets', async () => {
+    const { wallet, identityStore } = createHarness();
+    const root = await wallet.createIdentity({ label: 'Campus forum' });
+
+    const installed = await wallet.provisionDeviceOnThisWallet(root.localId, {
+      label: 'Campus forum · this device',
+    });
+
+    expect(installed.localId).not.toBe(root.localId);
+    expect(installed.subject).toBe(root.subject);
+    expect(installed).not.toHaveProperty('bundle');
+    expect(installed).not.toHaveProperty('transferKey');
+    expect(await identityStore.get(installed.localId)).toMatchObject({
+      label: 'Campus forum · this device',
+      subject: root.subject,
+      deviceV2: {
+        deviceId: installed.deviceId,
+        authorizationId: installed.authorizationId,
+        localState: 'pending-activation',
+      },
+    });
+    expect(await identityStore.get(root.localId)).toMatchObject({
+      issuedDevicesV2: [
+        {
+          deviceId: installed.deviceId,
+          authorizationId: installed.authorizationId,
+          label: 'Campus forum · this device',
+          localState: 'issued',
+        },
+      ],
+    });
+  });
+
   it('encrypts an exact device-only transfer shape with no root private material', async () => {
     const { wallet } = createHarness();
     const root = await wallet.createIdentity();
@@ -1606,6 +1639,10 @@ describe('v2 root-authorized devices', () => {
     await expect(wallet.issueDeviceTransfer(identity.localId)).rejects.toMatchObject({
       code: 'INVALID_REQUEST',
     });
+    await expect(wallet.provisionDeviceOnThisWallet(identity.localId)).rejects.toMatchObject({
+      code: 'INVALID_REQUEST',
+    });
+    expect((await storeDelegate.get(identity.localId))?.issuedDevicesV2).toBeUndefined();
   });
 
   it('does not offer any raw root or device private-key export API', () => {
