@@ -337,6 +337,11 @@ export interface WalletCoreApi {
     rootLocalId: string,
     options?: IssueDeviceTransferOptions,
   ): Promise<IssuedDeviceTransferV2>;
+  /** Provisions a device into this wallet without exposing transfer material to the caller. */
+  provisionDeviceOnThisWallet(
+    rootLocalId: string,
+    options?: IssueDeviceTransferOptions,
+  ): Promise<ImportedDeviceV2>;
   importDeviceTransfer(
     bundle: DeviceTransferEnvelopeV2,
     transferKey: Uint8Array,

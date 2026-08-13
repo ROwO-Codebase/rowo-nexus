@@ -205,12 +205,14 @@ const walletCore = new WalletCore({
 
 export interface CreateIdentityInput {
   label?: string;
+  /** App-level convenience: provision a separate v2 device after the root is registered. */
+  withDeviceKey?: boolean;
   withAgreementKey?: boolean;
 }
 
-export interface RotateIdentityInput extends CreateIdentityInput {
+export type RotateIdentityInput = Omit<CreateIdentityInput, 'withDeviceKey'> & {
   revokeOld: boolean;
-}
+};
 
 export const walletAdapter = {
   async listIdentities(): Promise<LocalIdentitySummary[]> {
@@ -266,6 +268,13 @@ export const walletAdapter = {
     options: IssueDeviceTransferOptions = {},
   ): Promise<IssuedDeviceTransferV2> {
     return walletCore.issueDeviceTransfer(rootLocalId, options);
+  },
+
+  provisionDeviceOnThisWallet(
+    rootLocalId: string,
+    options: IssueDeviceTransferOptions = {},
+  ): Promise<ImportedDeviceV2> {
+    return walletCore.provisionDeviceOnThisWallet(rootLocalId, options);
   },
 
   importDeviceTransfer(

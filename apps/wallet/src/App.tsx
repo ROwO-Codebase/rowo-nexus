@@ -48,6 +48,7 @@ import {
   installAndActivateDevice,
   type DeviceInstallResult,
 } from './lib/device-management';
+import { createIdentityWithOptionalLocalDevice } from './lib/create-identity';
 import {
   walletAdapter,
   type CreateIdentityInput,
@@ -136,11 +137,35 @@ function App() {
   const scopedCount = identities.filter((identity) => identity.localScopes.length > 0).length;
 
   const createIdentity = async (input: CreateIdentityInput) => {
-    const created = await walletAdapter.createIdentity(input);
+    const created = await createIdentityWithOptionalLocalDevice(walletAdapter, input);
     await refresh();
-    setSelectedId(created.localId);
+    setSelectedId(created.device?.localId ?? created.root.localId);
     setFlow(undefined);
-    setNotice({ kind: 'success', message: 'Independent identity created and registered.' });
+    if (created.deviceState === 'active' && created.deviceError === undefined) {
+      setNotice({
+        kind: 'success',
+        message: 'Identity created. Its separate device key is active on this device.',
+      });
+      return;
+    }
+    if (created.device !== undefined) {
+      setNotice({
+        kind: 'error',
+        message:
+          created.deviceState === 'pending-activation'
+            ? `Identity created and the device key was installed safely, but activation is pending. Open it and retry. ${created.deviceError ?? ''}`.trim()
+            : `Identity and device key created. ${created.deviceError ?? 'The local device setup needs attention.'}`,
+      });
+      return;
+    }
+    if (created.deviceError !== undefined) {
+      setNotice({
+        kind: 'error',
+        message: `Identity created and registered, but its device key could not be installed. You can add one from the identity details. ${created.deviceError}`,
+      });
+      return;
+    }
+    setNotice({ kind: 'success', message: 'Independent root identity created and registered.' });
   };
 
   const retryRegistration = async (identity: LocalIdentitySummary) => {

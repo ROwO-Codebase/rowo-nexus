@@ -795,6 +795,41 @@ export class WalletCore implements WalletCoreApi {
     bundle: DeviceTransferEnvelopeV2,
     transferKey: Uint8Array,
   ): Promise<ImportedDeviceV2> {
+    return this.#importDeviceTransfer(bundle, transferKey);
+  }
+
+  /**
+   * Provisions a separate device key into this wallet while keeping the encrypted transfer and its
+   * key behind the WalletCore boundary. Registry activation remains a separate retryable step.
+   */
+  public async provisionDeviceOnThisWallet(
+    rootLocalId: string,
+    options: IssueDeviceTransferOptions = {},
+  ): Promise<ImportedDeviceV2> {
+    if (
+      getManagedKeyVaultCapabilities(this.#keyVault) === undefined ||
+      this.#identityStore.update === undefined ||
+      this.#identityStore.appendIssuedDevice === undefined ||
+      this.#identityStore.reserveDeviceRecord === undefined
+    ) {
+      throw new WalletCoreError(
+        'INVALID_REQUEST',
+        'This wallet does not support crash-safe same-device provisioning.',
+      );
+    }
+    const issued = await this.issueDeviceTransfer(rootLocalId, options);
+    try {
+      return await this.#importDeviceTransfer(issued.bundle, issued.transferKey, options.label);
+    } finally {
+      issued.transferKey.fill(0);
+    }
+  }
+
+  async #importDeviceTransfer(
+    bundle: DeviceTransferEnvelopeV2,
+    transferKey: Uint8Array,
+    localLabel?: string,
+  ): Promise<ImportedDeviceV2> {
     const managedKeyVault = getManagedKeyVaultCapabilities(this.#keyVault);
     if (managedKeyVault === undefined) {
       throw new WalletCoreError(
@@ -888,6 +923,7 @@ export class WalletCore implements WalletCoreApi {
         localId,
         subject,
         genesis,
+        ...(localLabel === undefined ? {} : { label: localLabel }),
         localScopes: [],
         authorizationHistory: [],
         localState: 'active',
