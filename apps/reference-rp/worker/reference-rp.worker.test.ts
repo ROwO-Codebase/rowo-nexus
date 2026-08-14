@@ -267,6 +267,7 @@ describe('deployed reference RP Worker', () => {
       deviceId: device.deviceId,
       authorizationId: device.authorizationId,
     });
+    await expect(lifecycleRequestCounts()).resolves.toEqual({ identity: 0, device: 1 });
     const cookie = cookiePair(response.headers.get('Set-Cookie'));
     const stored = await runInDurableObject(
       env.RP_STATE.getByName('reference-rp-primary'),
@@ -291,6 +292,7 @@ describe('deployed reference RP Worker', () => {
       friendlyName: 'revoked_device',
     });
     expect(denied.status).toBe(401);
+    await expect(lifecycleRequestCounts()).resolves.toEqual({ identity: 0, device: 2 });
   });
 
   it.each(['stale', 'forged', 'wrong-tuple'] as const)(
@@ -317,6 +319,7 @@ describe('deployed reference RP Worker', () => {
       friendlyName: 'revoked_identity',
     });
     expect(denied.status).toBe(401);
+    await expect(lifecycleRequestCounts()).resolves.toEqual({ identity: 0, device: 2 });
   });
 
   it('rejects a v2 session at the exact device authorization expiry second', async () => {
@@ -615,6 +618,14 @@ async function lifecycleControl(
     body: JSON.stringify({ subject: identity.subject, genesis: identity.genesis }),
   });
   expect(response.ok).toBe(true);
+}
+
+async function lifecycleRequestCounts(): Promise<{ identity: number; device: number }> {
+  const response = await env.TEST_LIFECYCLE.fetch(
+    'https://lifecycle.test/__test/status-request-counts',
+  );
+  expect(response.ok).toBe(true);
+  return await response.json();
 }
 
 async function createRegisteredDevice(identity: TestIdentity): Promise<TestDevice> {

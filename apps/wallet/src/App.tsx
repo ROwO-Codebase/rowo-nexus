@@ -133,6 +133,8 @@ function App() {
     () => identities.find((identity) => identity.localId === selectedId),
     [identities, selectedId],
   );
+  const rootKeys = identities.filter((identity) => identity.device === undefined);
+  const deviceKeys = identities.filter((identity) => identity.device !== undefined);
   const activeCount = identities.filter((identity) => identity.localState === 'active').length;
   const scopedCount = identities.filter((identity) => identity.localScopes.length > 0).length;
 
@@ -562,21 +564,33 @@ function App() {
             </button>
           </motion.div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2">
-            {identities.map((identity) => (
-              <IdentityCard
-                key={identity.localId}
-                identity={identity}
-                selected={selectedId === identity.localId}
-                retryingRegistration={retryingRegistrationId === identity.localId}
-                onSelect={() =>
-                  setSelectedId((current) =>
-                    current === identity.localId ? undefined : identity.localId,
-                  )
-                }
-                onRetryRegistration={() => void retryRegistration(identity)}
-              />
-            ))}
+          <div className="space-y-8">
+            <KeySection
+              id="root-keys-title"
+              title="Root keys"
+              description="Identity-level keys that authorize devices and control the identity lifecycle."
+              emptyMessage="No root keys are stored in this wallet."
+              identities={rootKeys}
+              selectedId={selectedId}
+              retryingRegistrationId={retryingRegistrationId}
+              onSelect={(localId) =>
+                setSelectedId((current) => (current === localId ? undefined : localId))
+              }
+              onRetryRegistration={(identity) => void retryRegistration(identity)}
+            />
+            <KeySection
+              id="device-keys-title"
+              title="Device keys"
+              description="Root-authorized keys for everyday proofs on this wallet."
+              emptyMessage="No device keys are installed in this wallet."
+              identities={deviceKeys}
+              selectedId={selectedId}
+              retryingRegistrationId={retryingRegistrationId}
+              onSelect={(localId) =>
+                setSelectedId((current) => (current === localId ? undefined : localId))
+              }
+              onRetryRegistration={(identity) => void retryRegistration(identity)}
+            />
           </div>
         )}
       </section>
@@ -694,6 +708,65 @@ function App() {
         )}
       </AnimatePresence>
     </WalletLayout>
+  );
+}
+
+interface KeySectionProps {
+  id: string;
+  title: string;
+  description: string;
+  emptyMessage: string;
+  identities: readonly LocalIdentitySummary[];
+  selectedId: string | undefined;
+  retryingRegistrationId: string | undefined;
+  onSelect: (localId: string) => void;
+  onRetryRegistration: (identity: LocalIdentitySummary) => void;
+}
+
+function KeySection({
+  id,
+  title,
+  description,
+  emptyMessage,
+  identities,
+  selectedId,
+  retryingRegistrationId,
+  onSelect,
+  onRetryRegistration,
+}: KeySectionProps) {
+  return (
+    <section aria-labelledby={id}>
+      <div className="mb-4 flex items-end justify-between gap-4">
+        <div>
+          <h3 id={id} className="text-lg font-bold text-slate-900">
+            {title}
+          </h3>
+          <p className="mt-1 text-sm text-slate-500">{description}</p>
+        </div>
+        <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
+          {String(identities.length)} {identities.length === 1 ? 'key' : 'keys'}
+        </span>
+      </div>
+
+      {identities.length === 0 ? (
+        <p className="rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-8 text-center text-sm text-slate-500">
+          {emptyMessage}
+        </p>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2">
+          {identities.map((identity) => (
+            <IdentityCard
+              key={identity.localId}
+              identity={identity}
+              selected={selectedId === identity.localId}
+              retryingRegistration={retryingRegistrationId === identity.localId}
+              onSelect={() => onSelect(identity.localId)}
+              onRetryRegistration={() => onRetryRegistration(identity)}
+            />
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 

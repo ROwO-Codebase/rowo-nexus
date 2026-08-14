@@ -30,7 +30,7 @@ import {
   signProtocolPayload,
 } from '@nexus/crypto';
 import { verifyRpOperationV2 } from '@nexus/verifier';
-import type { ChallengeStore, DeviceLifecycleProvider, LifecycleProvider } from '@nexus/verifier';
+import type { ChallengeStore, DeviceLifecycleProvider } from '@nexus/verifier';
 import {
   createDeviceFixture,
   createDeviceRootRevocation,
@@ -159,49 +159,28 @@ function challengeStore(expected: VerificationExpectationV2): ChallengeStore {
   };
 }
 
-function authoritativeProviders(
+function authoritativeDeviceProvider(
   stub: DurableObjectStub<IdentityState>,
   expectedSubject: NexusSubject,
-): { lifecycle: LifecycleProvider; devices: DeviceLifecycleProvider } {
+): DeviceLifecycleProvider {
   return {
-    lifecycle: {
-      async getAuthoritativeStatus(subject) {
-        if (subject !== expectedSubject) return { state: 'not-found' };
-        const result = await stub.status();
-        if (!result.ok) return { state: 'not-found' };
-        return result.value.state === 'active'
-          ? {
-              state: 'active',
-              sequence: result.value.sequence,
-              registeredAt: result.value.registeredAt,
-            }
-          : {
-              state: 'revoked',
-              sequence: result.value.sequence,
-              registeredAt: result.value.registeredAt,
-              ...(result.value.revokedAt === null ? {} : { revokedAt: result.value.revokedAt }),
-            };
-      },
-    },
-    devices: {
-      async getAuthoritativeDeviceStatus(subject, deviceId, authorizationId) {
-        if (subject !== expectedSubject) return { state: 'not-found' };
-        const result = await stub.deviceStatus({ deviceId, authorizationId });
-        if (!result.ok || result.value.deviceState === 'unknown') return { state: 'not-found' };
-        return {
-          state: result.value.deviceState,
-          identityState: result.value.identityState,
-          identitySequence: result.value.identitySequence,
-          deviceId: result.value.deviceId,
-          authorizationId: result.value.authorizationId,
-          deviceLedgerSequence: result.value.deviceLedgerSequence,
-          ...(result.value.activatedAt === null ? {} : { activatedAt: result.value.activatedAt }),
-          ...(result.value.revokedAt === null ? {} : { revokedAt: result.value.revokedAt }),
-          ...(result.value.authorizationExpiresAt === null
-            ? {}
-            : { authorizationExpiresAt: result.value.authorizationExpiresAt }),
-        };
-      },
+    async getAuthoritativeDeviceStatus(subject, deviceId, authorizationId) {
+      if (subject !== expectedSubject) return { state: 'not-found' };
+      const result = await stub.deviceStatus({ deviceId, authorizationId });
+      if (!result.ok || result.value.deviceState === 'unknown') return { state: 'not-found' };
+      return {
+        state: result.value.deviceState,
+        identityState: result.value.identityState,
+        identitySequence: result.value.identitySequence,
+        deviceId: result.value.deviceId,
+        authorizationId: result.value.authorizationId,
+        deviceLedgerSequence: result.value.deviceLedgerSequence,
+        ...(result.value.activatedAt === null ? {} : { activatedAt: result.value.activatedAt }),
+        ...(result.value.revokedAt === null ? {} : { revokedAt: result.value.revokedAt }),
+        ...(result.value.authorizationExpiresAt === null
+          ? {}
+          : { authorizationExpiresAt: result.value.authorizationExpiresAt }),
+      };
     },
   };
 }
@@ -1127,19 +1106,13 @@ describe('IdentityState SQLite Durable Object', () => {
       }),
     ).resolves.toMatchObject({ ok: true, value: { deviceState: 'active' } });
 
-    const providers = authoritativeProviders(stub, fixture.prepared.subject);
+    const devices = authoritativeDeviceProvider(stub, fixture.prepared.subject);
     for (const logicalInstall of ['A1', 'A2'] as const) {
       const nonce = freshNonce();
       const expected = proofExpectation(nonce);
       const proof = await createOwnershipProof(fixture, deviceA, nonce);
       await expect(
-        verifyRpOperationV2(
-          proof,
-          expected,
-          challengeStore(expected),
-          providers.lifecycle,
-          providers.devices,
-        ),
+        verifyRpOperationV2(proof, expected, challengeStore(expected), devices),
         logicalInstall,
       ).resolves.toMatchObject({
         subject: fixture.prepared.subject,
@@ -1173,13 +1146,7 @@ describe('IdentityState SQLite Durable Object', () => {
       const expected = proofExpectation(nonce);
       const proof = await createOwnershipProof(fixture, deviceA, nonce);
       await expect(
-        verifyRpOperationV2(
-          proof,
-          expected,
-          challengeStore(expected),
-          providers.lifecycle,
-          providers.devices,
-        ),
+        verifyRpOperationV2(proof, expected, challengeStore(expected), devices),
         logicalInstall,
       ).rejects.toMatchObject({
         code: 'IDENTITY_REVOKED',
@@ -1191,13 +1158,7 @@ describe('IdentityState SQLite Durable Object', () => {
     const expectedB = proofExpectation(nonceB);
     const proofB = await createOwnershipProof(fixture, deviceB, nonceB);
     await expect(
-      verifyRpOperationV2(
-        proofB,
-        expectedB,
-        challengeStore(expectedB),
-        providers.lifecycle,
-        providers.devices,
-      ),
+      verifyRpOperationV2(proofB, expectedB, challengeStore(expectedB), devices),
     ).resolves.toMatchObject({
       subject: fixture.prepared.subject,
       deviceId: deviceB.authorization.payload.deviceId,

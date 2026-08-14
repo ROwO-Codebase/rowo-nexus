@@ -50,4 +50,5 @@ export type {
   TransparencyCheckpointExpectation,
   TransparencyFreshnessExpectation,
   VerifiedDeviceSubject,
+  VerifiedRpDeviceOperation,
 } from './types.js';

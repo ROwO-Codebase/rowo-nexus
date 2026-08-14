@@ -314,6 +314,7 @@ export class ReferenceRpState extends DurableObject<ReferenceRpEnv> {
       maxClockSkewSeconds: MAX_CLOCK_SKEW_SECONDS,
     };
     let normalizedVerified: VerifiedSessionSigner;
+    let identitySequence: number;
     if (input.proofProtocol === OWNERSHIP_PROOF_PROTOCOL_V2) {
       const expectedV2: VerificationExpectationV2 = {
         ...expected,
@@ -326,46 +327,49 @@ export class ReferenceRpState extends DurableObject<ReferenceRpEnv> {
         deviceId: verified.deviceId,
         authorizationId: verified.authorizationId,
       };
-    } else {
-      const verified = await verifyOwnershipProof(input.proof, expected);
-      normalizedVerified = {
-        subject: verified.subject,
-        proofProtocol: OWNERSHIP_PROOF_PROTOCOL_V1,
-      };
-    }
-    const lifecycle = await getAuthoritativeLifecycle(this.env, normalizedVerified.subject);
-    if (lifecycle.state === 'not-found') {
-      throw new RpWorkerError(
-        'IDENTITY_NOT_FOUND',
-        'This Nexus identity is not active in the authoritative registry.',
-        403,
-      );
-    }
-    if (lifecycle.state !== 'active') {
-      throw new RpWorkerError(
-        'IDENTITY_REVOKED',
-        'This Nexus identity is revoked and cannot change notes.',
-        403,
-      );
-    }
-    if (
-      normalizedVerified.proofProtocol === OWNERSHIP_PROOF_PROTOCOL_V2 &&
-      normalizedVerified.deviceId !== undefined &&
-      normalizedVerified.authorizationId !== undefined
-    ) {
       const device = await getAuthoritativeDeviceStatus(
         this.env,
-        normalizedVerified.subject,
-        normalizedVerified.deviceId,
-        normalizedVerified.authorizationId,
+        verified.subject,
+        verified.deviceId,
+        verified.authorizationId,
       );
-      if (device.identityState !== 'active' || device.deviceState !== 'active') {
+      if (device.identityState !== 'active') {
+        throw new RpWorkerError(
+          'IDENTITY_REVOKED',
+          'This Nexus identity is revoked and cannot change notes.',
+          403,
+        );
+      }
+      if (device.deviceState !== 'active') {
         throw new RpWorkerError(
           'DEVICE_INACTIVE',
           'This Nexus device is not active and cannot start a session.',
           403,
         );
       }
+      identitySequence = device.identitySequence;
+    } else {
+      const verified = await verifyOwnershipProof(input.proof, expected);
+      normalizedVerified = {
+        subject: verified.subject,
+        proofProtocol: OWNERSHIP_PROOF_PROTOCOL_V1,
+      };
+      const lifecycle = await getAuthoritativeLifecycle(this.env, verified.subject);
+      if (lifecycle.state === 'not-found') {
+        throw new RpWorkerError(
+          'IDENTITY_NOT_FOUND',
+          'This Nexus identity is not active in the authoritative registry.',
+          403,
+        );
+      }
+      if (lifecycle.state !== 'active') {
+        throw new RpWorkerError(
+          'IDENTITY_REVOKED',
+          'This Nexus identity is revoked and cannot change notes.',
+          403,
+        );
+      }
+      identitySequence = lifecycle.sequence;
     }
 
     const proofHash = await canonicalSha256(input.proof);
@@ -387,7 +391,7 @@ export class ReferenceRpState extends DurableObject<ReferenceRpEnv> {
       token,
       tokenHash,
       receiptId,
-      sequence: lifecycle.sequence,
+      sequence: identitySequence,
     });
   }
 
@@ -503,13 +507,6 @@ export class ReferenceRpState extends DurableObject<ReferenceRpEnv> {
       throw new RpWorkerError('SESSION_INVALID', 'The RP session has expired.', 401);
     }
     const subject = row.subject as NexusSubject;
-    const lifecycle = await getAuthoritativeLifecycle(this.env, subject);
-    if (lifecycle.state === 'not-found') {
-      throw new RpWorkerError('SESSION_INVALID', 'The identity is no longer registered.', 401);
-    }
-    if (lifecycle.state !== 'active') {
-      throw new RpWorkerError('SESSION_INVALID', 'The Nexus identity is revoked.', 401);
-    }
     const v2Session = row.proof_protocol === OWNERSHIP_PROOF_PROTOCOL_V2;
     if (
       v2Session &&
@@ -520,6 +517,7 @@ export class ReferenceRpState extends DurableObject<ReferenceRpEnv> {
     ) {
       throw new RpWorkerError('SESSION_INVALID', 'The RP session device binding is invalid.', 401);
     }
+    let identitySequence: number;
     if (v2Session && row.device_id !== null && row.authorization_id !== null) {
       const deviceId = row.device_id as NexusDeviceIdV2;
       const authorizationId = row.authorization_id as NexusDeviceAuthorizationIdV2;
@@ -529,9 +527,22 @@ export class ReferenceRpState extends DurableObject<ReferenceRpEnv> {
         deviceId,
         authorizationId,
       );
-      if (device.identityState !== 'active' || device.deviceState !== 'active') {
+      if (device.identityState !== 'active') {
+        throw new RpWorkerError('SESSION_INVALID', 'The Nexus identity is revoked.', 401);
+      }
+      if (device.deviceState !== 'active') {
         throw new RpWorkerError('SESSION_INVALID', 'The Nexus device is no longer active.', 401);
       }
+      identitySequence = device.identitySequence;
+    } else {
+      const lifecycle = await getAuthoritativeLifecycle(this.env, subject);
+      if (lifecycle.state === 'not-found') {
+        throw new RpWorkerError('SESSION_INVALID', 'The identity is no longer registered.', 401);
+      }
+      if (lifecycle.state !== 'active') {
+        throw new RpWorkerError('SESSION_INVALID', 'The Nexus identity is revoked.', 401);
+      }
+      identitySequence = lifecycle.sequence;
     }
     return {
       tokenHash,
@@ -540,7 +551,7 @@ export class ReferenceRpState extends DurableObject<ReferenceRpEnv> {
         subject,
         friendlyName: this.#friendlyName(subject),
         state: 'active',
-        sequence: lifecycle.sequence,
+        sequence: identitySequence,
         expiresAt: row.expires_at,
         checkedAt: now,
         ...(v2Session

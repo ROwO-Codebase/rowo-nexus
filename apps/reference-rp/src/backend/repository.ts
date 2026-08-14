@@ -280,6 +280,7 @@ export class ReferenceRpRepository {
           authorizationId: NexusDeviceAuthorizationIdV2;
         }
       | undefined;
+    let identitySequence: number;
     if (input.proofProtocol === OWNERSHIP_PROOF_PROTOCOL_V2) {
       const expectedV2: VerificationExpectationV2 = {
         ...expected,
@@ -289,10 +290,10 @@ export class ReferenceRpRepository {
         input.proof,
         expectedV2,
         this.challenges,
-        this.lifecycle,
         this.#requireDeviceLifecycle(),
       );
       subject = verified.subject;
+      identitySequence = verified.identitySequence;
       deviceBinding = {
         proofProtocol: OWNERSHIP_PROOF_PROTOCOL_V2,
         deviceId: verified.deviceId,
@@ -306,6 +307,11 @@ export class ReferenceRpRepository {
         this.lifecycle,
       );
       subject = verified.subject;
+      const lifecycle = await this.lifecycle.getAuthoritativeStatus(subject);
+      if (lifecycle.state !== 'active') {
+        throw new RpError('SESSION_INVALID', 'The identity is no longer active.', 401);
+      }
+      identitySequence = lifecycle.sequence;
     }
     const proofHash = canonicalSha256(input.proof);
     const token = secureToken(32);
@@ -317,11 +323,6 @@ export class ReferenceRpRepository {
       ...(deviceBinding ?? {}),
     };
     this.#sessions.set(stored.tokenHash, stored);
-    const lifecycle = await this.lifecycle.getAuthoritativeStatus(subject);
-    if (lifecycle.state !== 'active') {
-      this.#sessions.delete(stored.tokenHash);
-      throw new RpError('SESSION_INVALID', 'The identity is no longer active.', 401);
-    }
     const receipt = this.#recordReceipt({
       operation: 'session.start',
       resource: SESSION_RESOURCE,
@@ -338,7 +339,7 @@ export class ReferenceRpRepository {
           subject,
           friendlyName: this.#profiles.get(subject)?.friendlyName ?? null,
           state: 'active',
-          sequence: lifecycle.sequence,
+          sequence: identitySequence,
           expiresAt: stored.expiresAt,
           checkedAt: this.#now(),
           ...(stored.proofProtocol === OWNERSHIP_PROOF_PROTOCOL_V2
@@ -362,15 +363,11 @@ export class ReferenceRpRepository {
     if (stored === undefined || stored.expiresAt <= now) {
       throw new RpError('SESSION_INVALID', 'The RP session has expired.', 401);
     }
-    const lifecycle = await this.lifecycle.getAuthoritativeStatus(stored.subject);
-    if (lifecycle.state !== 'active') {
-      throw new RpError('SESSION_INVALID', 'The identity is no longer active.', 401);
-    }
-    if (
-      stored.proofProtocol === OWNERSHIP_PROOF_PROTOCOL_V2 &&
-      stored.deviceId !== undefined &&
-      stored.authorizationId !== undefined
-    ) {
+    let identitySequence: number;
+    if (stored.proofProtocol === OWNERSHIP_PROOF_PROTOCOL_V2) {
+      if (stored.deviceId === undefined || stored.authorizationId === undefined) {
+        throw new RpError('SESSION_INVALID', 'The RP session device binding is invalid.', 401);
+      }
       const device = await this.#requireDeviceLifecycle().getAuthoritativeDeviceStatus(
         stored.subject,
         stored.deviceId,
@@ -383,6 +380,13 @@ export class ReferenceRpRepository {
       ) {
         throw new RpError('SESSION_INVALID', 'The Nexus device is no longer active.', 401);
       }
+      identitySequence = device.identitySequence;
+    } else {
+      const lifecycle = await this.lifecycle.getAuthoritativeStatus(stored.subject);
+      if (lifecycle.state !== 'active') {
+        throw new RpError('SESSION_INVALID', 'The identity is no longer active.', 401);
+      }
+      identitySequence = lifecycle.sequence;
     }
     return {
       stored,
@@ -390,7 +394,7 @@ export class ReferenceRpRepository {
         subject: stored.subject,
         friendlyName: this.#profiles.get(stored.subject)?.friendlyName ?? null,
         state: 'active',
-        sequence: lifecycle.sequence,
+        sequence: identitySequence,
         expiresAt: stored.expiresAt,
         checkedAt: now,
         ...(stored.proofProtocol === OWNERSHIP_PROOF_PROTOCOL_V2

@@ -49,7 +49,6 @@ import {
 import type {
   ChallengeStore,
   DeviceLifecycleProvider,
-  LifecycleProvider,
   NexusVerificationErrorCodeV2,
 } from './index.js';
 
@@ -441,13 +440,11 @@ describe('v2 RP orchestration', () => {
         return Promise.resolve(true);
       },
     };
-    const lifecycle: LifecycleProvider = {
-      getAuthoritativeStatus: () =>
-        Promise.resolve({ state: 'active', sequence: 0, registeredAt: NOW - 100 }),
-    };
+    const requestedStatuses: unknown[][] = [];
     const activeDevice: DeviceLifecycleProvider = {
-      getAuthoritativeDeviceStatus: () =>
-        Promise.resolve({
+      getAuthoritativeDeviceStatus: (subject, deviceId, authorizationId) => {
+        requestedStatuses.push([subject, deviceId, authorizationId]);
+        return Promise.resolve({
           state: 'active',
           identityState: 'active',
           identitySequence: 0,
@@ -456,14 +453,40 @@ describe('v2 RP orchestration', () => {
           deviceLedgerSequence: 1,
           activatedAt: NOW - 100,
           authorizationExpiresAt: NOW + 10_000,
-        }),
+        });
+      },
     };
     await expect(
-      verifyRpOperationV2(proof, expectation(), store, lifecycle, activeDevice),
-    ).resolves.toMatchObject({ subject: identity.subject });
+      verifyRpOperationV2(proof, expectation(), store, activeDevice),
+    ).resolves.toMatchObject({
+      subject: identity.subject,
+      identitySequence: 0,
+      deviceLedgerSequence: 1,
+    });
+    expect(requestedStatuses).toEqual([
+      [identity.subject, identity.authorization.payload.deviceId, identity.authorizationId],
+    ]);
     expect(consumed).toBe(true);
 
     consumed = false;
+    const revokedIdentity: DeviceLifecycleProvider = {
+      getAuthoritativeDeviceStatus: () =>
+        Promise.resolve({
+          state: 'revoked',
+          identityState: 'revoked',
+          identitySequence: 1,
+          deviceId: identity.authorization.payload.deviceId,
+          authorizationId: identity.authorizationId,
+          deviceLedgerSequence: 1,
+          revokedAt: NOW - 1,
+        }),
+    };
+    await expectCode(
+      verifyRpOperationV2(proof, expectation(), store, revokedIdentity),
+      'IDENTITY_REVOKED',
+    );
+    expect(consumed).toBe(false);
+
     const revokedDevice: DeviceLifecycleProvider = {
       getAuthoritativeDeviceStatus: () =>
         Promise.resolve({
@@ -477,7 +500,7 @@ describe('v2 RP orchestration', () => {
         }),
     };
     await expectCode(
-      verifyRpOperationV2(proof, expectation(), store, lifecycle, revokedDevice),
+      verifyRpOperationV2(proof, expectation(), store, revokedDevice),
       'DEVICE_REVOKED',
     );
     expect(consumed).toBe(false);
@@ -496,7 +519,7 @@ describe('v2 RP orchestration', () => {
         }),
     };
     await expectCode(
-      verifyRpOperationV2(proof, expectation(), store, lifecycle, expiredAtBoundary),
+      verifyRpOperationV2(proof, expectation(), store, expiredAtBoundary),
       'DEVICE_EXPIRED',
     );
     expect(consumed).toBe(false);

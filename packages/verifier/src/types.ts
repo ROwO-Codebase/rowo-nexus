@@ -111,6 +111,12 @@ export interface VerifiedDeviceSubject {
   authorizationId: DeviceAuthorizationIdV2;
 }
 
+/** A verified v2 proof plus the authoritative combined lifecycle snapshot used to accept it. */
+export interface VerifiedRpDeviceOperation extends VerifiedDeviceSubject {
+  identitySequence: number;
+  deviceLedgerSequence: number;
+}
+
 export interface OwnershipProofAnyOptions {
   acceptedProtocols: readonly (
     typeof OWNERSHIP_PROOF_PROTOCOL_V1 | typeof OWNERSHIP_PROOF_PROTOCOL_V2
