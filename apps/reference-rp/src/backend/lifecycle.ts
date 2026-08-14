@@ -187,7 +187,10 @@ export class AuthoritativeRegistryLifecycleProvider
  */
 export class LocalLifecycleAuthority implements LifecycleProvider, DeviceLifecycleProvider {
   readonly #states = new Map<NexusSubject, AuthoritativeLifecycleState>();
-  readonly #deviceStates = new Map<string, AuthoritativeDeviceLifecycleState>();
+  readonly #deviceStates = new Map<
+    string,
+    Exclude<AuthoritativeDeviceLifecycleState, { state: 'not-found' }>
+  >();
 
   public constructor(private readonly now: () => number = () => Math.floor(Date.now() / 1000)) {}
 
@@ -220,20 +223,29 @@ export class LocalLifecycleAuthority implements LifecycleProvider, DeviceLifecyc
   }
 
   public getAuthoritativeDeviceStatus(
-    _subject: NexusSubject,
+    subject: NexusSubject,
     deviceId: NexusDeviceIdV2,
     authorizationId: NexusDeviceAuthorizationIdV2,
   ): Promise<AuthoritativeDeviceLifecycleState> {
-    return Promise.resolve(
-      this.#deviceStates.get(deviceId) ?? {
+    const device =
+      this.#deviceStates.get(deviceId) ??
+      ({
         state: 'active',
         identityState: 'active',
         identitySequence: 0,
         deviceId,
         authorizationId,
         deviceLedgerSequence: 0,
-      },
-    );
+      } satisfies Exclude<AuthoritativeDeviceLifecycleState, { state: 'not-found' }>);
+    const identity = this.#states.get(subject);
+    if (identity?.state !== 'revoked') return Promise.resolve(device);
+    return Promise.resolve({
+      ...device,
+      state: 'revoked',
+      identityState: 'revoked',
+      identitySequence: identity.sequence,
+      ...(identity.revokedAt === undefined ? {} : { revokedAt: identity.revokedAt }),
+    });
   }
 
   public setDevice(

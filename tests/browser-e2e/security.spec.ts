@@ -197,13 +197,22 @@ test.describe.serial('Nexus browser security boundary', () => {
       await expect(
         wallet.getByText('Identity created. Its separate device key is active on this device.'),
       ).toBeVisible();
+
+      const rootKeys = wallet.getByRole('region', { name: 'Root keys' });
+      const deviceKeys = wallet.getByRole('region', { name: 'Device keys' });
       await expect(
-        wallet.getByRole('heading', { name: 'E2E local device root · this device' }).first(),
+        deviceKeys.getByRole('heading', { name: 'E2E local device root · this device' }),
       ).toBeVisible();
-      await expect(wallet.getByText('Active device', { exact: true })).toBeVisible();
+      await expect(deviceKeys.getByText('Active device', { exact: true })).toBeVisible();
       await expect(
-        wallet.getByRole('heading', { name: 'E2E local device root', exact: true }),
+        rootKeys.getByRole('heading', { name: 'E2E local device root', exact: true }),
       ).toBeVisible();
+      await expect(
+        rootKeys.getByRole('heading', { name: 'E2E local device root · this device' }),
+      ).toHaveCount(0);
+      await expect(
+        deviceKeys.getByRole('heading', { name: 'E2E local device root', exact: true }),
+      ).toHaveCount(0);
     } finally {
       await localDeviceContext.close();
     }

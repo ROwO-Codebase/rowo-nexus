@@ -13,7 +13,7 @@ import type {
   ChallengeStore,
   DeviceLifecycleProvider,
   LifecycleProvider,
-  VerifiedDeviceSubject,
+  VerifiedRpDeviceOperation,
 } from './types.js';
 
 /**
@@ -62,9 +62,8 @@ async function verifyRpOperationV2Internal(
   proof: OwnershipProofV2,
   expected: VerificationExpectationV2,
   challengeStore: ChallengeStore,
-  lifecycle: LifecycleProvider,
   deviceLifecycle: DeviceLifecycleProvider,
-): Promise<VerifiedDeviceSubject> {
+): Promise<VerifiedRpDeviceOperation> {
   const verified = await verifyOwnershipProofV2(proof, expected);
 
   const challenge = await challengeStore.get(expected.nonce);
@@ -79,19 +78,14 @@ async function verifyRpOperationV2Internal(
     throw verificationError('NONCE_REPLAY_OR_EXPIRED');
   }
 
-  const identityStatus = await lifecycle.getAuthoritativeStatus(verified.subject);
-  if (identityStatus.state === 'not-found') throw verificationError('IDENTITY_NOT_FOUND');
-  if (identityStatus.state !== 'active') throw verificationError('IDENTITY_REVOKED');
-
   const deviceStatus = await deviceLifecycle.getAuthoritativeDeviceStatus(
     verified.subject,
     verified.deviceId,
     verified.authorizationId,
   );
   if (deviceStatus.state === 'not-found') throw verificationErrorV2('DEVICE_NOT_FOUND');
-  // The device status response is a combined snapshot. Requiring its identity
-  // component prevents an independently fetched stale v1-active result from
-  // overriding a current terminal identity revocation.
+  // The device response is one authoritative combined snapshot. Its identity
+  // component makes a separate, independently raced v1 status lookup redundant.
   if (deviceStatus.identityState !== 'active') throw verificationError('IDENTITY_REVOKED');
   if (deviceStatus.deviceId !== verified.deviceId) throw verificationErrorV2('WRONG_DEVICE');
   if (deviceStatus.authorizationId !== verified.authorizationId) {
@@ -108,24 +102,21 @@ async function verifyRpOperationV2Internal(
 
   const consumed = await challengeStore.consumeAtomically(expected.nonce);
   if (!consumed) throw verificationError('NONCE_REPLAY_OR_EXPIRED');
-  return verified;
+  return {
+    ...verified,
+    identitySequence: deviceStatus.identitySequence,
+    deviceLedgerSequence: deviceStatus.deviceLedgerSequence,
+  };
 }
 
 export async function verifyRpOperationV2(
   proof: OwnershipProofV2,
   expected: VerificationExpectationV2,
   challengeStore: ChallengeStore,
-  lifecycle: LifecycleProvider,
   deviceLifecycle: DeviceLifecycleProvider,
-): Promise<VerifiedDeviceSubject> {
+): Promise<VerifiedRpDeviceOperation> {
   try {
-    return await verifyRpOperationV2Internal(
-      proof,
-      expected,
-      challengeStore,
-      lifecycle,
-      deviceLifecycle,
-    );
+    return await verifyRpOperationV2Internal(proof, expected, challengeStore, deviceLifecycle);
   } catch (error) {
     rethrowVerificationErrorV2(error);
   }

@@ -6,6 +6,8 @@ const lifecycleService = `
   const signature = 'A'.repeat(86);
   const statusPrivateKey = 'MC4CAQAwBQYDK2VwBCIEIMWqjfQ_n4N77bdELzHct7Fm04U1B28JS4XOOi4LRFj3'; // gitleaks:allow -- fixed test-only Ed25519 fixture
   let deviceStatusMode = 'fresh';
+  let identityStatusRequests = 0;
+  let deviceStatusRequests = 0;
 
   const decode = (value) => Uint8Array.from(atob(value.replaceAll('-', '+').replaceAll('_', '/') + '='.repeat((4 - value.length % 4) % 4)), (character) => character.charCodeAt(0));
   const encode = (value) => btoa(String.fromCharCode(...value)).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/u, '');
@@ -29,7 +31,12 @@ const lifecycleService = `
         identities.clear();
         devices.clear();
         deviceStatusMode = 'fresh';
+        identityStatusRequests = 0;
+        deviceStatusRequests = 0;
         return Response.json({ ok: true });
+      }
+      if (url.pathname === '/__test/status-request-counts') {
+        return Response.json({ identity: identityStatusRequests, device: deviceStatusRequests });
       }
       if (url.pathname === '/__test/register') {
         identities.set(body.subject, { genesis: body.genesis, state: 'active' });
@@ -54,6 +61,7 @@ const lifecycleService = `
         return Response.json({ ok: true });
       }
       if (url.pathname === '/v2/device/status') {
+        deviceStatusRequests += 1;
         const device = devices.get(body.deviceId);
         if (!device || device.subject !== body.subject || device.authorizationId !== body.authorizationId) {
           return Response.json({ error: { code: 'DEVICE_NOT_FOUND', message: 'Not found.' } }, { status: 404 });
@@ -61,7 +69,11 @@ const lifecycleService = `
         const now = Math.floor(Date.now() / 1000);
         const identity = identities.get(body.subject);
         const identityState = identity?.state === 'active' ? 'active' : 'revoked';
-        const deviceState = deviceStatusMode === 'expiry-boundary' ? 'expired' : device.state;
+        const deviceState = identityState === 'revoked'
+          ? 'revoked'
+          : deviceStatusMode === 'expiry-boundary'
+            ? 'expired'
+            : device.state;
         const statementAuthorizationId = deviceStatusMode === 'wrong-tuple' ? 'nxa2_' + 'A'.repeat(43) : body.authorizationId;
         const issuedAt = deviceStatusMode === 'stale' ? now - 120 : now;
         const authorizationExpiresAt = deviceStatusMode === 'expiry-boundary' || deviceStatusMode === 'active-expiry-boundary' ? now : device.authorizationExpiresAt;
@@ -102,6 +114,7 @@ const lifecycleService = `
         });
       }
       if (url.pathname !== '/v1/identity/status') return new Response('Not Found', { status: 404 });
+      identityStatusRequests += 1;
       const identity = identities.get(body.subject);
       if (!identity) return Response.json({ error: { code: 'IDENTITY_NOT_FOUND', message: 'Not found.' } }, { status: 404 });
       const now = Math.floor(Date.now() / 1000);
